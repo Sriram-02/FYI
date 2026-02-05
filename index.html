@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0A0A0A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FYI">
+    <link rel="manifest" href="manifest.json">
+    <title>FYI</title>
+
+    <!-- Fonts: Cabinet Grotesk Variable for headlines, Satoshi for body -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@variable&display=swap" rel="stylesheet">
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Plausible Analytics - Privacy-friendly usage tracking -->
+    <!-- Replace YOUR_DOMAIN with your Plausible domain after signing up at plausible.io -->
+    <script defer data-domain="YOUR_DOMAIN" src="https://plausible.io/js/script.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">
+                ☰
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div class="dropdown-menu" id="dropdownMenu">
+                <button class="dropdown-item" id="whatIsFYIBtn">What is FYI</button>
+                <button class="dropdown-item" id="ourPhilosophyBtn">Our Philosophy</button>
+            </div>
+
+            <div class="header-logo" id="headerLogo" aria-label="Go to first story">
+                <span class="logo-fallback">
+                    <span class="logo-text"><span class="fyi-text">FYI</span><span class="fyi-dot">.</span></span>
+                </span>
+            </div>
+
+            <button class="header-action" id="themeToggle" aria-label="Toggle theme">
+                <svg class="icon-sun" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg class="icon-moon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- Date Display -->
+        <div class="date-display" id="dateDisplay">
+            <!-- Date will be injected by JS -->
+        </div>
+
+        <!-- Progress Dots -->
+        <div class="progress-dots" id="progressDots">
+            <!-- Dots will be injected by JS -->
+        </div>
+
+        <!-- Pull to Refresh Indicator -->
+        <div class="pull-indicator" id="pullIndicator">
+            <div class="pull-spinner"></div>
+            <span class="pull-text">Release to refresh</span>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Loading today's stories...</p>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="main-content" id="mainContent">
+            <!-- Today Section -->
+            <section class="section section-today active" id="sectionToday">
+                <div class="card-container" id="cardContainer">
+                    <!-- Cards will be injected here -->
+                </div>
+
+                <!-- No Stories State -->
+                <div class="empty-state" id="noStoriesState">
+                    <div class="empty-icon">📰</div>
+                    <h2 class="empty-title">No stories for today yet</h2>
+                    <p class="empty-text">Check back later — new stories are added daily.</p>
+                    <button class="refresh-button" id="emptyRefreshBtn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+
+                <!-- Completion Screen -->
+                <div class="completion-screen" id="completionScreen">
+                    <div class="completion-content">
+                        <div class="completion-icon">✨</div>
+                        <h2 class="completion-title">You're all caught up</h2>
+                        <p class="completion-subtitle">That's your daily dose of critical thinking.</p>
+
+                        <button class="secondary-button" id="reviewStoriesBtn">
+                            <span>Review Stories</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Swipe Hint -->
+                <div class="swipe-hint" id="swipeHint">
+                    <div class="swipe-hint-content">
+                        <span class="swipe-arrow">←</span>
+                        <span>Swipe to browse</span>
+                        <span class="swipe-arrow">→</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History Section -->
+            <section class="section section-history" id="sectionHistory">
+                <div class="section-header">
+                    <button class="back-button" id="historyBackBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"/>
+                        </svg>
+                        <span>Back</span>
+                    </button>
+                    <h2 class="section-title">Questions You've Been Curious About</h2>
+                </div>
+                <div class="history-list" id="historyList">
+                    <!-- History items will be injected -->
+                </div>
+                <div class="empty-state" id="historyEmpty">
+                    <div class="empty-icon">💭</div>
+                    <h3 class="empty-title">No questions explored yet</h3>
+                    <p class="empty-text">Tap on questions in stories to see answers — they'll appear here.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- History Toggle Button -->
+        <button class="history-toggle" id="historyToggle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>Your Questions</span>
+        </button>
+
+        <!-- Q&A Modal -->
+        <div class="modal-backdrop" id="modalBackdrop">
+            <div class="modal" id="qaModal">
+                <div class="modal-drag-hint">
+                    <div class="drag-bar"></div>
+                    <span class="drag-text">Swipe down to return</span>
+                </div>
+
+                <button class="modal-close" id="modalClose">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+
+                <!-- Q&A View -->
+                <div class="modal-view" id="qaView">
+                    <div class="modal-header">
+                        <span class="modal-emoji" id="modalEmoji"></span>
+                        <h2 class="modal-headline" id="modalHeadline"></h2>
+                    </div>
+                    <p class="modal-subheading">Are you curious about:</p>
+                    <div class="questions-container" id="questionsContainer">
+                        <!-- Questions will be injected -->
+                    </div>
+                </div>
+
+                <!-- Answer View -->
+                <div class="modal-view hidden" id="answerView">
+                    <div class="answer-header">
+                        <span class="answer-label" id="answerLabel">A</span>
+                        <p class="answer-question" id="answerQuestion"></p>
+                    </div>
+                    <div class="answer-content">
+                        <p class="answer-text" id="answerText"></p>
+                    </div>
+                    <div class="rating-section">
+                        <p class="rating-label">Was this helpful?</p>
+                        <div class="star-rating" id="starRating">
+                            <span class="star" data-rating="1">★</span>
+                            <span class="star" data-rating="2">★</span>
+                            <span class="star" data-rating="3">★</span>
+                            <span class="star" data-rating="4">★</span>
+                            <span class="star" data-rating="5">★</span>
+                        </div>
+                    </div>
+                    <div class="answer-actions">
+                        <button class="action-button primary" id="doneBtn">
+                            <span>Done</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div class="toast" id="toast">
+            <span class="toast-icon" id="toastIcon">✓</span>
+            <span class="toast-message" id="toastMessage"></span>
+        </div>
+
+        <!-- Info Modal: What is FYI -->
+        <div class="info-modal-backdrop" id="whatIsFYIModal">
+            <div class="info-modal">
+                <button class="info-modal-close" id="whatIsFYIClose">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <h2 class="info-modal-title">What is FYI</h2>
+                <p class="info-modal-content">FYI is your daily briefing designed for the curious mind. Each morning, we surface 3 stories that matter—and more importantly, we help you question them. Because knowing what happened is just the start. Understanding why it matters is where insight begins.</p>
+            </div>
+        </div>
+
+        <!-- Info Modal: Our Philosophy -->
+        <div class="info-modal-backdrop" id="ourPhilosophyModal">
+            <div class="info-modal">
+                <button class="info-modal-close" id="ourPhilosophyClose">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <h2 class="info-modal-title">Our Philosophy</h2>
+                <p class="info-modal-content">We believe news should make you smarter, not just busier. Traditional news tells you what happened. We go further—we help you ask the questions experts would ask: What's the real incentive here? Who benefits from this narrative? What are they not saying?<br><br>FYI is built for people who want to think critically about the world, not just consume headlines. Three stories. Three minutes. One sharper perspective.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

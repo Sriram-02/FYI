@@ -1,0 +1,65 @@
+{
+    "name": "FYI",
+    "short_name": "FYI",
+    "description": "Your daily briefing for the curious mind. Three stories, three minutes, one sharper perspective.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0A0A0A",
+    "theme_color": "#0A0A0A",
+    "orientation": "portrait",
+    "scope": "/",
+    "lang": "en",
+    "categories": ["news", "education"],
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%230A0A0A' width='512' height='512' rx='100'/><text y='340' x='256' text-anchor='middle' font-size='280'>⚡</text></svg>",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%230A0A0A' width='512' height='512' rx='100'/><text y='340' x='256' text-anchor='middle' font-size='280'>⚡</text></svg>",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "maskable"
+        },
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%230A0A0A' width='192' height='192' rx='40'/><text y='130' x='96' text-anchor='middle' font-size='100'>⚡</text></svg>",
+            "sizes": "192x192",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 144 144'><rect fill='%230A0A0A' width='144' height='144' rx='30'/><text y='100' x='72' text-anchor='middle' font-size='80'>⚡</text></svg>",
+            "sizes": "144x144",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 844'><rect fill='%230A0A0A' width='390' height='844'/><rect fill='%231A1A1A' x='20' y='100' width='350' height='400' rx='24'/><text fill='white' x='40' y='180' font-size='48'>📉</text><text fill='white' x='40' y='260' font-size='28' font-weight='bold'>Gold Prices Crash</text></svg>",
+            "sizes": "390x844",
+            "type": "image/svg+xml",
+            "form_factor": "narrow",
+            "label": "Story cards view"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Today's Stories",
+            "short_name": "Stories",
+            "description": "View today's FYI stories",
+            "url": "/",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%23DA7756' width='96' height='96' rx='20'/><text y='65' x='48' text-anchor='middle' font-size='50'>📰</text></svg>",
+                    "sizes": "96x96",
+                    "type": "image/svg+xml"
+                }
+            ]
+        }
+    ],
+    "related_applications": [],
+    "prefer_related_applications": false
+}
