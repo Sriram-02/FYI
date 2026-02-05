@@ -120,22 +120,36 @@ const fallbackStories = [
         emoji: "📉",
         headline: "Gold Prices Crash After Heavy Liquidation",
         teaser: "Investors are booking profits after gold hit record highs, triggering algorithmic selling and a sharp correction in global markets. This market behavior reveals the psychology behind profit-taking and the technical levels that matter to institutional traders. Central banks continue accumulating while retail investors panic—creating an interesting divergence in market sentiment.",
+        summary: "Gold prices fell sharply as investors took profits after the precious metal hit record highs near $2,450/oz. The sell-off was accelerated by algorithmic trading and institutional limit orders set at psychological price barriers. Despite the correction, central banks—particularly in Asia—continue accumulating gold reserves, signaling long-term confidence in the asset as a hedge against economic uncertainty.",
         imageUrl: "",
         questions: [
             {
                 label: "✦",
                 text: "Why are investors selling NOW after gold hit records?",
-                answer: "Classic profit-taking psychology. Gold touched $2,450/oz—a psychological barrier that triggered algorithmic selling. Large institutional investors had set limit orders at this level months ago. Additionally, recent Fed signals suggesting delayed rate cuts reduced gold's appeal as a hedge. When momentum traders see others exiting, FOMO works in reverse."
+                answer: "Classic profit-taking psychology. Gold touched $2,450/oz—a psychological barrier that triggered algorithmic selling. Large institutional investors had set limit orders at this level months ago. Additionally, recent Fed signals suggesting delayed rate cuts reduced gold's appeal as a hedge. When momentum traders see others exiting, FOMO works in reverse.",
+                deepQuestions: [
+                    { text: "What makes $2,450 a psychological barrier?", answer: "Round numbers act as mental anchors for traders. Institutions set automatic sell orders at these levels, and when multiple orders trigger simultaneously, it creates a cascade effect. This is why you see sharp movements at price points like $2,000, $2,250, and $2,500." },
+                    { text: "How do algorithmic traders impact gold prices?", answer: "Algorithms now account for 60-70% of trading volume. They detect patterns and execute trades in milliseconds. When algorithms sense selling momentum, they amplify it by front-running expected price drops, creating self-fulfilling prophecies." },
+                    { text: "Why does Fed policy affect gold so much?", answer: "Gold doesn't pay interest or dividends. When the Fed keeps rates high, bonds become more attractive alternatives. Gold's appeal increases when real interest rates (adjusted for inflation) are low or negative, making holding gold less costly compared to interest-bearing assets." }
+                ]
             },
             {
                 label: "✦",
                 text: "Does this mean gold isn't safe anymore?",
-                answer: "Not at all—this is normal market behavior, not a fundamental shift. Gold remains the ultimate crisis hedge. What we're seeing is a technical correction after a 15% rally. Long-term holders aren't selling; it's primarily short-term traders and algorithms. Central banks, especially in Asia, continue accumulating."
+                answer: "Not at all—this is normal market behavior, not a fundamental shift. Gold remains the ultimate crisis hedge. What we're seeing is a technical correction after a 15% rally. Long-term holders aren't selling; it's primarily short-term traders and algorithms. Central banks, especially in Asia, continue accumulating.",
+                deepQuestions: [
+                    { text: "What's the difference between a correction and a crash?", answer: "A correction is typically a 10-20% decline from recent highs and is considered healthy market behavior. A crash implies a sudden, severe decline (20%+) often driven by panic. This gold movement is firmly in correction territory—normal after any strong rally." },
+                    { text: "Why are central banks still buying gold?", answer: "Central banks are diversifying away from US dollar reserves due to geopolitical risks and inflation concerns. China, Russia, and Turkey have been major buyers. Gold offers protection against currency devaluation and can't be sanctioned or frozen like foreign currency reserves." }
+                ]
             },
             {
                 label: "✦",
                 text: "How is USD recovering with Trump chaos?",
-                answer: "Counterintuitively, political uncertainty often strengthens the dollar short-term. Global investors flee to USD-denominated assets during volatility—it's still the world's reserve currency. Meanwhile, other major economies face their own issues: Europe's stagnation, China's property crisis, Japan's weak yen."
+                answer: "Counterintuitively, political uncertainty often strengthens the dollar short-term. Global investors flee to USD-denominated assets during volatility—it's still the world's reserve currency. Meanwhile, other major economies face their own issues: Europe's stagnation, China's property crisis, Japan's weak yen.",
+                deepQuestions: [
+                    { text: "Why do investors run TO the dollar during US political chaos?", answer: "It's the 'cleanest dirty shirt' phenomenon. Despite domestic turmoil, US markets remain the deepest and most liquid globally. Treasury bonds are still considered the safest assets. When uncertainty hits anywhere, the reflex is to buy dollars first, ask questions later." },
+                    { text: "Could another currency replace the dollar?", answer: "Not soon. The dollar represents 60% of global reserves and 88% of forex trades. No alternative has the liquidity, legal framework, or trust. China's yuan has capital controls, Europe lacks unified fiscal policy, and crypto is too volatile. Change would take decades, not years." }
+                ]
             }
         ]
     },
@@ -145,22 +159,35 @@ const fallbackStories = [
         emoji: "🤝",
         headline: "India-UAE Sign Nuclear, Defence, Trade Pacts",
         teaser: "A landmark strategic partnership bundles nuclear cooperation, defense agreements, and trade access into one comprehensive deal. The diplomatic move creates powerful interdependencies between both nations that extend far beyond traditional bilateral relations. This agreement signals a major shift in Middle East power dynamics and energy security frameworks.",
+        summary: "India and the UAE signed a comprehensive strategic partnership covering nuclear energy cooperation, defense technology sharing, and expanded trade access. The deal includes training for UAE nuclear engineers and potential export of Indian defense systems like BrahMos missiles. This bundled approach creates mutual dependencies that strengthen bilateral ties and positions both nations advantageously in the evolving Middle East power structure.",
         imageUrl: "",
         questions: [
             {
                 label: "✦",
                 text: "Why bundle nuclear + defense + trade together?",
-                answer: "It's diplomatic leverage maximization. Bundling creates interdependencies that make either party think twice before souring relations. If UAE wants nuclear cooperation, they commit to defense purchases. If India wants trade access, they share technology. Each component serves as insurance for the others."
+                answer: "It's diplomatic leverage maximization. Bundling creates interdependencies that make either party think twice before souring relations. If UAE wants nuclear cooperation, they commit to defense purchases. If India wants trade access, they share technology. Each component serves as insurance for the others.",
+                deepQuestions: [
+                    { text: "Is this bundling strategy common in international deals?", answer: "Yes, it's called 'package diplomacy.' The US does it with arms sales tied to political alignment. China's Belt and Road bundles infrastructure with resource access. The strategy reduces the risk of one-sided agreements and creates lasting partnerships." },
+                    { text: "What does India gain from this specific bundle?", answer: "India gets a reliable energy partner, a major defense export market, and preferential trade terms. UAE's oil-rich economy provides investment capital India needs. The defense sales boost India's 'Make in India' initiative and establish it as a credible arms exporter." }
+                ]
             },
             {
                 label: "✦",
                 text: "Since when does UAE have nuclear capability?",
-                answer: "UAE's Barakah Nuclear Power Plant went operational in 2020—the first in the Arab world. They're not building weapons; this is about clean energy. The country aims for 25% nuclear power by 2030. India's cooperation involves training UAE engineers and potentially supplying components."
+                answer: "UAE's Barakah Nuclear Power Plant went operational in 2020—the first in the Arab world. They're not building weapons; this is about clean energy. The country aims for 25% nuclear power by 2030. India's cooperation involves training UAE engineers and potentially supplying components.",
+                deepQuestions: [
+                    { text: "Why would an oil-rich country need nuclear power?", answer: "Forward-thinking energy policy. UAE knows oil is finite and faces climate pressure. Nuclear provides baseload power for industry and desalination. Using oil for export rather than domestic consumption maximizes revenue. It's also about prestige and technological advancement." },
+                    { text: "Is there any weapons proliferation risk here?", answer: "UAE signed the 'gold standard' 123 Agreement with the US, explicitly renouncing enrichment and reprocessing. They import fuel and return spent rods. The IAEA monitors closely. This is genuinely a civilian energy program—among the most transparent globally." }
+                ]
             },
             {
                 label: "✦",
                 text: "Why UAE and not Russia for defense?",
-                answer: "Russia's Ukraine situation changed everything. Their weapons are now battle-tested—and found wanting. Export capacity dropped as they prioritize domestic needs. Western sanctions complicate spare parts. India offers a middle path: proven systems like BrahMos missiles, no sanctions risk."
+                answer: "Russia's Ukraine situation changed everything. Their weapons are now battle-tested—and found wanting. Export capacity dropped as they prioritize domestic needs. Western sanctions complicate spare parts. India offers a middle path: proven systems like BrahMos missiles, no sanctions risk.",
+                deepQuestions: [
+                    { text: "How has Ukraine changed perceptions of Russian weapons?", answer: "Russian tanks, aircraft, and air defense systems have shown vulnerabilities against Western weapons. The vaunted T-90 tanks proved vulnerable to Javelins. Their inability to achieve air superiority raised questions about their aircraft. Buyers now question if they're getting reliable technology." },
+                    { text: "What makes Indian defense equipment attractive?", answer: "India offers a 'non-aligned' option—no political strings attached. BrahMos missiles are genuinely world-class (fastest cruise missiles). Indian equipment often incorporates both Russian and Western technology, offering a unique hybrid. Pricing is competitive with generous financing." }
+                ]
             }
         ]
     },
@@ -170,22 +197,35 @@ const fallbackStories = [
         emoji: "🤖",
         headline: "India Sets Up AI Task Force for Vulnerabilities",
         teaser: "The government has established a dedicated committee to assess AI model risks and develop regulatory frameworks for emerging technologies. This move positions India in the global conversation on AI governance alongside the EU and US, while balancing innovation incentives with safety concerns. The task force includes experts from major tech companies and academic institutions.",
+        summary: "India formed a dedicated AI task force to assess vulnerabilities in AI models and develop appropriate regulatory frameworks. The committee includes experts from Google DeepMind, Microsoft Research India, and leading academic institutions. With a 6-month deadline for initial recommendations, India aims to establish its voice in global AI governance while balancing innovation with safety—particularly focusing on challenges unique to its context like misinformation in local languages.",
         imageUrl: "",
         questions: [
             {
                 label: "✦",
                 text: "Does India even have AI expertise for this?",
-                answer: "More than people assume. India has the world's second-largest AI talent pool after the US. IITs and IISc produce top researchers; many return from Silicon Valley. The task force includes people from Google DeepMind, Microsoft Research India, and TCS Research."
+                answer: "More than people assume. India has the world's second-largest AI talent pool after the US. IITs and IISc produce top researchers; many return from Silicon Valley. The task force includes people from Google DeepMind, Microsoft Research India, and TCS Research.",
+                deepQuestions: [
+                    { text: "Why does India have such a large AI talent pool?", answer: "It's the engineering education infrastructure. India produces 1.5 million engineering graduates annually. Top IITs are globally competitive. Plus, the Indian diaspora in Silicon Valley creates a reverse brain drain as senior researchers return to lead labs at Google, Microsoft, and Amazon in India." },
+                    { text: "How does India's AI research compare globally?", answer: "India ranks 5th globally in AI research publications. Indian researchers have contributed to major breakthroughs in NLP (particularly multilingual models), computer vision, and AI for healthcare. The gap is in funding and compute resources rather than talent." }
+                ]
             },
             {
                 label: "✦",
                 text: "Will this just be another 3-year report nobody reads?",
-                answer: "Valid skepticism, but timing matters. Unlike past tech committees, AI regulation has global urgency—EU's AI Act, Biden's executive order, China's rules. India can't afford to be left out of standard-setting. The task force has a 6-month deadline for initial recommendations."
+                answer: "Valid skepticism, but timing matters. Unlike past tech committees, AI regulation has global urgency—EU's AI Act, Biden's executive order, China's rules. India can't afford to be left out of standard-setting. The task force has a 6-month deadline for initial recommendations.",
+                deepQuestions: [
+                    { text: "What's different about this task force?", answer: "Three things: tight deadline (6 months vs typical 2-3 years), industry participation (not just bureaucrats), and clear mandate (actionable recommendations, not just observations). The pressure from global AI regulation race adds external accountability." },
+                    { text: "How has India's past tech regulation performed?", answer: "Mixed. IT Act 2000 was forward-thinking. Data Protection Bill took 5 years and multiple drafts. Digital India initiatives moved fast. The pattern suggests urgency and industry involvement correlate with better outcomes—both present here." }
+                ]
             },
             {
                 label: "✦",
                 text: "Why not outsource to EU? They're ahead on regulation",
-                answer: "EU's AI Act is designed for European values and market structures—privacy-first, precautionary principle, heavy compliance costs. India's priorities differ: enabling AI adoption for development, protecting against misinformation in local languages, and maintaining tech sovereignty."
+                answer: "EU's AI Act is designed for European values and market structures—privacy-first, precautionary principle, heavy compliance costs. India's priorities differ: enabling AI adoption for development, protecting against misinformation in local languages, and maintaining tech sovereignty.",
+                deepQuestions: [
+                    { text: "What are India-specific AI challenges?", answer: "Misinformation in 22 official languages (EU deals with ~24 but lower linguistic diversity), deepfakes in elections with 900 million voters, AI for agricultural advisories to 120 million farmers, and bias in systems trained predominantly on Western data. Generic Western frameworks don't address these." },
+                    { text: "What does 'tech sovereignty' mean for AI?", answer: "It means not depending on foreign-controlled AI systems for critical applications. India wants domestic capability in foundational AI models, control over training data, and the ability to audit systems used in governance. It's about strategic autonomy, not isolation." }
+                ]
             }
         ]
     }
@@ -233,6 +273,7 @@ const state = {
     currentIndex: 0,
     totalStories: 0,
     currentStory: null,
+    currentQuestion: null, // Track current Q&A question for Dig Deeper
     currentSection: 'today',
     isDragging: false,
     startX: 0,
@@ -244,7 +285,9 @@ const state = {
     history: [],
     theme: 'dark',
     isLoading: true,
-    viewedStories: []
+    viewedStories: [],
+    longPressTimer: null,
+    isLongPress: false
 };
 
 // ==========================================
@@ -306,6 +349,23 @@ function cacheElements() {
     elements.toast = document.getElementById('toast');
     elements.toastIcon = document.getElementById('toastIcon');
     elements.toastMessage = document.getElementById('toastMessage');
+
+    // Summary Modal
+    elements.summaryModalBackdrop = document.getElementById('summaryModalBackdrop');
+    elements.summaryModal = document.getElementById('summaryModal');
+    elements.summaryModalClose = document.getElementById('summaryModalClose');
+    elements.summaryModalHeadline = document.getElementById('summaryModalHeadline');
+    elements.summaryModalText = document.getElementById('summaryModalText');
+
+    // Dig Deeper
+    elements.digDeeperBtn = document.getElementById('digDeeperBtn');
+    elements.digDeeperView = document.getElementById('digDeeperView');
+    elements.deepQuestionsContainer = document.getElementById('deepQuestionsContainer');
+    elements.deepAnswerView = document.getElementById('deepAnswerView');
+    elements.deepAnswerQuestion = document.getElementById('deepAnswerQuestion');
+    elements.deepAnswerText = document.getElementById('deepAnswerText');
+    elements.backToDeepQuestionsBtn = document.getElementById('backToDeepQuestionsBtn');
+    elements.deepDoneBtn = document.getElementById('deepDoneBtn');
 }
 
 // ==========================================
@@ -490,33 +550,72 @@ function parseCSV(csvText) {
     // Parse header row
     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim().replace(/\s+/g, ' '));
 
-    // Expected column structure:
-    // Date, Headline, Teaser, Question 1, Question 2, Question 3, Question 4, Answer 1, Answer 2, Answer 3, Banner Image URL
-    // Note: Question 4 is always "Skip this story" and has no answer
+    // Expected column structure (28 columns):
+    // 0: Date, 1: Headline, 2: Teaser, 3: Summary
+    // 4: Question 1, 5: Question 2, 6: Question 3, 7: Question 4
+    // 8: Answer 1, 9: Answer 2, 10: Answer 3
+    // 11-13: Q1-Deep1, Q1-Deep2, Q1-Deep3
+    // 14-16: A1-Deep1, A1-Deep2, A1-Deep3
+    // 17-19: Q2-Deep1, Q2-Deep2, Q2-Deep3
+    // 20-22: A2-Deep1, A2-Deep2, A2-Deep3
+    // 23-25: Q3-Deep1, Q3-Deep2, Q3-Deep3
+    // 26-28: A3-Deep1, A3-Deep2, A3-Deep3
+    // 29: Banner Image URL
 
     // Map expected headers to indices
     const headerMap = {};
-    const expectedHeaders = ['date', 'headline', 'teaser', 'question 1', 'question 2', 'question 3', 'question 4', 'answer 1', 'answer 2', 'answer 3', 'banner image url'];
 
     headers.forEach((header, index) => {
-        // Normalize header for matching
-        const normalized = header.replace(/[^a-z0-9\s]/g, '').trim();
-        expectedHeaders.forEach(expected => {
-            if (normalized === expected || header.includes(expected) || expected.includes(normalized)) {
-                headerMap[expected] = index;
-            }
-        });
-        // Also check for exact matches
-        if (header === 'date') headerMap['date'] = index;
-        if (header === 'headline') headerMap['headline'] = index;
-        if (header === 'teaser') headerMap['teaser'] = index;
-        if (header.includes('question 1') || header === 'question1') headerMap['question 1'] = index;
-        if (header.includes('question 2') || header === 'question2') headerMap['question 2'] = index;
-        if (header.includes('question 3') || header === 'question3') headerMap['question 3'] = index;
-        if (header.includes('question 4') || header === 'question4') headerMap['question 4'] = index;
-        if (header.includes('answer 1') || header === 'answer1') headerMap['answer 1'] = index;
-        if (header.includes('answer 2') || header === 'answer2') headerMap['answer 2'] = index;
-        if (header.includes('answer 3') || header === 'answer3') headerMap['answer 3'] = index;
+        const normalized = header.replace(/[^a-z0-9\s-]/g, '').trim();
+
+        // Core fields
+        if (header === 'date' || normalized === 'date') headerMap['date'] = index;
+        if (header === 'headline' || normalized === 'headline') headerMap['headline'] = index;
+        if (header === 'teaser' || normalized === 'teaser') headerMap['teaser'] = index;
+        if (header === 'summary' || normalized === 'summary') headerMap['summary'] = index;
+
+        // Questions 1-4
+        if (header.includes('question 1') || normalized === 'question 1') headerMap['question 1'] = index;
+        if (header.includes('question 2') || normalized === 'question 2') headerMap['question 2'] = index;
+        if (header.includes('question 3') || normalized === 'question 3') headerMap['question 3'] = index;
+        if (header.includes('question 4') || normalized === 'question 4') headerMap['question 4'] = index;
+
+        // Answers 1-3
+        if (header.includes('answer 1') || normalized === 'answer 1') headerMap['answer 1'] = index;
+        if (header.includes('answer 2') || normalized === 'answer 2') headerMap['answer 2'] = index;
+        if (header.includes('answer 3') || normalized === 'answer 3') headerMap['answer 3'] = index;
+
+        // Deep questions for Q1
+        if (header.includes('q1-deep1') || normalized === 'q1-deep1') headerMap['q1-deep1'] = index;
+        if (header.includes('q1-deep2') || normalized === 'q1-deep2') headerMap['q1-deep2'] = index;
+        if (header.includes('q1-deep3') || normalized === 'q1-deep3') headerMap['q1-deep3'] = index;
+
+        // Deep answers for Q1
+        if (header.includes('a1-deep1') || normalized === 'a1-deep1') headerMap['a1-deep1'] = index;
+        if (header.includes('a1-deep2') || normalized === 'a1-deep2') headerMap['a1-deep2'] = index;
+        if (header.includes('a1-deep3') || normalized === 'a1-deep3') headerMap['a1-deep3'] = index;
+
+        // Deep questions for Q2
+        if (header.includes('q2-deep1') || normalized === 'q2-deep1') headerMap['q2-deep1'] = index;
+        if (header.includes('q2-deep2') || normalized === 'q2-deep2') headerMap['q2-deep2'] = index;
+        if (header.includes('q2-deep3') || normalized === 'q2-deep3') headerMap['q2-deep3'] = index;
+
+        // Deep answers for Q2
+        if (header.includes('a2-deep1') || normalized === 'a2-deep1') headerMap['a2-deep1'] = index;
+        if (header.includes('a2-deep2') || normalized === 'a2-deep2') headerMap['a2-deep2'] = index;
+        if (header.includes('a2-deep3') || normalized === 'a2-deep3') headerMap['a2-deep3'] = index;
+
+        // Deep questions for Q3
+        if (header.includes('q3-deep1') || normalized === 'q3-deep1') headerMap['q3-deep1'] = index;
+        if (header.includes('q3-deep2') || normalized === 'q3-deep2') headerMap['q3-deep2'] = index;
+        if (header.includes('q3-deep3') || normalized === 'q3-deep3') headerMap['q3-deep3'] = index;
+
+        // Deep answers for Q3
+        if (header.includes('a3-deep1') || normalized === 'a3-deep1') headerMap['a3-deep1'] = index;
+        if (header.includes('a3-deep2') || normalized === 'a3-deep2') headerMap['a3-deep2'] = index;
+        if (header.includes('a3-deep3') || normalized === 'a3-deep3') headerMap['a3-deep3'] = index;
+
+        // Banner Image URL
         if (header.includes('banner') || header.includes('image url')) headerMap['banner image url'] = index;
     });
 
@@ -534,26 +633,49 @@ function parseCSV(csvText) {
             return (values[idx] || '').trim();
         };
 
-        // Build story object using the exact column structure
+        // Process image URL - handle relative paths from /images/ folder
+        let imageUrl = getValue('banner image url', 27);
+        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+            // Assume it's a filename in the /images/ folder
+            imageUrl = `/images/${imageUrl}`;
+        }
+
+        // Build story object using the 28-column structure
         const story = {
             id: i,
             date: getValue('date', 0),
             emoji: '📰', // No emoji column - use default
             headline: getValue('headline', 1),
             teaser: getValue('teaser', 2),
-            imageUrl: getValue('banner image url', 10),
+            summary: getValue('summary', 3),
+            imageUrl: imageUrl,
             questions: []
         };
 
-        // Parse questions 1-3 (Question 4 is skip, handled separately in modal)
+        // Parse questions 1-3 with their deep dive questions
         for (let q = 1; q <= 3; q++) {
-            const question = getValue(`question ${q}`, 2 + q);
-            const answer = getValue(`answer ${q}`, 6 + q);
+            const question = getValue(`question ${q}`, 3 + q);
+            const answer = getValue(`answer ${q}`, 7 + q);
+
             if (question && question.trim() && answer && answer.trim()) {
+                // Build deep dive questions array
+                const deepQuestions = [];
+                for (let d = 1; d <= 3; d++) {
+                    const deepQ = getValue(`q${q}-deep${d}`, -1);
+                    const deepA = getValue(`a${q}-deep${d}`, -1);
+                    if (deepQ && deepQ.trim() && deepA && deepA.trim()) {
+                        deepQuestions.push({
+                            text: deepQ.trim(),
+                            answer: deepA.trim()
+                        });
+                    }
+                }
+
                 story.questions.push({
                     label: '✦',
                     text: question.trim(),
-                    answer: answer.trim()
+                    answer: answer.trim(),
+                    deepQuestions: deepQuestions
                 });
             }
         }
@@ -709,38 +831,50 @@ function createCardElement(story, position) {
 
 function setupCardInteractions(card, story) {
     // Touch events
-    card.addEventListener('touchstart', (e) => handleDragStart(e, card), { passive: true });
+    card.addEventListener('touchstart', (e) => handleDragStart(e, card, story), { passive: true });
     card.addEventListener('touchmove', (e) => handleDragMove(e, card), { passive: false });
     card.addEventListener('touchend', (e) => handleDragEnd(e, card, story));
 
     // Mouse events for desktop
-    card.addEventListener('mousedown', (e) => handleDragStart(e, card));
+    card.addEventListener('mousedown', (e) => handleDragStart(e, card, story));
     card.addEventListener('mousemove', (e) => handleDragMove(e, card));
     card.addEventListener('mouseup', (e) => handleDragEnd(e, card, story));
     card.addEventListener('mouseleave', (e) => {
+        clearLongPressTimer();
         if (state.isDragging) handleDragEnd(e, card, story);
     });
 
-    // Click/tap to open
-    card.addEventListener('click', (e) => {
-        if (!state.isDragging && Math.abs(state.currentX) < 10) {
-            triggerHaptic('light');
-            openModal(story);
-        }
-    });
+    // Tap opens Summary Modal (handled in handleDragEnd when no swipe detected)
 }
 
 // ==========================================
 // Drag/Swipe Handling
 // ==========================================
 
-function handleDragStart(e, card) {
+function handleDragStart(e, card, story) {
     state.isDragging = true;
+    state.isLongPress = false;
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
     state.startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
     state.currentX = 0;
     card.classList.add('dragging');
     hideSwipeHint();
+
+    // Start long press timer (500-700ms)
+    clearLongPressTimer();
+    state.longPressTimer = setTimeout(() => {
+        if (!state.isDragging || Math.abs(state.currentX) > 10) return;
+        state.isLongPress = true;
+        triggerHaptic('heavy'); // Strong haptic for long press
+        openSummaryModal(story);
+    }, 600); // 600ms for long press
+}
+
+function clearLongPressTimer() {
+    if (state.longPressTimer) {
+        clearTimeout(state.longPressTimer);
+        state.longPressTimer = null;
+    }
 }
 
 function handleDragMove(e, card) {
@@ -751,6 +885,11 @@ function handleDragMove(e, card) {
 
     const deltaX = clientX - state.startX;
     const deltaY = clientY - state.startY;
+
+    // Cancel long press if user moves finger
+    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+        clearLongPressTimer();
+    }
 
     if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaX) < 10) {
         return;
@@ -774,25 +913,44 @@ function handleDragMove(e, card) {
 function handleDragEnd(e, card, story) {
     if (!state.isDragging) return;
 
+    clearLongPressTimer();
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right');
 
     const deltaX = state.currentX;
 
+    // If long press was triggered, don't do anything else
+    if (state.isLongPress) {
+        state.isLongPress = false;
+        card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+        card.style.transform = 'translateX(0) rotate(0) scale(1)';
+        setTimeout(() => { card.style.transition = ''; }, 300);
+        state.currentX = 0;
+        return;
+    }
+
     if (Math.abs(deltaX) > state.dragThreshold) {
         triggerHaptic('medium');
         if (deltaX > 0) {
-            // Swipe right: Open modal WITHOUT removing card yet
+            // Swipe RIGHT: Open Q&A modal WITHOUT removing card yet
             // Card stays in place, modal opens on top
             card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
             card.style.transform = 'translateX(0) rotate(0) scale(1)';
             setTimeout(() => { card.style.transition = ''; }, 300);
             openModal(story);
         } else {
-            // Swipe left: Skip to next card
+            // Swipe LEFT: Skip to next card
             animateCardExit(card, 'left', () => nextCard());
         }
+    } else if (Math.abs(deltaX) < 10) {
+        // TAP: Open Summary Modal
+        triggerHaptic('light');
+        openSummaryModal(story);
+        card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+        card.style.transform = 'translateX(0) rotate(0) scale(1)';
+        setTimeout(() => { card.style.transition = ''; }, 300);
     } else {
+        // Small drag, snap back
         card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
         card.style.transform = 'translateX(0) rotate(0) scale(1)';
         setTimeout(() => { card.style.transition = ''; }, 300);
@@ -985,6 +1143,9 @@ function setupModalSwipe() {
 function showAnswer(question) {
     addToHistory(state.currentStory, question);
 
+    // Store current question for Dig Deeper feature
+    state.currentQuestion = question;
+
     // Track question clicked
     trackQuestionClicked(state.currentStory.headline, question.text);
 
@@ -999,6 +1160,12 @@ function showAnswer(question) {
         elements.answerQuestion.textContent = question.text;
         elements.answerText.textContent = question.answer;
 
+        // Show/hide Dig Deeper button based on availability
+        const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
+        if (elements.digDeeperBtn) {
+            elements.digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
+        }
+
         resetStars();
 
         setTimeout(() => {
@@ -1008,18 +1175,38 @@ function showAnswer(question) {
 }
 
 function showQAView() {
-    elements.answerView.classList.add('fade-out');
+    // Hide all other views first
+    const hideViews = [elements.answerView, elements.digDeeperView, elements.deepAnswerView].filter(v => v);
 
-    setTimeout(() => {
-        elements.answerView.classList.add('hidden');
-        elements.answerView.classList.remove('fade-out');
-        elements.qaView.classList.remove('hidden');
-        elements.qaView.classList.add('fade-in');
+    // Find which view is currently visible
+    const visibleView = hideViews.find(v => !v.classList.contains('hidden'));
+
+    if (visibleView) {
+        visibleView.classList.add('fade-out');
 
         setTimeout(() => {
-            elements.qaView.classList.remove('fade-in');
-        }, 300);
-    }, 200);
+            // Hide all views
+            hideViews.forEach(v => {
+                v.classList.add('hidden');
+                v.classList.remove('fade-out', 'fade-in');
+            });
+
+            // Show Q&A view
+            elements.qaView.classList.remove('hidden');
+            elements.qaView.classList.add('fade-in');
+
+            setTimeout(() => {
+                elements.qaView.classList.remove('fade-in');
+            }, 300);
+        }, 200);
+    } else {
+        // No view visible, just show Q&A
+        hideViews.forEach(v => {
+            v.classList.add('hidden');
+            v.classList.remove('fade-out', 'fade-in');
+        });
+        elements.qaView.classList.remove('hidden', 'fade-out');
+    }
 }
 
 function closeModal() {
@@ -1032,9 +1219,204 @@ function closeModal() {
         elements.qaView.classList.remove('hidden', 'fade-out', 'fade-in');
         elements.answerView.classList.add('hidden');
         elements.answerView.classList.remove('fade-out', 'fade-in');
+        elements.digDeeperView.classList.add('hidden');
+        elements.digDeeperView.classList.remove('fade-out', 'fade-in');
+        elements.deepAnswerView.classList.add('hidden');
+        elements.deepAnswerView.classList.remove('fade-out', 'fade-in');
         state.currentStory = null;
+        state.currentQuestion = null;
         state.currentHistoryEntry = null;
     }, 300);
+}
+
+// ==========================================
+// Summary Modal
+// ==========================================
+
+function openSummaryModal(story) {
+    state.currentStory = story;
+
+    // Track story viewed
+    const storyIndex = state.stories.findIndex(s => s.id === story.id);
+    trackStoryViewed(storyIndex + 1, story.headline);
+
+    elements.summaryModalHeadline.textContent = story.headline;
+    elements.summaryModalText.textContent = story.summary || story.teaser;
+
+    elements.summaryModalBackdrop.classList.add('visible');
+    document.body.classList.add('no-scroll');
+
+    // Setup swipe to dismiss
+    setupSummaryModalSwipe();
+}
+
+function closeSummaryModal() {
+    elements.summaryModalBackdrop.classList.remove('visible');
+    document.body.classList.remove('no-scroll');
+    elements.summaryModal.style.transform = '';
+}
+
+function setupSummaryModalSwipe() {
+    let startY = 0;
+    let currentY = 0;
+
+    const modal = elements.summaryModal;
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && modal.scrollTop === 0) {
+            e.preventDefault();
+            modal.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            closeSummaryModal();
+        } else {
+            modal.style.transform = '';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    // Remove old listeners first to avoid duplicates
+    modal.removeEventListener('touchstart', modal._touchStartHandler);
+    modal.removeEventListener('touchmove', modal._touchMoveHandler);
+    modal.removeEventListener('touchend', modal._touchEndHandler);
+
+    // Store handlers for removal later
+    modal._touchStartHandler = handleTouchStart;
+    modal._touchMoveHandler = handleTouchMove;
+    modal._touchEndHandler = handleTouchEnd;
+
+    modal.addEventListener('touchstart', handleTouchStart, { passive: true });
+    modal.addEventListener('touchmove', handleTouchMove, { passive: false });
+    modal.addEventListener('touchend', handleTouchEnd);
+}
+
+// ==========================================
+// Dig Deeper Feature
+// ==========================================
+
+function showDigDeeper() {
+    const question = state.currentQuestion;
+    if (!question || !question.deepQuestions || question.deepQuestions.length === 0) {
+        // No deep questions available, just close modal
+        showToast('ℹ', 'No follow-up questions available');
+        showQAView();
+        return;
+    }
+
+    elements.answerView.classList.add('fade-out');
+
+    setTimeout(() => {
+        elements.answerView.classList.add('hidden');
+        elements.answerView.classList.remove('fade-out');
+
+        // Populate deep questions
+        elements.deepQuestionsContainer.innerHTML = '';
+        question.deepQuestions.forEach((dq, index) => {
+            const button = document.createElement('button');
+            button.className = 'deep-question-button';
+            button.innerHTML = `
+                <span class="deep-question-label">✦</span>
+                <span class="deep-question-text">${dq.text}</span>
+            `;
+            button.addEventListener('click', () => {
+                triggerHaptic('light');
+                showDeepAnswer(dq);
+            });
+            elements.deepQuestionsContainer.appendChild(button);
+        });
+
+        // Add "Back to main questions" option
+        const backButton = document.createElement('button');
+        backButton.className = 'deep-question-button';
+        backButton.style.background = 'transparent';
+        backButton.style.border = '1px solid var(--border-color)';
+        backButton.innerHTML = `
+            <span class="deep-question-label">←</span>
+            <span class="deep-question-text">Back to main questions</span>
+        `;
+        backButton.addEventListener('click', () => {
+            triggerHaptic('light');
+            hideDigDeeper();
+        });
+        elements.deepQuestionsContainer.appendChild(backButton);
+
+        elements.digDeeperView.classList.remove('hidden');
+        elements.digDeeperView.classList.add('fade-in');
+
+        setTimeout(() => {
+            elements.digDeeperView.classList.remove('fade-in');
+        }, 300);
+    }, 200);
+}
+
+function hideDigDeeper() {
+    elements.digDeeperView.classList.add('fade-out');
+
+    setTimeout(() => {
+        elements.digDeeperView.classList.add('hidden');
+        elements.digDeeperView.classList.remove('fade-out');
+        showQAView();
+    }, 200);
+}
+
+function showDeepAnswer(deepQuestion) {
+    elements.digDeeperView.classList.add('fade-out');
+
+    setTimeout(() => {
+        elements.digDeeperView.classList.add('hidden');
+        elements.digDeeperView.classList.remove('fade-out');
+
+        elements.deepAnswerQuestion.textContent = deepQuestion.text;
+        elements.deepAnswerText.textContent = deepQuestion.answer;
+
+        elements.deepAnswerView.classList.remove('hidden');
+        elements.deepAnswerView.classList.add('fade-in');
+
+        setTimeout(() => {
+            elements.deepAnswerView.classList.remove('fade-in');
+        }, 300);
+    }, 200);
+}
+
+function backToDeepQuestions() {
+    elements.deepAnswerView.classList.add('fade-out');
+
+    setTimeout(() => {
+        elements.deepAnswerView.classList.add('hidden');
+        elements.deepAnswerView.classList.remove('fade-out');
+
+        elements.digDeeperView.classList.remove('hidden');
+        elements.digDeeperView.classList.add('fade-in');
+
+        setTimeout(() => {
+            elements.digDeeperView.classList.remove('fade-in');
+        }, 300);
+    }, 200);
+}
+
+function deepDone() {
+    // Close from deep answer back to Q&A view
+    elements.deepAnswerView.classList.add('fade-out');
+
+    setTimeout(() => {
+        elements.deepAnswerView.classList.add('hidden');
+        elements.deepAnswerView.classList.remove('fade-out');
+        showQAView();
+    }, 200);
 }
 
 // ==========================================
@@ -1431,6 +1813,48 @@ function setupEventListeners() {
         showQAView();
     });
 
+    // Dig Deeper button
+    if (elements.digDeeperBtn) {
+        elements.digDeeperBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            showDigDeeper();
+        });
+    }
+
+    // Back to deep questions button
+    if (elements.backToDeepQuestionsBtn) {
+        elements.backToDeepQuestionsBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            backToDeepQuestions();
+        });
+    }
+
+    // Deep done button
+    if (elements.deepDoneBtn) {
+        elements.deepDoneBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            deepDone();
+        });
+    }
+
+    // Summary Modal close button
+    if (elements.summaryModalClose) {
+        elements.summaryModalClose.addEventListener('click', () => {
+            triggerHaptic('light');
+            closeSummaryModal();
+        });
+    }
+
+    // Summary Modal backdrop click
+    if (elements.summaryModalBackdrop) {
+        elements.summaryModalBackdrop.addEventListener('click', (e) => {
+            if (e.target === elements.summaryModalBackdrop) {
+                triggerHaptic('light');
+                closeSummaryModal();
+            }
+        });
+    }
+
     // Review stories button
     elements.reviewStoriesBtn.addEventListener('click', () => {
         triggerHaptic('light');
@@ -1455,21 +1879,35 @@ function setupEventListeners() {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && elements.modalBackdrop.classList.contains('visible')) {
-            closeModal();
+        // Escape closes modals
+        if (e.key === 'Escape') {
+            if (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible')) {
+                closeSummaryModal();
+            } else if (elements.modalBackdrop.classList.contains('visible')) {
+                closeModal();
+            }
         }
 
-        if (state.currentSection === 'today' && !elements.modalBackdrop.classList.contains('visible')) {
+        // Arrow keys for card navigation (when no modal is open)
+        const anyModalOpen = (elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible')) ||
+                             (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible'));
+
+        if (state.currentSection === 'today' && !anyModalOpen) {
             if (e.key === 'ArrowLeft') {
                 const card = document.querySelector('.story-card[data-position="0"]');
                 if (card) {
-                    const story = state.stories[state.currentIndex];
                     animateCardExit(card, 'left', nextCard);
                 }
             }
             if (e.key === 'ArrowRight') {
                 const story = state.stories[state.currentIndex];
                 if (story) openModal(story);
+            }
+            if (e.key === ' ' || e.key === 'Enter') {
+                // Space/Enter opens Summary Modal
+                e.preventDefault();
+                const story = state.stories[state.currentIndex];
+                if (story) openSummaryModal(story);
             }
         }
     });
