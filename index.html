@@ -212,10 +212,59 @@
                         </div>
                     </div>
                     <div class="answer-actions">
+                        <button class="action-button secondary" id="digDeeperBtn">
+                            <span>Dig Deeper</span>
+                        </button>
                         <button class="action-button primary" id="doneBtn">
                             <span>Done</span>
                         </button>
                     </div>
+                </div>
+
+                <!-- Dig Deeper View -->
+                <div class="modal-view hidden" id="digDeeperView">
+                    <div class="dig-deeper-header">
+                        <h3 class="dig-deeper-title">Dig Deeper</h3>
+                        <p class="dig-deeper-subtitle">Explore related questions:</p>
+                    </div>
+                    <div class="deep-questions-container" id="deepQuestionsContainer">
+                        <!-- Deep questions will be injected -->
+                    </div>
+                </div>
+
+                <!-- Deep Answer View -->
+                <div class="modal-view hidden" id="deepAnswerView">
+                    <div class="answer-header">
+                        <span class="answer-label">✦</span>
+                        <p class="answer-question" id="deepAnswerQuestion"></p>
+                    </div>
+                    <div class="answer-content">
+                        <p class="answer-text" id="deepAnswerText"></p>
+                    </div>
+                    <div class="answer-actions">
+                        <button class="action-button secondary" id="backToDeepQuestionsBtn">
+                            <span>More Questions</span>
+                        </button>
+                        <button class="action-button primary" id="deepDoneBtn">
+                            <span>Done</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Modal -->
+        <div class="summary-modal-backdrop" id="summaryModalBackdrop">
+            <div class="summary-modal" id="summaryModal">
+                <button class="summary-modal-close" id="summaryModalClose">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="summary-modal-content">
+                    <h2 class="summary-modal-headline" id="summaryModalHeadline"></h2>
+                    <p class="summary-modal-text" id="summaryModalText"></p>
                 </div>
             </div>
         </div>
