@@ -619,6 +619,7 @@ button {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-bottom: 3px solid var(--accent);
 }
 
 .card-banner-placeholder {
@@ -1473,4 +1474,186 @@ button {
     font-size: var(--font-size-md);
     color: var(--text-secondary);
     line-height: var(--line-height-relaxed);
+}
+
+/* ==========================================
+   Summary Modal (Tap to view)
+   ========================================== */
+
+.summary-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0);
+    z-index: var(--z-modal-backdrop);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-normal), visibility var(--transition-normal), background var(--transition-normal);
+}
+
+.summary-modal-backdrop.visible {
+    opacity: 1;
+    visibility: visible;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.summary-modal {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 60vh;
+    max-height: 60dvh;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--spacing-lg) var(--spacing-lg) calc(var(--safe-bottom) + var(--spacing-xl));
+    z-index: var(--z-modal);
+    transform: translateY(100%);
+    transition: transform var(--transition-normal), background var(--transition-normal);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.summary-modal-backdrop.visible .summary-modal {
+    transform: translateY(0);
+}
+
+/* X button in TOP-LEFT corner */
+.summary-modal-close {
+    position: absolute;
+    top: var(--spacing-md);
+    left: var(--spacing-md);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    z-index: 1;
+}
+
+.summary-modal-close:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.summary-modal-close:active {
+    transform: scale(0.92);
+}
+
+.summary-modal-content {
+    padding-top: var(--spacing-xl);
+}
+
+.summary-modal-headline {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    font-variation-settings: 'wght' 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+    line-height: var(--line-height-tight);
+}
+
+.summary-modal-text {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    line-height: var(--line-height-relaxed);
+}
+
+@media (min-width: 480px) {
+    .summary-modal {
+        left: 50%;
+        transform: translateX(-50%) translateY(100%);
+        max-width: 480px;
+        border-radius: var(--radius-xl);
+        bottom: var(--spacing-lg);
+    }
+
+    .summary-modal-backdrop.visible .summary-modal {
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ==========================================
+   Dig Deeper View Styles
+   ========================================== */
+
+.dig-deeper-header {
+    margin-bottom: var(--spacing-lg);
+    padding-right: var(--spacing-2xl);
+}
+
+.dig-deeper-title {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: var(--spacing-xs);
+}
+
+.dig-deeper-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+}
+
+.deep-questions-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.deep-question-button {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    text-align: left;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.deep-question-button:hover {
+    background: var(--bg-card-hover);
+}
+
+.deep-question-button:active {
+    transform: scale(0.98);
+}
+
+.deep-question-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    color: var(--accent);
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.deep-question-text {
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: var(--line-height-normal);
+    padding-top: 2px;
+}
+
+/* Back to questions button in deep answer */
+#backToDeepQuestionsBtn {
+    background: var(--bg-card);
+    color: var(--text-secondary);
+}
+
+#backToDeepQuestionsBtn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
 }
