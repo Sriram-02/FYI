@@ -38,7 +38,7 @@
 
             <div class="header-logo" id="headerLogo" aria-label="Go to first story">
                 <span class="logo-fallback">
-                    <span class="logo-text"><span class="fyi-text">FYI</span><span class="fyi-dot">.</span></span>
+                    <span class="logo-text"><span class="fyi-text">FYI</span><span class="fyi-comma">,</span> <span class="fyi-name" id="fyiUserName"></span></span>
                 </span>
             </div>
 
@@ -115,7 +115,7 @@
                 <div class="completion-screen" id="completionScreen">
                     <div class="completion-content">
                         <div class="completion-icon">✨</div>
-                        <h2 class="completion-title">You're all caught up</h2>
+                        <h2 class="completion-title" id="completionTitle">You're all caught up</h2>
                         <p class="completion-subtitle">That's your daily dose of critical thinking.</p>
 
                         <button class="secondary-button" id="reviewStoriesBtn">
@@ -224,7 +224,7 @@
                 <!-- Dig Deeper View -->
                 <div class="modal-view hidden" id="digDeeperView">
                     <div class="dig-deeper-header">
-                        <h3 class="dig-deeper-title">Dig Deeper</h3>
+                        <h3 class="dig-deeper-title">Curiosity never killed the cat</h3>
                         <p class="dig-deeper-subtitle">Explore related questions:</p>
                     </div>
                     <div class="deep-questions-container" id="deepQuestionsContainer">
@@ -264,7 +264,9 @@
                 </button>
                 <div class="summary-modal-content">
                     <h2 class="summary-modal-headline" id="summaryModalHeadline"></h2>
-                    <p class="summary-modal-text" id="summaryModalText"></p>
+                    <div class="summary-modal-bullets" id="summaryModalBullets">
+                        <!-- Bullets will be injected -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -300,6 +302,16 @@
                 </button>
                 <h2 class="info-modal-title">Our Philosophy</h2>
                 <p class="info-modal-content">We believe news should make you smarter, not just busier. Traditional news tells you what happened. We go further—we help you ask the questions experts would ask: What's the real incentive here? Who benefits from this narrative? What are they not saying?<br><br>FYI is built for people who want to think critically about the world, not just consume headlines. Three stories. Three minutes. One sharper perspective.</p>
+            </div>
+        </div>
+
+        <!-- Welcome Modal (First Time User) -->
+        <div class="welcome-modal-backdrop" id="welcomeModalBackdrop">
+            <div class="welcome-modal">
+                <h2 class="welcome-title">Welcome to FYI!</h2>
+                <p class="welcome-subtitle">What should we call you?</p>
+                <input type="text" class="welcome-input" id="welcomeNameInput" maxlength="15" placeholder="Your name" autocomplete="off" autocapitalize="words">
+                <button class="welcome-button" id="welcomeSubmitBtn">Let's go</button>
             </div>
         </div>
     </div>
