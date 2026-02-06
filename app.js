@@ -287,7 +287,8 @@ const state = {
     isLoading: true,
     viewedStories: [],
     longPressTimer: null,
-    isLongPress: false
+    isLongPress: false,
+    userName: ''
 };
 
 // ==========================================
@@ -355,7 +356,6 @@ function cacheElements() {
     elements.summaryModal = document.getElementById('summaryModal');
     elements.summaryModalClose = document.getElementById('summaryModalClose');
     elements.summaryModalHeadline = document.getElementById('summaryModalHeadline');
-    elements.summaryModalText = document.getElementById('summaryModalText');
 
     // Dig Deeper
     elements.digDeeperBtn = document.getElementById('digDeeperBtn');
@@ -366,6 +366,19 @@ function cacheElements() {
     elements.deepAnswerText = document.getElementById('deepAnswerText');
     elements.backToDeepQuestionsBtn = document.getElementById('backToDeepQuestionsBtn');
     elements.deepDoneBtn = document.getElementById('deepDoneBtn');
+
+    // Welcome Modal
+    elements.welcomeModalBackdrop = document.getElementById('welcomeModalBackdrop');
+    elements.welcomeNameInput = document.getElementById('welcomeNameInput');
+    elements.welcomeSubmitBtn = document.getElementById('welcomeSubmitBtn');
+
+    // User Name Display
+    elements.fyiUserName = document.getElementById('fyiUserName');
+    elements.fyiComma = document.querySelector('.fyi-comma');
+    elements.completionTitle = document.getElementById('completionTitle');
+
+    // Summary Modal Bullets
+    elements.summaryModalBullets = document.getElementById('summaryModalBullets');
 }
 
 // ==========================================
@@ -378,7 +391,25 @@ async function init() {
     applyTheme();
     setupEventListeners();
 
+    // Check if user has set their name
+    const savedName = localStorage.getItem('fyi_user_name');
+    if (savedName) {
+        state.userName = savedName;
+        updateUserNameDisplay();
+    } else {
+        // Show welcome modal for first-time users
+        showWelcomeModal();
+        return; // Don't load content until name is set
+    }
+
     // Show loading and fetch stories
+    await loadAppContent();
+
+    // Track app opened
+    trackAppOpened();
+}
+
+async function loadAppContent() {
     showLoading(true);
     await fetchStories();
     showLoading(false);
@@ -390,9 +421,6 @@ async function init() {
     renderHistory();
     showSwipeHint();
     registerServiceWorker();
-
-    // Track app opened
-    trackAppOpened();
 }
 
 // Format and display today's date
@@ -723,6 +751,122 @@ function parseCSVLine(line) {
 }
 
 // ==========================================
+// User Name / Welcome Modal
+// ==========================================
+
+function showWelcomeModal() {
+    elements.welcomeModalBackdrop.classList.add('visible');
+    setTimeout(() => {
+        elements.welcomeNameInput.focus();
+    }, 300);
+}
+
+function hideWelcomeModal() {
+    elements.welcomeModalBackdrop.classList.remove('visible');
+}
+
+function formatUserName(name) {
+    // Proper capitalization: first letter uppercase, rest lowercase
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+function saveUserName(name) {
+    const formatted = formatUserName(name);
+    if (formatted) {
+        localStorage.setItem('fyi_user_name', formatted);
+        state.userName = formatted;
+        updateUserNameDisplay();
+        hideWelcomeModal();
+        // Now load the app content
+        loadAppContent();
+        trackAppOpened();
+    }
+}
+
+function updateUserNameDisplay() {
+    if (state.userName) {
+        elements.fyiUserName.textContent = state.userName;
+        elements.fyiComma.classList.remove('hidden');
+        elements.fyiUserName.classList.remove('hidden');
+
+        // Dynamically adjust font size for long names
+        adjustNameFontSize();
+    } else {
+        elements.fyiComma.classList.add('hidden');
+        elements.fyiUserName.classList.add('hidden');
+    }
+}
+
+function adjustNameFontSize() {
+    // Reset to default size first
+    elements.fyiUserName.style.fontSize = '';
+
+    // Get available width (approximate: header width minus hamburger, theme toggle, and FYI text)
+    const headerWidth = window.innerWidth;
+    const availableWidth = headerWidth - 200; // Reserve space for other elements
+
+    // Measure current width
+    const nameWidth = elements.fyiUserName.offsetWidth;
+
+    // If name is too wide, reduce font size
+    if (nameWidth > availableWidth) {
+        const ratio = availableWidth / nameWidth;
+        const currentSize = 32; // Default font size
+        const newSize = Math.max(18, Math.floor(currentSize * ratio));
+        elements.fyiUserName.style.fontSize = `${newSize}px`;
+    }
+}
+
+// ==========================================
+// HTML Text Formatting
+// ==========================================
+
+function parseFormattedText(text) {
+    if (!text) return text;
+
+    // Parse custom HTML-like tags for formatting
+    let formatted = text;
+
+    // <color1>text</color1> -> orange accent color
+    formatted = formatted.replace(/<color1>(.*?)<\/color1>/gi, '<span class="text-color1">$1</span>');
+
+    // <color2>text</color2> -> teal/blue secondary color
+    formatted = formatted.replace(/<color2>(.*?)<\/color2>/gi, '<span class="text-color2">$1</span>');
+
+    // <mark>text</mark> -> yellow highlight background
+    formatted = formatted.replace(/<mark>(.*?)<\/mark>/gi, '<span class="text-mark">$1</span>');
+
+    return formatted;
+}
+
+function parseSummaryWithBullets(text) {
+    if (!text) return '';
+
+    // Split by <br> tags
+    const lines = text.split(/<br\s*\/?>/gi);
+
+    // If only one line (no <br> tags), return as single bullet
+    if (lines.length === 1) {
+        return `<div class="summary-bullet-item">
+            <span class="summary-bullet-icon">✦</span>
+            <span class="summary-bullet-text">${parseFormattedText(lines[0].trim())}</span>
+        </div>`;
+    }
+
+    // Multiple lines - create bullet for each non-empty line
+    return lines
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => `<div class="summary-bullet-item">
+            <span class="summary-bullet-icon">✦</span>
+            <span class="summary-bullet-text">${parseFormattedText(line)}</span>
+        </div>`)
+        .join('');
+}
+
+// ==========================================
 // Theme
 // ==========================================
 
@@ -932,12 +1076,10 @@ function handleDragEnd(e, card, story) {
     if (Math.abs(deltaX) > state.dragThreshold) {
         triggerHaptic('medium');
         if (deltaX > 0) {
-            // Swipe RIGHT: Open Q&A modal WITHOUT removing card yet
-            // Card stays in place, modal opens on top
-            card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-            card.style.transform = 'translateX(0) rotate(0) scale(1)';
-            setTimeout(() => { card.style.transition = ''; }, 300);
-            openModal(story);
+            // Swipe RIGHT: Card glides off smoothly to the right while Q&A modal opens
+            animateCardExitWithModal(card, 'right', () => {
+                // Card has exited, modal is already open
+            }, story);
         } else {
             // Swipe LEFT: Skip to next card
             animateCardExit(card, 'left', () => nextCard());
@@ -968,6 +1110,28 @@ function animateCardExit(card, direction, callback) {
     card.style.opacity = '0';
 
     setTimeout(callback, 400);
+}
+
+function animateCardExitWithModal(card, direction, callback, story) {
+    // Smoothly animate card off screen while opening modal simultaneously
+    const exitX = direction === 'left' ? -window.innerWidth : window.innerWidth * 0.7;
+    const rotation = direction === 'left' ? -20 : 12;
+
+    // Use smooth easing for premium feel
+    card.style.transition = 'transform 450ms cubic-bezier(0.32, 0.72, 0, 1), opacity 450ms cubic-bezier(0.32, 0.72, 0, 1)';
+    card.classList.add('exiting');
+    card.style.transform = `translateX(${exitX}px) rotate(${rotation}deg) scale(0.85)`;
+    card.style.opacity = '0';
+
+    // Open modal immediately for coordinated animation
+    openModal(story);
+
+    setTimeout(() => {
+        card.style.transition = '';
+        // Don't remove the card - keep it invisible until modal closes
+        // This prevents visual issues if user closes modal early
+        if (callback) callback();
+    }, 450);
 }
 
 // ==========================================
@@ -1025,6 +1189,11 @@ function showCompletion() {
     elements.completionScreen.classList.add('visible');
     elements.progressFill.style.width = '100%';
     elements.historyToggle.classList.add('hidden');
+
+    // Update completion title with user's name
+    if (state.userName && elements.completionTitle) {
+        elements.completionTitle.textContent = `You're all caught up, ${state.userName}`;
+    }
 }
 
 function resetApp() {
@@ -1158,7 +1327,8 @@ function showAnswer(question) {
 
         elements.answerLabel.textContent = '✦';
         elements.answerQuestion.textContent = question.text;
-        elements.answerText.textContent = question.answer;
+        // Apply HTML formatting to answer text
+        elements.answerText.innerHTML = parseFormattedText(question.answer);
 
         // Show/hide Dig Deeper button based on availability
         const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
@@ -1226,6 +1396,9 @@ function closeModal() {
         state.currentStory = null;
         state.currentQuestion = null;
         state.currentHistoryEntry = null;
+
+        // Re-render cards to restore any that were animated out for the modal
+        renderCards();
     }, 300);
 }
 
@@ -1241,7 +1414,10 @@ function openSummaryModal(story) {
     trackStoryViewed(storyIndex + 1, story.headline);
 
     elements.summaryModalHeadline.textContent = story.headline;
-    elements.summaryModalText.textContent = story.summary || story.teaser;
+
+    // Parse summary with bullets and HTML formatting
+    const summaryText = story.summary || story.teaser;
+    elements.summaryModalBullets.innerHTML = parseSummaryWithBullets(summaryText);
 
     elements.summaryModalBackdrop.classList.add('visible');
     document.body.classList.add('no-scroll');
@@ -1381,7 +1557,8 @@ function showDeepAnswer(deepQuestion) {
         elements.digDeeperView.classList.remove('fade-out');
 
         elements.deepAnswerQuestion.textContent = deepQuestion.text;
-        elements.deepAnswerText.textContent = deepQuestion.answer;
+        // Apply HTML formatting to deep answer text
+        elements.deepAnswerText.innerHTML = parseFormattedText(deepQuestion.answer);
 
         elements.deepAnswerView.classList.remove('hidden');
         elements.deepAnswerView.classList.add('fade-in');
@@ -1513,7 +1690,13 @@ function showHistoryAnswer(entry) {
 
     elements.answerLabel.textContent = '✦';
     elements.answerQuestion.textContent = entry.question;
-    elements.answerText.textContent = entry.answer;
+    // Apply HTML formatting to history answer
+    elements.answerText.innerHTML = parseFormattedText(entry.answer);
+
+    // Hide Dig Deeper button for history items (no deep questions stored)
+    if (elements.digDeeperBtn) {
+        elements.digDeeperBtn.style.display = 'none';
+    }
 
     setRating(entry.rating, true);
 
@@ -1872,6 +2055,37 @@ function setupEventListeners() {
     // History back button
     elements.historyBackBtn.addEventListener('click', () => {
         switchSection('today');
+    });
+
+    // Welcome modal submit
+    if (elements.welcomeSubmitBtn) {
+        elements.welcomeSubmitBtn.addEventListener('click', () => {
+            const name = elements.welcomeNameInput.value.trim();
+            if (name) {
+                triggerHaptic('medium');
+                saveUserName(name);
+            }
+        });
+    }
+
+    // Welcome modal input - submit on Enter key
+    if (elements.welcomeNameInput) {
+        elements.welcomeNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const name = elements.welcomeNameInput.value.trim();
+                if (name) {
+                    triggerHaptic('medium');
+                    saveUserName(name);
+                }
+            }
+        });
+    }
+
+    // Resize handler to adjust name font size
+    window.addEventListener('resize', () => {
+        if (state.userName) {
+            adjustNameFontSize();
+        }
     });
 
     // Pull to refresh
