@@ -364,7 +364,6 @@ function cacheElements() {
     elements.deepAnswerView = document.getElementById('deepAnswerView');
     elements.deepAnswerQuestion = document.getElementById('deepAnswerQuestion');
     elements.deepAnswerText = document.getElementById('deepAnswerText');
-    elements.backToDeepQuestionsBtn = document.getElementById('backToDeepQuestionsBtn');
     elements.deepDoneBtn = document.getElementById('deepDoneBtn');
 
     // Welcome Modal
@@ -375,10 +374,19 @@ function cacheElements() {
     // User Name Display
     elements.fyiUserName = document.getElementById('fyiUserName');
     elements.fyiComma = document.querySelector('.fyi-comma');
+    elements.fyiSpace = document.querySelector('.fyi-space');
+    elements.logoTextBlock = document.getElementById('logoTextBlock');
     elements.completionTitle = document.getElementById('completionTitle');
 
     // Summary Modal Bullets
     elements.summaryModalBullets = document.getElementById('summaryModalBullets');
+
+    // Recap Week
+    elements.recapWeekBtn = document.getElementById('recapWeekBtn');
+    elements.recapWeekView = document.getElementById('recapWeekView');
+    elements.recapStoriesList = document.getElementById('recapStoriesList');
+    elements.recapEmpty = document.getElementById('recapEmpty');
+    elements.recapBackBtn = document.getElementById('recapBackBtn');
 }
 
 // ==========================================
@@ -569,6 +577,167 @@ async function fetchStories() {
             showToast('⚠', 'Using sample stories');
         }
     }
+}
+
+// ==========================================
+// Recap This Week Functions
+// ==========================================
+
+async function fetchPastWeekStories() {
+    // Check if sheet ID is configured
+    if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
+        return [];
+    }
+
+    try {
+        // Fetch public Google Sheet as CSV
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+        const response = await fetch(csvUrl);
+        if (!response.ok) {
+            throw new Error('Failed to fetch sheet');
+        }
+
+        const csvText = await response.text();
+        const stories = parseCSV(csvText);
+
+        // Get date range: past 7 days excluding today
+        const today = getTodayDate();
+        const pastWeekDates = getPastWeekDates();
+
+        // Filter to past week stories only (excluding today)
+        const pastWeekStories = stories.filter(story => {
+            const storyDate = parseDate(story.date);
+            return storyDate !== today && pastWeekDates.includes(storyDate);
+        });
+
+        // Sort by date (most recent first)
+        pastWeekStories.sort((a, b) => {
+            const dateA = parseDate(a.date);
+            const dateB = parseDate(b.date);
+            return dateB.localeCompare(dateA);
+        });
+
+        return pastWeekStories;
+    } catch (error) {
+        console.error('Error fetching past week stories:', error);
+        return [];
+    }
+}
+
+function getPastWeekDates() {
+    const dates = [];
+    const today = new Date();
+
+    // Get past 7 days (not including today)
+    for (let i = 1; i <= 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        dates.push(`${year}-${month}-${day}`);
+    }
+
+    return dates;
+}
+
+function formatDateForDisplay(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00');
+    const options = { weekday: 'long', month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+}
+
+async function showRecapView() {
+    triggerHaptic('light');
+
+    // Show loading state in recap
+    elements.recapStoriesList.innerHTML = '<div class="recap-loading"><div class="loading-spinner"></div><p>Loading past stories...</p></div>';
+    elements.recapEmpty.style.display = 'none';
+
+    // Hide completion screen and show recap view
+    elements.completionScreen.classList.remove('visible');
+    elements.recapWeekView.classList.add('visible');
+
+    // Fetch past week stories
+    const pastStories = await fetchPastWeekStories();
+
+    if (pastStories.length === 0) {
+        elements.recapStoriesList.innerHTML = '';
+        elements.recapEmpty.style.display = 'block';
+    } else {
+        renderRecapStories(pastStories);
+        elements.recapEmpty.style.display = 'none';
+    }
+}
+
+function hideRecapView() {
+    triggerHaptic('light');
+    elements.recapWeekView.classList.remove('visible');
+    elements.completionScreen.classList.add('visible');
+}
+
+function renderRecapStories(stories) {
+    // Group stories by date
+    const groupedByDate = {};
+    stories.forEach(story => {
+        const date = parseDate(story.date);
+        if (!groupedByDate[date]) {
+            groupedByDate[date] = [];
+        }
+        groupedByDate[date].push(story);
+    });
+
+    // Render grouped stories
+    let html = '';
+    const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+
+    sortedDates.forEach(date => {
+        const displayDate = formatDateForDisplay(date);
+        html += `<div class="recap-date-group">
+            <div class="recap-date-header">${displayDate}</div>`;
+
+        groupedByDate[date].forEach((story, index) => {
+            html += `
+                <div class="recap-story-card" data-recap-date="${date}" data-recap-index="${index}">
+                    <span class="recap-story-emoji">${story.emoji || '📰'}</span>
+                    <div class="recap-story-info">
+                        <h4 class="recap-story-headline">${story.headline}</h4>
+                    </div>
+                    <svg class="recap-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </div>`;
+        });
+
+        html += '</div>';
+    });
+
+    elements.recapStoriesList.innerHTML = html;
+
+    // Add click handlers
+    const recapCards = elements.recapStoriesList.querySelectorAll('.recap-story-card');
+    recapCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const date = card.dataset.recapDate;
+            const index = parseInt(card.dataset.recapIndex);
+            const story = groupedByDate[date][index];
+            if (story) {
+                triggerHaptic('light');
+                openRecapStoryModal(story);
+            }
+        });
+    });
+}
+
+function openRecapStoryModal(story) {
+    // Set the current story for modal interaction
+    state.currentStory = story;
+    state.currentQuestion = null;
+
+    // Open the Q&A modal
+    openModal(story);
 }
 
 function parseCSV(csvText) {
@@ -789,33 +958,40 @@ function updateUserNameDisplay() {
     if (state.userName) {
         elements.fyiUserName.textContent = state.userName;
         elements.fyiComma.classList.remove('hidden');
+        if (elements.fyiSpace) elements.fyiSpace.classList.remove('hidden');
         elements.fyiUserName.classList.remove('hidden');
 
-        // Dynamically adjust font size for long names
-        adjustNameFontSize();
+        // Dynamically adjust font size for long names - shrink entire logo block together
+        adjustLogoFontSize();
     } else {
         elements.fyiComma.classList.add('hidden');
+        if (elements.fyiSpace) elements.fyiSpace.classList.add('hidden');
         elements.fyiUserName.classList.add('hidden');
     }
 }
 
-function adjustNameFontSize() {
+function adjustLogoFontSize() {
     // Reset to default size first
-    elements.fyiUserName.style.fontSize = '';
+    if (elements.logoTextBlock) {
+        elements.logoTextBlock.style.fontSize = '';
+    }
 
-    // Get available width (approximate: header width minus hamburger, theme toggle, and FYI text)
+    // Get available width (header width minus hamburger and theme toggle buttons with padding)
     const headerWidth = window.innerWidth;
-    const availableWidth = headerWidth - 200; // Reserve space for other elements
+    const availableWidth = headerWidth - 140; // Reserve 140px for hamburger (44px) + theme toggle (44px) + padding
 
-    // Measure current width
-    const nameWidth = elements.fyiUserName.offsetWidth;
+    // Measure current width of entire logo block
+    const logoBlock = elements.logoTextBlock;
+    if (!logoBlock) return;
 
-    // If name is too wide, reduce font size
-    if (nameWidth > availableWidth) {
-        const ratio = availableWidth / nameWidth;
-        const currentSize = 32; // Default font size
-        const newSize = Math.max(18, Math.floor(currentSize * ratio));
-        elements.fyiUserName.style.fontSize = `${newSize}px`;
+    const logoWidth = logoBlock.offsetWidth;
+
+    // If logo block is too wide, reduce font size for the ENTIRE block (both FYI and Name together)
+    if (logoWidth > availableWidth) {
+        const ratio = availableWidth / logoWidth;
+        const currentSize = 28; // Default font size in CSS
+        const newSize = Math.max(16, Math.floor(currentSize * ratio));
+        logoBlock.style.fontSize = `${newSize}px`;
     }
 }
 
@@ -1586,12 +1762,16 @@ function backToDeepQuestions() {
 }
 
 function deepDone() {
-    // Close from deep answer back to Q&A view
+    // Close from deep answer and return to main Q&A view (with the 4 main questions)
     elements.deepAnswerView.classList.add('fade-out');
 
     setTimeout(() => {
         elements.deepAnswerView.classList.add('hidden');
         elements.deepAnswerView.classList.remove('fade-out');
+        // Also ensure dig deeper view is hidden
+        elements.digDeeperView.classList.add('hidden');
+        elements.digDeeperView.classList.remove('fade-out', 'fade-in');
+        // Return to main Q&A view
         showQAView();
     }, 200);
 }
@@ -2004,14 +2184,6 @@ function setupEventListeners() {
         });
     }
 
-    // Back to deep questions button
-    if (elements.backToDeepQuestionsBtn) {
-        elements.backToDeepQuestionsBtn.addEventListener('click', () => {
-            triggerHaptic('light');
-            backToDeepQuestions();
-        });
-    }
-
     // Deep done button
     if (elements.deepDoneBtn) {
         elements.deepDoneBtn.addEventListener('click', () => {
@@ -2043,6 +2215,20 @@ function setupEventListeners() {
         triggerHaptic('light');
         resetApp();
     });
+
+    // Recap This Week button
+    if (elements.recapWeekBtn) {
+        elements.recapWeekBtn.addEventListener('click', () => {
+            showRecapView();
+        });
+    }
+
+    // Recap back button
+    if (elements.recapBackBtn) {
+        elements.recapBackBtn.addEventListener('click', () => {
+            hideRecapView();
+        });
+    }
 
     // Star rating
     setupStarRating();
@@ -2081,10 +2267,10 @@ function setupEventListeners() {
         });
     }
 
-    // Resize handler to adjust name font size
+    // Resize handler to adjust logo font size
     window.addEventListener('resize', () => {
         if (state.userName) {
-            adjustNameFontSize();
+            adjustLogoFontSize();
         }
     });
 
