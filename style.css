@@ -239,6 +239,8 @@ button {
     justify-content: center;
     cursor: pointer;
     transition: transform var(--transition-fast);
+    flex: 1;
+    max-width: calc(100% - 120px); /* Leave space for hamburger and theme toggle */
 }
 
 .header-logo:active {
@@ -253,29 +255,18 @@ button {
 .logo-fallback {
     display: flex;
     align-items: center;
+    justify-content: center;
 }
 
 .logo-text {
     font-family: var(--font-headline);
-    font-size: 48px;
-    font-weight: 400;
+    font-weight: 700;
     line-height: 1;
 }
 
-/* Theme-aware logo text colors */
-/* Dark mode (default): white text, maroon dot */
-.logo-text .fyi-text {
-    color: #FFFFFF;
-    transition: color var(--transition-normal);
-}
-
+/* Theme-aware logo text colors - keeping for backwards compatibility */
 .logo-text .fyi-dot {
     color: var(--accent);
-}
-
-/* Light mode: black text, orange dot */
-:root.light-mode .logo-text .fyi-text {
-    color: #1A1A1A;
 }
 
 :root.light-mode .logo-text .fyi-dot {
@@ -1300,6 +1291,10 @@ button {
     font-size: var(--font-size-md);
     font-weight: 500;
     transition: background var(--transition-fast), transform var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 .action-button.secondary {
@@ -1656,4 +1651,259 @@ button {
 #backToDeepQuestionsBtn:hover {
     background: var(--bg-card-hover);
     color: var(--text-primary);
+}
+
+/* ==========================================
+   Welcome Modal (First Time User)
+   ========================================== */
+
+.welcome-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-normal), visibility var(--transition-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+}
+
+.welcome-modal-backdrop.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.welcome-modal {
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-2xl) var(--spacing-xl);
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    transform: scale(0.9);
+    opacity: 0;
+    transition: transform var(--transition-normal), opacity var(--transition-normal);
+}
+
+.welcome-modal-backdrop.visible .welcome-modal {
+    transform: scale(1);
+    opacity: 1;
+}
+
+.welcome-title {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.welcome-subtitle {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xl);
+}
+
+.welcome-input {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--bg-input);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-body);
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+    transition: border-color var(--transition-fast);
+    outline: none;
+}
+
+.welcome-input:focus {
+    border-color: var(--accent);
+}
+
+.welcome-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.welcome-button {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-xl);
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-family: var(--font-body);
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.welcome-button:hover {
+    background: var(--accent-light);
+}
+
+.welcome-button:active {
+    transform: scale(0.96);
+}
+
+.welcome-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ==========================================
+   Logo with User Name
+   ========================================== */
+
+.logo-text {
+    display: flex;
+    align-items: baseline;
+    white-space: nowrap;
+}
+
+.fyi-text {
+    color: var(--accent);
+    font-family: var(--font-headline);
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.fyi-comma {
+    color: var(--accent);
+    font-family: var(--font-headline);
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.fyi-name {
+    color: #FFFFFF;
+    font-family: var(--font-headline);
+    font-size: 32px;
+    font-weight: 700;
+    transition: font-size var(--transition-fast), color var(--transition-normal);
+}
+
+/* Light mode: name text color inverts to dark */
+:root.light-mode .fyi-name {
+    color: #1A1A1A;
+}
+
+/* Hide comma and name when no user name is set */
+.fyi-comma:empty + .fyi-name:empty {
+    display: none;
+}
+
+.fyi-comma.hidden,
+.fyi-name.hidden {
+    display: none;
+}
+
+/* ==========================================
+   HTML Text Formatting (from Google Sheets)
+   ========================================== */
+
+/* Color 1: Signature Orange */
+.text-color1 {
+    color: var(--accent);
+}
+
+/* Color 2: Complementary Teal/Blue */
+.text-color2 {
+    color: #4ECDC4;
+}
+
+/* Mark: Yellow highlight background */
+.text-mark {
+    background: rgba(255, 235, 120, 0.35);
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+/* Light mode adjustments for text formatting */
+:root.light-mode .text-color2 {
+    color: #0D9488;
+}
+
+:root.light-mode .text-mark {
+    background: rgba(255, 235, 120, 0.5);
+}
+
+/* ==========================================
+   Orange Question Bullets
+   ========================================== */
+
+.question-label {
+    color: var(--accent) !important;
+}
+
+.answer-label {
+    color: var(--accent) !important;
+}
+
+.deep-question-label {
+    color: var(--accent) !important;
+}
+
+/* ==========================================
+   Answer Actions - Dig Deeper Primary, Done Secondary
+   ========================================== */
+
+#digDeeperBtn {
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#digDeeperBtn:hover {
+    background: var(--accent-light);
+}
+
+#doneBtn {
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+#doneBtn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+/* ==========================================
+   Summary Modal Bullet List
+   ========================================== */
+
+.summary-modal-bullets {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.summary-bullet-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+
+.summary-bullet-icon {
+    color: var(--accent);
+    font-size: 14px;
+    flex-shrink: 0;
+    line-height: 1.7;
+}
+
+.summary-bullet-text {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    line-height: var(--line-height-relaxed);
 }
