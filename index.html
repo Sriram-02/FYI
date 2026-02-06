@@ -10,9 +10,10 @@
     <link rel="manifest" href="manifest.json">
     <title>FYI</title>
 
-    <!-- Fonts: Cabinet Grotesk Variable for headlines, Satoshi for body -->
+    <!-- Fonts: Inter for logo, Cabinet Grotesk for headlines, Satoshi for body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@variable&display=swap" rel="stylesheet">
     <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 
@@ -38,7 +39,7 @@
 
             <div class="header-logo" id="headerLogo" aria-label="Go to first story">
                 <span class="logo-fallback">
-                    <span class="logo-text"><span class="fyi-text">FYI</span><span class="fyi-comma">,</span> <span class="fyi-name" id="fyiUserName"></span></span>
+                    <span class="logo-text" id="logoTextBlock"><span class="fyi-text">FYI</span><span class="fyi-comma">,</span><span class="fyi-space">&nbsp;</span><span class="fyi-name" id="fyiUserName"></span></span>
                 </span>
             </div>
 
@@ -118,9 +119,35 @@
                         <h2 class="completion-title" id="completionTitle">You're all caught up</h2>
                         <p class="completion-subtitle">That's your daily dose of critical thinking.</p>
 
-                        <button class="secondary-button" id="reviewStoriesBtn">
-                            <span>Review Stories</span>
+                        <div class="completion-buttons">
+                            <button class="secondary-button" id="reviewStoriesBtn">
+                                <span>Review stories</span>
+                            </button>
+                            <button class="secondary-button" id="recapWeekBtn">
+                                <span>Recap this week</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recap Week View -->
+                <div class="recap-week-view" id="recapWeekView">
+                    <div class="recap-header">
+                        <button class="back-button" id="recapBackBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"/>
+                            </svg>
+                            <span>Back</span>
                         </button>
+                        <h2 class="recap-title">This Week's Stories</h2>
+                    </div>
+                    <div class="recap-stories-list" id="recapStoriesList">
+                        <!-- Past week stories will be injected -->
+                    </div>
+                    <div class="recap-empty" id="recapEmpty">
+                        <div class="empty-icon">📅</div>
+                        <h3 class="empty-title">No stories from the past week yet</h3>
+                        <p class="empty-text">Check back after a few days of reading!</p>
                     </div>
                 </div>
 
@@ -224,8 +251,8 @@
                 <!-- Dig Deeper View -->
                 <div class="modal-view hidden" id="digDeeperView">
                     <div class="dig-deeper-header">
-                        <h3 class="dig-deeper-title">Curiosity never killed the cat</h3>
-                        <p class="dig-deeper-subtitle">Explore related questions:</p>
+                        <h3 class="dig-deeper-title">Dig Deeper</h3>
+                        <p class="dig-deeper-subtitle">Curiosity never killed the cat</p>
                     </div>
                     <div class="deep-questions-container" id="deepQuestionsContainer">
                         <!-- Deep questions will be injected -->
@@ -242,10 +269,7 @@
                         <p class="answer-text" id="deepAnswerText"></p>
                     </div>
                     <div class="answer-actions">
-                        <button class="action-button secondary" id="backToDeepQuestionsBtn">
-                            <span>More Questions</span>
-                        </button>
-                        <button class="action-button primary" id="deepDoneBtn">
+                        <button class="action-button primary full-width" id="deepDoneBtn">
                             <span>Done</span>
                         </button>
                     </div>
