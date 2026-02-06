@@ -865,9 +865,25 @@ button {
 
 /* Story Thumbnails - removed, simplified completion screen */
 
+.completion-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    width: 100%;
+    max-width: 280px;
+    margin-top: var(--spacing-lg);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.completion-buttons .secondary-button {
+    width: 100%;
+}
+
 .secondary-button {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-md) var(--spacing-xl);
     background: var(--bg-card);
@@ -877,6 +893,7 @@ button {
     font-weight: 500;
     color: var(--text-primary);
     transition: background var(--transition-fast), transform var(--transition-fast);
+    flex: 1;
 }
 
 .secondary-button:hover {
@@ -885,6 +902,142 @@ button {
 
 .secondary-button:active {
     transform: scale(0.96);
+}
+
+/* ==========================================
+   Recap This Week View
+   ========================================== */
+
+.recap-week-view {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-primary);
+    z-index: var(--z-cards);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: opacity var(--transition-normal), visibility var(--transition-normal), transform var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.recap-week-view.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.recap-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.recap-title {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: var(--spacing-sm);
+}
+
+.recap-stories-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.recap-date-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.recap-date-header {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--spacing-sm) 0;
+    margin-bottom: var(--spacing-xs);
+}
+
+.recap-story-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    cursor: pointer;
+    transition: transform var(--transition-fast), background var(--transition-fast);
+    margin-bottom: var(--spacing-sm);
+}
+
+.recap-story-card:hover {
+    background: var(--bg-card-hover);
+}
+
+.recap-story-card:active {
+    transform: scale(0.98);
+}
+
+.recap-story-emoji {
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.recap-story-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.recap-story-headline {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.recap-arrow {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    opacity: 0.5;
+}
+
+.recap-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl);
+    gap: var(--spacing-md);
+    color: var(--text-secondary);
+}
+
+.recap-loading p {
+    font-size: var(--font-size-sm);
+    margin: 0;
+}
+
+.recap-empty {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: var(--spacing-2xl);
+    text-align: center;
 }
 
 /* ==========================================
@@ -1320,6 +1473,11 @@ button {
     transform: scale(0.96);
 }
 
+.action-button.full-width {
+    flex: none;
+    width: 100%;
+}
+
 /* ==========================================
    Toast
    ========================================== */
@@ -1587,13 +1745,17 @@ button {
     font-family: var(--font-headline);
     font-size: var(--font-size-xl);
     font-weight: 700;
+    font-variation-settings: 'wght' 700;
     color: var(--accent);
     margin-bottom: var(--spacing-xs);
 }
 
 .dig-deeper-subtitle {
+    font-family: var(--font-body);
     font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
+    font-weight: 400;
+    color: var(--text-secondary);
+    font-style: normal;
 }
 
 .deep-questions-container {
@@ -1760,35 +1922,36 @@ button {
 }
 
 /* ==========================================
-   Logo with User Name
+   Logo with User Name - Inter Font
    ========================================== */
 
 .logo-text {
     display: flex;
     align-items: baseline;
     white-space: nowrap;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: font-size var(--transition-fast);
 }
 
 .fyi-text {
     color: var(--accent);
-    font-family: var(--font-headline);
-    font-size: 32px;
-    font-weight: 700;
 }
 
 .fyi-comma {
     color: var(--accent);
-    font-family: var(--font-headline);
-    font-size: 32px;
-    font-weight: 700;
+}
+
+.fyi-space {
+    /* Single space - letter-spacing on .logo-text provides visual separation */
+    display: inline;
 }
 
 .fyi-name {
     color: #FFFFFF;
-    font-family: var(--font-headline);
-    font-size: 32px;
-    font-weight: 700;
-    transition: font-size var(--transition-fast), color var(--transition-normal);
+    transition: color var(--transition-normal);
 }
 
 /* Light mode: name text color inverts to dark */
@@ -1796,12 +1959,9 @@ button {
     color: #1A1A1A;
 }
 
-/* Hide comma and name when no user name is set */
-.fyi-comma:empty + .fyi-name:empty {
-    display: none;
-}
-
+/* Hide comma, space, and name when no user name is set */
 .fyi-comma.hidden,
+.fyi-space.hidden,
 .fyi-name.hidden {
     display: none;
 }
