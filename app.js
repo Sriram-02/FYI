@@ -288,7 +288,12 @@ const state = {
     viewedStories: [],
     longPressTimer: null,
     isLongPress: false,
-    userName: ''
+    userName: '',
+    // Archive mode
+    archiveMode: false,
+    archiveStories: [],
+    archiveIndex: 0,
+    originalStories: [] // Store today's stories when entering archive mode
 };
 
 // ==========================================
@@ -318,8 +323,10 @@ function cacheElements() {
     elements.noStoriesState = document.getElementById('noStoriesState');
     elements.completionScreen = document.getElementById('completionScreen');
     elements.reviewStoriesBtn = document.getElementById('reviewStoriesBtn');
+    elements.yourQuestionsBtn = document.getElementById('yourQuestionsBtn');
     elements.swipeHint = document.getElementById('swipeHint');
     elements.emptyRefreshBtn = document.getElementById('emptyRefreshBtn');
+    elements.prevStoryBtn = document.getElementById('prevStoryBtn');
 
     // Sections
     elements.sectionToday = document.getElementById('sectionToday');
@@ -366,6 +373,11 @@ function cacheElements() {
     elements.deepAnswerText = document.getElementById('deepAnswerText');
     elements.deepDoneBtn = document.getElementById('deepDoneBtn');
 
+    // Modal Prev Buttons
+    elements.answerViewPrev = document.getElementById('answerViewPrev');
+    elements.digDeeperViewPrev = document.getElementById('digDeeperViewPrev');
+    elements.deepAnswerViewPrev = document.getElementById('deepAnswerViewPrev');
+
     // Welcome Modal
     elements.welcomeModalBackdrop = document.getElementById('welcomeModalBackdrop');
     elements.welcomeNameInput = document.getElementById('welcomeNameInput');
@@ -401,8 +413,8 @@ async function init() {
 
     // Check if user has set their name
     const savedName = localStorage.getItem('fyi_user_name');
-    if (savedName) {
-        state.userName = savedName;
+    if (savedName && savedName.trim().length > 0) {
+        state.userName = savedName.trim();
         updateUserNameDisplay();
     } else {
         // Show welcome modal for first-time users
@@ -580,10 +592,10 @@ async function fetchStories() {
 }
 
 // ==========================================
-// Recap This Week Functions
+// Archives Functions
 // ==========================================
 
-async function fetchPastWeekStories() {
+async function fetchArchiveStories() {
     // Check if sheet ID is configured
     if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
         return [];
@@ -601,26 +613,26 @@ async function fetchPastWeekStories() {
         const csvText = await response.text();
         const stories = parseCSV(csvText);
 
-        // Get date range: past 7 days excluding today
+        // Get all stories except today
         const today = getTodayDate();
-        const pastWeekDates = getPastWeekDates();
 
-        // Filter to past week stories only (excluding today)
-        const pastWeekStories = stories.filter(story => {
+        // Filter to archive stories only (excluding today)
+        const archiveStories = stories.filter(story => {
             const storyDate = parseDate(story.date);
-            return storyDate !== today && pastWeekDates.includes(storyDate);
+            return storyDate !== today;
         });
 
         // Sort by date (most recent first)
-        pastWeekStories.sort((a, b) => {
+        archiveStories.sort((a, b) => {
             const dateA = parseDate(a.date);
             const dateB = parseDate(b.date);
             return dateB.localeCompare(dateA);
         });
 
-        return pastWeekStories;
+        // Return last 50 stories
+        return archiveStories.slice(0, 50);
     } catch (error) {
-        console.error('Error fetching past week stories:', error);
+        console.error('Error fetching archive stories:', error);
         return [];
     }
 }
@@ -652,30 +664,74 @@ function formatDateForDisplay(dateStr) {
 async function showRecapView() {
     triggerHaptic('light');
 
-    // Show loading state in recap
-    elements.recapStoriesList.innerHTML = '<div class="recap-loading"><div class="loading-spinner"></div><p>Loading past stories...</p></div>';
-    elements.recapEmpty.style.display = 'none';
+    // Show loading state
+    showLoading(true);
 
-    // Hide completion screen and show recap view
-    elements.completionScreen.classList.remove('visible');
-    elements.recapWeekView.classList.add('visible');
+    // Fetch archive stories
+    const archiveStories = await fetchArchiveStories();
 
-    // Fetch past week stories
-    const pastStories = await fetchPastWeekStories();
+    showLoading(false);
 
-    if (pastStories.length === 0) {
+    if (archiveStories.length === 0) {
+        // Show empty state in recap view
         elements.recapStoriesList.innerHTML = '';
         elements.recapEmpty.style.display = 'block';
-    } else {
-        renderRecapStories(pastStories);
-        elements.recapEmpty.style.display = 'none';
+        elements.completionScreen.classList.remove('visible');
+        elements.recapWeekView.classList.add('visible');
+        return;
     }
+
+    // Enter archive mode - show archive stories as swipeable cards
+    state.archiveMode = true;
+    state.originalStories = [...state.stories]; // Save current stories
+    state.archiveStories = archiveStories;
+    state.archiveIndex = 0;
+
+    // Replace current stories with archive stories
+    state.stories = archiveStories;
+    state.totalStories = archiveStories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    // Hide completion screen
+    elements.completionScreen.classList.remove('visible');
+
+    // Render archive cards
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    showToast('📚', `${archiveStories.length} archive stories loaded`);
 }
 
 function hideRecapView() {
     triggerHaptic('light');
     elements.recapWeekView.classList.remove('visible');
     elements.completionScreen.classList.add('visible');
+}
+
+function exitArchiveMode() {
+    if (!state.archiveMode) return;
+
+    state.archiveMode = false;
+
+    // Restore today's stories
+    state.stories = state.originalStories;
+    state.totalStories = state.stories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+    state.archiveStories = [];
+    state.originalStories = [];
+
+    // Re-render with today's stories
+    elements.completionScreen.classList.remove('visible');
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    showToast('✓', "Back to today's stories");
 }
 
 function renderRecapStories(stories) {
@@ -1014,6 +1070,12 @@ function parseFormattedText(text) {
     // <mark>text</mark> -> yellow highlight background
     formatted = formatted.replace(/<mark>(.*?)<\/mark>/gi, '<span class="text-mark">$1</span>');
 
+    // <lookup def="definition">word</lookup> -> clickable orange underlined word
+    formatted = formatted.replace(
+        /<lookup\s+def="([^"]*)">(.*?)<\/lookup>/gi,
+        '<span class="text-lookup" data-definition="$1" onclick="showLookupTooltip(this, event)">$2</span>'
+    );
+
     return formatted;
 }
 
@@ -1081,12 +1143,12 @@ function renderCards() {
     // Check if no stories
     if (state.stories.length === 0) {
         elements.noStoriesState.classList.add('visible');
-        elements.historyToggle.classList.add('hidden');
+        if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
         return;
     }
 
     elements.noStoriesState.classList.remove('visible');
-    elements.historyToggle.classList.remove('hidden');
+    if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
 
     // Check if completed
     if (state.currentIndex >= state.totalStories) {
@@ -1101,6 +1163,9 @@ function renderCards() {
         const card = createCardElement(story, index);
         elements.cardContainer.appendChild(card);
     });
+
+    // Update prev button visibility
+    updatePrevButtonVisibility();
 }
 
 function createCardElement(story, position) {
@@ -1108,6 +1173,7 @@ function createCardElement(story, position) {
     card.className = 'story-card';
     card.dataset.id = story.id;
     card.dataset.position = position;
+    card.dataset.flipped = 'false';
 
     // Banner image
     let bannerHTML = '';
@@ -1128,16 +1194,75 @@ function createCardElement(story, position) {
     // Use teaser from story, or placeholder if empty
     const teaserText = story.teaser || "This is placeholder teaser text for the story. It should span approximately five lines to show how the expanded subheading area will look with real content from your Google Sheet.";
 
+    // Parse summary for display on back face
+    const summaryText = story.summary || story.teaser || '';
+    const summaryHTML = parseFormattedText(summaryText);
+
+    // Check if user has flipped before (for "Tap to flip" hint)
+    const hasFlippedBefore = localStorage.getItem('fyi_has_flipped') === 'true';
+    const flipHintClass = hasFlippedBefore ? 'hidden' : '';
+
     card.innerHTML = `
-        <div class="card-swipe-overlay left"></div>
-        <div class="card-swipe-overlay right"></div>
-        ${bannerHTML}
-        <div class="card-body">
-            <h2 class="card-headline">${story.headline}</h2>
-            <p class="card-teaser">${teaserText}</p>
-            <div class="card-hint">
-                <span>Curious?</span>
-                <span class="card-hint-arrow">›</span>
+        <div class="card-flipper">
+            <!-- FRONT FACE -->
+            <div class="card-face card-front">
+                <div class="card-swipe-overlay left"></div>
+                <div class="card-swipe-overlay right"></div>
+                ${bannerHTML}
+                <div class="card-body">
+                    <h2 class="card-headline">${story.headline}</h2>
+                    <p class="card-teaser">${teaserText}</p>
+                </div>
+                <!-- Bottom Navigation Indicators -->
+                <div class="card-nav-indicators">
+                    <div class="nav-indicator nav-skip">
+                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 14L4 9l5-5"/>
+                            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+                        </svg>
+                        <span>Skip</span>
+                    </div>
+                    <div class="nav-indicator nav-flip ${flipHintClass}" id="flipHint-${story.id}">
+                        <span>Tap to flip</span>
+                    </div>
+                    <div class="nav-indicator nav-curious">
+                        <span>Curious</span>
+                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 14l5-5-5-5"/>
+                            <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BACK FACE -->
+            <div class="card-face card-back">
+                <div class="card-swipe-overlay left"></div>
+                <div class="card-swipe-overlay right"></div>
+                <div class="card-back-content">
+                    <h3 class="card-back-header">Summary</h3>
+                    <div class="card-summary-text">${summaryHTML}</div>
+                </div>
+                <!-- Bottom Navigation Indicators (same on back) -->
+                <div class="card-nav-indicators">
+                    <div class="nav-indicator nav-skip">
+                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 14L4 9l5-5"/>
+                            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+                        </svg>
+                        <span>Skip</span>
+                    </div>
+                    <div class="nav-indicator nav-flip-back">
+                        <span>Tap to flip back</span>
+                    </div>
+                    <div class="nav-indicator nav-curious">
+                        <span>Curious</span>
+                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 14l5-5-5-5"/>
+                            <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -1147,6 +1272,30 @@ function createCardElement(story, position) {
     }
 
     return card;
+}
+
+// Flip card function
+function flipCard(card, story) {
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (isFlipped) {
+        // Flip back to front
+        card.classList.remove('flipped');
+        card.dataset.flipped = 'false';
+    } else {
+        // Flip to back (summary)
+        card.classList.add('flipped');
+        card.dataset.flipped = 'true';
+
+        // Hide the "Tap to flip" hint permanently after first flip
+        if (localStorage.getItem('fyi_has_flipped') !== 'true') {
+            localStorage.setItem('fyi_has_flipped', 'true');
+            // Hide all flip hints on all cards
+            document.querySelectorAll('.nav-flip').forEach(hint => {
+                hint.classList.add('hidden');
+            });
+        }
+    }
 }
 
 function setupCardInteractions(card, story) {
@@ -1186,7 +1335,7 @@ function handleDragStart(e, card, story) {
         if (!state.isDragging || Math.abs(state.currentX) > 10) return;
         state.isLongPress = true;
         triggerHaptic('heavy'); // Strong haptic for long press
-        openSummaryModal(story);
+        flipCard(card, story);
     }, 600); // 600ms for long press
 }
 
@@ -1261,9 +1410,9 @@ function handleDragEnd(e, card, story) {
             animateCardExit(card, 'left', () => nextCard());
         }
     } else if (Math.abs(deltaX) < 10) {
-        // TAP: Open Summary Modal
+        // TAP: Flip card to show summary
         triggerHaptic('light');
-        openSummaryModal(story);
+        flipCard(card, story);
         card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
         card.style.transform = 'translateX(0) rotate(0) scale(1)';
         setTimeout(() => { card.style.transition = ''; }, 300);
@@ -1329,6 +1478,25 @@ function nextCard() {
         updateProgress();
         renderProgressDots();
         renderCards();
+        updatePrevButtonVisibility();
+    }
+}
+
+function prevCard() {
+    if (state.currentIndex > 0) {
+        state.currentIndex--;
+        saveToStorage();
+        updateProgress();
+        renderProgressDots();
+        renderCards();
+        updatePrevButtonVisibility();
+        triggerHaptic('light');
+    }
+}
+
+function updatePrevButtonVisibility() {
+    if (elements.prevStoryBtn) {
+        elements.prevStoryBtn.classList.toggle('hidden', state.currentIndex === 0);
     }
 }
 
@@ -1364,7 +1532,7 @@ function showCompletion() {
     elements.cardContainer.innerHTML = '';
     elements.completionScreen.classList.add('visible');
     elements.progressFill.style.width = '100%';
-    elements.historyToggle.classList.add('hidden');
+    if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
 
     // Update completion title with user's name
     if (state.userName && elements.completionTitle) {
@@ -1377,11 +1545,12 @@ function resetApp() {
     state.viewedStories = [];
     saveToStorage();
     elements.completionScreen.classList.remove('visible');
-    elements.historyToggle.classList.remove('hidden');
+    if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
     updateProgress();
     renderProgressDots();
     renderCards();
     showSwipeHint();
+    updatePrevButtonVisibility();
     triggerHaptic('light');
 }
 
@@ -1494,65 +1663,107 @@ function showAnswer(question) {
     // Track question clicked
     trackQuestionClicked(state.currentStory.headline, question.text);
 
-    elements.qaView.classList.add('fade-out');
+    console.log('[showAnswer] Transitioning from Q&A to answer view');
 
-    setTimeout(() => {
-        elements.qaView.classList.add('hidden');
-        elements.answerView.classList.remove('hidden');
-        elements.answerView.classList.add('fade-in');
+    // Reset all views first
+    resetAllModalViews();
 
-        elements.answerLabel.textContent = '✦';
-        elements.answerQuestion.textContent = question.text;
-        // Apply HTML formatting to answer text
-        elements.answerText.innerHTML = parseFormattedText(question.answer);
+    // Prepare answer view content before showing
+    elements.answerLabel.textContent = '✦';
+    elements.answerQuestion.textContent = question.text;
+    elements.answerText.innerHTML = parseFormattedText(question.answer);
 
-        // Show/hide Dig Deeper button based on availability
-        const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
-        if (elements.digDeeperBtn) {
-            elements.digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
-        }
+    // Show/hide Dig Deeper button based on availability
+    const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
+    if (elements.digDeeperBtn) {
+        elements.digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
+    }
 
-        resetStars();
+    resetStars();
 
-        setTimeout(() => {
-            elements.answerView.classList.remove('fade-in');
-        }, 300);
-    }, 200);
+    // Now show answer view
+    elements.answerView.classList.remove('hidden');
+    elements.answerView.style.display = 'block';
+    elements.answerView.style.visibility = 'visible';
+    elements.answerView.style.opacity = '1';
+
+    // Force reflow
+    void elements.answerView.offsetHeight;
 }
 
 function showQAView() {
-    // Hide all other views first
-    const hideViews = [elements.answerView, elements.digDeeperView, elements.deepAnswerView].filter(v => v);
+    console.log('[showQAView] Starting transition to Q&A view');
 
-    // Find which view is currently visible
-    const visibleView = hideViews.find(v => !v.classList.contains('hidden'));
+    // STRATEGY 1: Complete reset of all modal views
+    const allViews = [elements.qaView, elements.answerView, elements.digDeeperView, elements.deepAnswerView].filter(v => v);
 
-    if (visibleView) {
-        visibleView.classList.add('fade-out');
+    // First, immediately hide all views without animation
+    allViews.forEach(v => {
+        v.classList.add('hidden');
+        v.classList.remove('fade-out', 'fade-in');
+        // Reset ALL possible inline styles
+        v.style.cssText = '';
+        v.style.zIndex = '';
+        v.style.opacity = '';
+        v.style.visibility = '';
+        v.style.pointerEvents = '';
+        v.style.display = '';
+        v.style.position = '';
+        v.style.transform = '';
+    });
 
-        setTimeout(() => {
-            // Hide all views
-            hideViews.forEach(v => {
-                v.classList.add('hidden');
-                v.classList.remove('fade-out', 'fade-in');
-            });
+    // STRATEGY 2: Force reflow to ensure styles are applied
+    void document.body.offsetHeight;
 
-            // Show Q&A view
-            elements.qaView.classList.remove('hidden');
-            elements.qaView.classList.add('fade-in');
+    // STRATEGY 3: Explicitly show Q&A view
+    elements.qaView.classList.remove('hidden');
+    elements.qaView.style.display = 'block';
+    elements.qaView.style.visibility = 'visible';
+    elements.qaView.style.opacity = '1';
+    elements.qaView.style.pointerEvents = 'auto';
 
-            setTimeout(() => {
-                elements.qaView.classList.remove('fade-in');
-            }, 300);
-        }, 200);
-    } else {
-        // No view visible, just show Q&A
-        hideViews.forEach(v => {
-            v.classList.add('hidden');
-            v.classList.remove('fade-out', 'fade-in');
-        });
-        elements.qaView.classList.remove('hidden', 'fade-out');
+    // STRATEGY 4: Force another reflow
+    void elements.qaView.offsetHeight;
+
+    // STRATEGY 5: Verify modal backdrop is still correctly visible
+    if (!elements.modalBackdrop.classList.contains('visible')) {
+        elements.modalBackdrop.classList.add('visible');
     }
+
+    // STRATEGY 6: Ensure modal container is on top
+    elements.qaModal.style.zIndex = '301';
+
+    console.log('[showQAView] Q&A view should now be visible');
+    console.log('[showQAView] qaView hidden?', elements.qaView.classList.contains('hidden'));
+    console.log('[showQAView] qaView display:', getComputedStyle(elements.qaView).display);
+
+    // Verify function - check everything is correct
+    verifyModalState();
+}
+
+function verifyModalState() {
+    // Check Q&A view is visible
+    const qaViewStyle = getComputedStyle(elements.qaView);
+    const qaViewVisible = qaViewStyle.display !== 'none' && qaViewStyle.visibility !== 'hidden';
+
+    // Check other views are hidden
+    const answerHidden = elements.answerView.classList.contains('hidden');
+    const digDeeperHidden = elements.digDeeperView ? elements.digDeeperView.classList.contains('hidden') : true;
+    const deepAnswerHidden = elements.deepAnswerView ? elements.deepAnswerView.classList.contains('hidden') : true;
+
+    console.log('[verifyModalState] Q&A visible:', qaViewVisible);
+    console.log('[verifyModalState] Answer hidden:', answerHidden);
+    console.log('[verifyModalState] DigDeeper hidden:', digDeeperHidden);
+    console.log('[verifyModalState] DeepAnswer hidden:', deepAnswerHidden);
+
+    // Check for any stray overlay elements
+    const overlays = document.querySelectorAll('[class*="overlay"], [class*="backdrop"]');
+    overlays.forEach(el => {
+        const style = getComputedStyle(el);
+        if (style.position === 'fixed' || style.position === 'absolute') {
+            console.log('[verifyModalState] Found overlay element:', el.className, 'zIndex:', style.zIndex);
+        }
+    });
 }
 
 function closeModal() {
@@ -1661,119 +1872,135 @@ function setupSummaryModalSwipe() {
 // ==========================================
 
 function showDigDeeper() {
+    console.log('[showDigDeeper] Transitioning to dig deeper view');
+
     const question = state.currentQuestion;
     if (!question || !question.deepQuestions || question.deepQuestions.length === 0) {
-        // No deep questions available, just close modal
         showToast('ℹ', 'No follow-up questions available');
         showQAView();
         return;
     }
 
-    elements.answerView.classList.add('fade-out');
+    // Reset all views first
+    resetAllModalViews();
 
-    setTimeout(() => {
-        elements.answerView.classList.add('hidden');
-        elements.answerView.classList.remove('fade-out');
-
-        // Populate deep questions
-        elements.deepQuestionsContainer.innerHTML = '';
-        question.deepQuestions.forEach((dq, index) => {
-            const button = document.createElement('button');
-            button.className = 'deep-question-button';
-            button.innerHTML = `
-                <span class="deep-question-label">✦</span>
-                <span class="deep-question-text">${dq.text}</span>
-            `;
-            button.addEventListener('click', () => {
-                triggerHaptic('light');
-                showDeepAnswer(dq);
-            });
-            elements.deepQuestionsContainer.appendChild(button);
-        });
-
-        // Add "Back to main questions" option
-        const backButton = document.createElement('button');
-        backButton.className = 'deep-question-button';
-        backButton.style.background = 'transparent';
-        backButton.style.border = '1px solid var(--border-color)';
-        backButton.innerHTML = `
-            <span class="deep-question-label">←</span>
-            <span class="deep-question-text">Back to main questions</span>
+    // Populate deep questions
+    elements.deepQuestionsContainer.innerHTML = '';
+    question.deepQuestions.forEach((dq, index) => {
+        const button = document.createElement('button');
+        button.className = 'deep-question-button';
+        button.innerHTML = `
+            <span class="deep-question-label">✦</span>
+            <span class="deep-question-text">${dq.text}</span>
         `;
-        backButton.addEventListener('click', () => {
+        button.addEventListener('click', () => {
             triggerHaptic('light');
-            hideDigDeeper();
+            showDeepAnswer(dq);
         });
-        elements.deepQuestionsContainer.appendChild(backButton);
+        elements.deepQuestionsContainer.appendChild(button);
+    });
 
-        elements.digDeeperView.classList.remove('hidden');
-        elements.digDeeperView.classList.add('fade-in');
+    // Add "Back to main questions" option
+    const backButton = document.createElement('button');
+    backButton.className = 'deep-question-button';
+    backButton.style.background = 'transparent';
+    backButton.style.border = '1px solid var(--border-color)';
+    backButton.innerHTML = `
+        <span class="deep-question-label">←</span>
+        <span class="deep-question-text">Back to main questions</span>
+    `;
+    backButton.addEventListener('click', () => {
+        triggerHaptic('light');
+        hideDigDeeper();
+    });
+    elements.deepQuestionsContainer.appendChild(backButton);
 
-        setTimeout(() => {
-            elements.digDeeperView.classList.remove('fade-in');
-        }, 300);
-    }, 200);
+    // Show dig deeper view
+    elements.digDeeperView.classList.remove('hidden');
+    elements.digDeeperView.style.display = 'block';
+    elements.digDeeperView.style.visibility = 'visible';
+    elements.digDeeperView.style.opacity = '1';
+
+    // Force reflow
+    void elements.digDeeperView.offsetHeight;
 }
 
 function hideDigDeeper() {
-    elements.digDeeperView.classList.add('fade-out');
-
-    setTimeout(() => {
-        elements.digDeeperView.classList.add('hidden');
-        elements.digDeeperView.classList.remove('fade-out');
-        showQAView();
-    }, 200);
+    console.log('[hideDigDeeper] Returning to Q&A view');
+    showQAView();
 }
 
 function showDeepAnswer(deepQuestion) {
-    elements.digDeeperView.classList.add('fade-out');
+    console.log('[showDeepAnswer] Transitioning to deep answer view');
 
-    setTimeout(() => {
-        elements.digDeeperView.classList.add('hidden');
-        elements.digDeeperView.classList.remove('fade-out');
+    // Reset all views first
+    resetAllModalViews();
 
-        elements.deepAnswerQuestion.textContent = deepQuestion.text;
-        // Apply HTML formatting to deep answer text
-        elements.deepAnswerText.innerHTML = parseFormattedText(deepQuestion.answer);
+    // Prepare deep answer content
+    elements.deepAnswerQuestion.textContent = deepQuestion.text;
+    elements.deepAnswerText.innerHTML = parseFormattedText(deepQuestion.answer);
 
-        elements.deepAnswerView.classList.remove('hidden');
-        elements.deepAnswerView.classList.add('fade-in');
+    // Show deep answer view
+    elements.deepAnswerView.classList.remove('hidden');
+    elements.deepAnswerView.style.display = 'block';
+    elements.deepAnswerView.style.visibility = 'visible';
+    elements.deepAnswerView.style.opacity = '1';
 
-        setTimeout(() => {
-            elements.deepAnswerView.classList.remove('fade-in');
-        }, 300);
-    }, 200);
+    // Force reflow
+    void elements.deepAnswerView.offsetHeight;
 }
 
 function backToDeepQuestions() {
-    elements.deepAnswerView.classList.add('fade-out');
+    console.log('[backToDeepQuestions] Transitioning from deep answer to deep questions');
 
-    setTimeout(() => {
-        elements.deepAnswerView.classList.add('hidden');
-        elements.deepAnswerView.classList.remove('fade-out');
+    // Immediately reset all views
+    resetAllModalViews();
 
-        elements.digDeeperView.classList.remove('hidden');
-        elements.digDeeperView.classList.add('fade-in');
+    // Show only dig deeper view
+    elements.digDeeperView.classList.remove('hidden');
+    elements.digDeeperView.style.display = 'block';
+    elements.digDeeperView.style.visibility = 'visible';
+    elements.digDeeperView.style.opacity = '1';
 
-        setTimeout(() => {
-            elements.digDeeperView.classList.remove('fade-in');
-        }, 300);
-    }, 200);
+    // Force reflow
+    void elements.digDeeperView.offsetHeight;
+}
+
+function hideDigDeeperToAnswer() {
+    console.log('[hideDigDeeperToAnswer] Transitioning from dig deeper to answer');
+
+    // Immediately reset all views
+    resetAllModalViews();
+
+    // Show only answer view
+    elements.answerView.classList.remove('hidden');
+    elements.answerView.style.display = 'block';
+    elements.answerView.style.visibility = 'visible';
+    elements.answerView.style.opacity = '1';
+
+    // Force reflow
+    void elements.answerView.offsetHeight;
 }
 
 function deepDone() {
-    // Close from deep answer and return to main Q&A view (with the 4 main questions)
-    elements.deepAnswerView.classList.add('fade-out');
+    console.log('[deepDone] Returning to Q&A view from deep answer');
 
-    setTimeout(() => {
-        elements.deepAnswerView.classList.add('hidden');
-        elements.deepAnswerView.classList.remove('fade-out');
-        // Also ensure dig deeper view is hidden
-        elements.digDeeperView.classList.add('hidden');
-        elements.digDeeperView.classList.remove('fade-out', 'fade-in');
-        // Return to main Q&A view
-        showQAView();
-    }, 200);
+    // Use the comprehensive showQAView function
+    showQAView();
+}
+
+// Helper function to reset all modal views to hidden state
+function resetAllModalViews() {
+    const allViews = [elements.qaView, elements.answerView, elements.digDeeperView, elements.deepAnswerView].filter(v => v);
+
+    allViews.forEach(v => {
+        v.classList.add('hidden');
+        v.classList.remove('fade-out', 'fade-in');
+        v.style.cssText = '';
+    });
+
+    // Force reflow
+    void document.body.offsetHeight;
 }
 
 // ==========================================
@@ -1909,10 +2136,10 @@ function switchSection(sectionName) {
 
     if (sectionName === 'today') {
         elements.sectionToday.classList.add('active');
-        elements.historyToggle.classList.remove('hidden');
+        if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
     } else {
         elements.sectionHistory.classList.add('active');
-        elements.historyToggle.classList.add('hidden');
+        if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
     }
 }
 
@@ -1970,6 +2197,70 @@ function resetStars() {
     state.currentHistoryEntry = null;
     const stars = elements.starRating.querySelectorAll('.star');
     stars.forEach(star => star.classList.remove('active', 'filling'));
+}
+
+// ==========================================
+// Word Lookup Tooltip
+// ==========================================
+
+function createLookupTooltip() {
+    // Create tooltip if it doesn't exist
+    if (document.getElementById('lookupTooltip')) return;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'lookup-tooltip';
+    tooltip.id = 'lookupTooltip';
+    tooltip.innerHTML = `
+        <div class="lookup-tooltip-header">FYI explains</div>
+        <div class="lookup-tooltip-content" id="lookupTooltipContent"></div>
+    `;
+    document.body.appendChild(tooltip);
+}
+
+function showLookupTooltip(element, event) {
+    event.stopPropagation(); // Prevent card flip
+
+    createLookupTooltip();
+
+    const tooltip = document.getElementById('lookupTooltip');
+    const content = document.getElementById('lookupTooltipContent');
+    const definition = element.dataset.definition;
+
+    if (!definition) return;
+
+    content.textContent = definition;
+
+    // Position tooltip near the word
+    const rect = element.getBoundingClientRect();
+    const tooltipWidth = 280;
+
+    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+    left = Math.max(16, Math.min(left, window.innerWidth - tooltipWidth - 16));
+
+    let top = rect.bottom + 8;
+    // If not enough space below, show above
+    if (top + 150 > window.innerHeight) {
+        top = rect.top - 120;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.classList.add('visible');
+
+    triggerHaptic('light');
+
+    // Close on click outside (after a small delay)
+    setTimeout(() => {
+        document.addEventListener('click', closeLookupTooltip, { once: true });
+        document.addEventListener('touchstart', closeLookupTooltip, { once: true });
+    }, 10);
+}
+
+function closeLookupTooltip() {
+    const tooltip = document.getElementById('lookupTooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
 }
 
 // ==========================================
@@ -2145,7 +2436,10 @@ function setupEventListeners() {
     // Logo click to reset to Story 1
     elements.headerLogo.addEventListener('click', () => {
         triggerHaptic('light');
-        if (state.stories.length > 0 && (state.currentIndex > 0 || elements.completionScreen.classList.contains('visible'))) {
+        if (state.archiveMode) {
+            // Exit archive mode and return to today's stories
+            exitArchiveMode();
+        } else if (state.stories.length > 0 && (state.currentIndex > 0 || elements.completionScreen.classList.contains('visible'))) {
             resetApp();
             showToast('✓', 'Back to first story');
         }
@@ -2192,6 +2486,28 @@ function setupEventListeners() {
         });
     }
 
+    // Modal Prev buttons
+    if (elements.answerViewPrev) {
+        elements.answerViewPrev.addEventListener('click', () => {
+            triggerHaptic('light');
+            showQAView();
+        });
+    }
+
+    if (elements.digDeeperViewPrev) {
+        elements.digDeeperViewPrev.addEventListener('click', () => {
+            triggerHaptic('light');
+            hideDigDeeperToAnswer();
+        });
+    }
+
+    if (elements.deepAnswerViewPrev) {
+        elements.deepAnswerViewPrev.addEventListener('click', () => {
+            triggerHaptic('light');
+            backToDeepQuestions();
+        });
+    }
+
     // Summary Modal close button
     if (elements.summaryModalClose) {
         elements.summaryModalClose.addEventListener('click', () => {
@@ -2216,6 +2532,21 @@ function setupEventListeners() {
         resetApp();
     });
 
+    // Your Questions button (on completion screen)
+    if (elements.yourQuestionsBtn) {
+        elements.yourQuestionsBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            switchSection('history');
+        });
+    }
+
+    // Prev Story button
+    if (elements.prevStoryBtn) {
+        elements.prevStoryBtn.addEventListener('click', () => {
+            prevCard();
+        });
+    }
+
     // Recap This Week button
     if (elements.recapWeekBtn) {
         elements.recapWeekBtn.addEventListener('click', () => {
@@ -2233,10 +2564,12 @@ function setupEventListeners() {
     // Star rating
     setupStarRating();
 
-    // History toggle
-    elements.historyToggle.addEventListener('click', () => {
-        switchSection('history');
-    });
+    // History toggle (legacy floating button, may be removed)
+    if (elements.historyToggle) {
+        elements.historyToggle.addEventListener('click', () => {
+            switchSection('history');
+        });
+    }
 
     // History back button
     elements.historyBackBtn.addEventListener('click', () => {
