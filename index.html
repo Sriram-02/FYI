@@ -2,7 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- CRITICAL: Viewport configuration to prevent Android/Chrome auto-scaling
+         - width=device-width: Use device width, not scaled width
+         - initial-scale=1.0: Start at 1:1 scale
+         - maximum-scale=1.0: Prevent zoom scaling
+         - minimum-scale=1.0: Lock minimum scale
+         - user-scalable=no: Disable pinch zoom
+         - viewport-fit=cover: Fill safe areas -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- Disable Chrome's automatic text inflation on Android -->
+    <meta name="HandheldFriendly" content="true">
+    <meta name="MobileOptimized" content="width">
     <meta name="theme-color" content="#0A0A0A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
