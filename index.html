@@ -132,8 +132,8 @@
                 <!-- Completion Screen -->
                 <div class="completion-screen" id="completionScreen">
                     <div class="completion-content">
-                        <div class="completion-icon">✨</div>
-                        <h2 class="completion-title" id="completionTitle">You're all caught up</h2>
+                        <img class="completion-image" id="completionImage" src="images/cat-sleep.jpg" alt="Sleeping cat">
+                        <h2 class="completion-title" id="completionTitle">Take a break</h2>
                         <p class="completion-subtitle">That's your daily dose of critical thinking.</p>
 
                         <div class="completion-buttons">
@@ -141,10 +141,6 @@
                                 <span>Review stories</span>
                             </button>
                             <button class="secondary-button" id="yourQuestionsBtn">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <polyline points="12 6 12 12 16 14"/>
-                                </svg>
                                 <span>Your questions</span>
                             </button>
                             <button class="secondary-button" id="recapWeekBtn">
@@ -157,12 +153,6 @@
                 <!-- Recap Week View -->
                 <div class="recap-week-view" id="recapWeekView">
                     <div class="recap-header">
-                        <button class="back-button" id="recapBackBtn">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="15 18 9 12 15 6"/>
-                            </svg>
-                            <span>Back</span>
-                        </button>
                         <h2 class="recap-title">Archives</h2>
                     </div>
                     <div class="recap-stories-list" id="recapStoriesList">
@@ -188,12 +178,6 @@
             <!-- History Section -->
             <section class="section section-history" id="sectionHistory">
                 <div class="section-header">
-                    <button class="back-button" id="historyBackBtn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="15 18 9 12 15 6"/>
-                        </svg>
-                        <span>Back</span>
-                    </button>
                     <h2 class="section-title">Questions You've Been Curious About</h2>
                 </div>
                 <div class="history-list" id="historyList">
@@ -377,6 +361,11 @@
                 <button class="welcome-button" id="welcomeSubmitBtn">Let's go</button>
             </div>
         </div>
+
+        <!-- Global Footer -->
+        <footer class="global-footer" id="globalFooter">
+            <span>© 2026 FYI • Made in IIMB</span>
+        </footer>
     </div>
 
     <script src="app.js"></script>
