@@ -293,7 +293,11 @@ const state = {
     archiveMode: false,
     archiveStories: [],
     archiveIndex: 0,
-    originalStories: [] // Store today's stories when entering archive mode
+    originalStories: [], // Store today's stories when entering archive mode
+    // Track if navigated from completion screen
+    cameFromCompletion: false,
+    // Track if in recap view (accessed from completion)
+    inRecapView: false
 };
 
 // ==========================================
@@ -664,6 +668,10 @@ function formatDateForDisplay(dateStr) {
 async function showRecapView() {
     triggerHaptic('light');
 
+    // Track that we came from completion screen
+    state.cameFromCompletion = true;
+    state.inRecapView = true;
+
     // Show loading state
     showLoading(true);
 
@@ -678,6 +686,8 @@ async function showRecapView() {
         elements.recapEmpty.style.display = 'block';
         elements.completionScreen.classList.remove('visible');
         elements.recapWeekView.classList.add('visible');
+        // Show prev button for returning to completion
+        updatePrevButtonForCompletionNav();
         return;
     }
 
@@ -709,6 +719,10 @@ function hideRecapView() {
     triggerHaptic('light');
     elements.recapWeekView.classList.remove('visible');
     elements.completionScreen.classList.add('visible');
+    // Reset navigation state
+    state.cameFromCompletion = false;
+    state.inRecapView = false;
+    updatePrevButtonVisibility();
 }
 
 function exitArchiveMode() {
@@ -1067,6 +1081,9 @@ function parseFormattedText(text) {
     // <color2>text</color2> -> teal/blue secondary color
     formatted = formatted.replace(/<color2>(.*?)<\/color2>/gi, '<span class="text-color2">$1</span>');
 
+    // <color3>text</color3> -> plum/purple color (#6B5C8A)
+    formatted = formatted.replace(/<color3>(.*?)<\/color3>/gi, '<span class="text-color3">$1</span>');
+
     // <mark>text</mark> -> yellow highlight background
     formatted = formatted.replace(/<mark>(.*?)<\/mark>/gi, '<span class="text-mark">$1</span>');
 
@@ -1213,25 +1230,25 @@ function createCardElement(story, position) {
                     <h2 class="card-headline">${story.headline}</h2>
                     <p class="card-teaser">${teaserText}</p>
                 </div>
-                <!-- Bottom Navigation Indicators -->
+                <!-- Bottom Navigation Indicators - All clickable -->
                 <div class="card-nav-indicators">
-                    <div class="nav-indicator nav-skip">
+                    <button class="nav-indicator nav-skip" data-action="skip">
                         <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 14L4 9l5-5"/>
                             <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
                         </svg>
                         <span>Skip</span>
-                    </div>
-                    <div class="nav-indicator nav-flip ${flipHintClass}" id="flipHint-${story.id}">
+                    </button>
+                    <button class="nav-indicator nav-flip" data-action="flip" id="flipHint-${story.id}">
                         <span>Tap to flip</span>
-                    </div>
-                    <div class="nav-indicator nav-curious">
+                    </button>
+                    <button class="nav-indicator nav-curious" data-action="curious">
                         <span>Curious</span>
                         <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M15 14l5-5-5-5"/>
                             <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
                         </svg>
-                    </div>
+                    </button>
                 </div>
             </div>
 
@@ -1243,25 +1260,25 @@ function createCardElement(story, position) {
                     <h3 class="card-back-header">Summary</h3>
                     <div class="card-summary-text">${summaryHTML}</div>
                 </div>
-                <!-- Bottom Navigation Indicators (same on back) -->
+                <!-- Bottom Navigation Indicators - All clickable -->
                 <div class="card-nav-indicators">
-                    <div class="nav-indicator nav-skip">
+                    <button class="nav-indicator nav-skip" data-action="skip">
                         <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 14L4 9l5-5"/>
                             <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
                         </svg>
                         <span>Skip</span>
-                    </div>
-                    <div class="nav-indicator nav-flip-back">
+                    </button>
+                    <button class="nav-indicator nav-flip-back" data-action="flip">
                         <span>Tap to flip back</span>
-                    </div>
-                    <div class="nav-indicator nav-curious">
+                    </button>
+                    <button class="nav-indicator nav-curious" data-action="curious">
                         <span>Curious</span>
                         <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M15 14l5-5-5-5"/>
                             <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
                         </svg>
-                    </div>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1299,21 +1316,56 @@ function flipCard(card, story) {
 }
 
 function setupCardInteractions(card, story) {
-    // Touch events
+    // Touch events for swiping
     card.addEventListener('touchstart', (e) => handleDragStart(e, card, story), { passive: true });
     card.addEventListener('touchmove', (e) => handleDragMove(e, card), { passive: false });
     card.addEventListener('touchend', (e) => handleDragEnd(e, card, story));
 
-    // Mouse events for desktop
+    // Mouse events for desktop swiping
     card.addEventListener('mousedown', (e) => handleDragStart(e, card, story));
     card.addEventListener('mousemove', (e) => handleDragMove(e, card));
     card.addEventListener('mouseup', (e) => handleDragEnd(e, card, story));
     card.addEventListener('mouseleave', (e) => {
-        clearLongPressTimer();
         if (state.isDragging) handleDragEnd(e, card, story);
     });
 
-    // Tap opens Summary Modal (handled in handleDragEnd when no swipe detected)
+    // Setup click handlers for nav buttons (Skip, Flip, Curious)
+    setupNavButtonHandlers(card, story);
+}
+
+function setupNavButtonHandlers(card, story) {
+    // Find all nav indicator buttons
+    const navButtons = card.querySelectorAll('.nav-indicator');
+
+    navButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent swipe handler from triggering
+            const action = btn.dataset.action;
+
+            if (action === 'skip') {
+                // Skip: animate card left and go to next
+                triggerHaptic('light');
+                animateCardExit(card, 'left', () => nextCard());
+            } else if (action === 'flip') {
+                // Flip: toggle card flip
+                triggerHaptic('light');
+                flipCard(card, story);
+            } else if (action === 'curious') {
+                // Curious: open Q&A modal
+                triggerHaptic('medium');
+                animateCardExitWithModal(card, 'right', () => {}, story);
+            }
+        });
+
+        // Prevent touch events on buttons from triggering swipe
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+
+        btn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+        });
+    });
 }
 
 // ==========================================
@@ -1328,22 +1380,12 @@ function handleDragStart(e, card, story) {
     state.currentX = 0;
     card.classList.add('dragging');
     hideSwipeHint();
-
-    // Start long press timer (500-700ms)
-    clearLongPressTimer();
-    state.longPressTimer = setTimeout(() => {
-        if (!state.isDragging || Math.abs(state.currentX) > 10) return;
-        state.isLongPress = true;
-        triggerHaptic('heavy'); // Strong haptic for long press
-        flipCard(card, story);
-    }, 600); // 600ms for long press
+    // Long-press flip REMOVED - flip is now only via "Tap to flip" button
 }
 
+// Long-press timer functions REMOVED - flip is now only via "Tap to flip" button
 function clearLongPressTimer() {
-    if (state.longPressTimer) {
-        clearTimeout(state.longPressTimer);
-        state.longPressTimer = null;
-    }
+    // No-op: long press timer removed
 }
 
 function handleDragMove(e, card) {
@@ -1354,11 +1396,6 @@ function handleDragMove(e, card) {
 
     const deltaX = clientX - state.startX;
     const deltaY = clientY - state.startY;
-
-    // Cancel long press if user moves finger
-    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-        clearLongPressTimer();
-    }
 
     if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaX) < 10) {
         return;
@@ -1382,21 +1419,10 @@ function handleDragMove(e, card) {
 function handleDragEnd(e, card, story) {
     if (!state.isDragging) return;
 
-    clearLongPressTimer();
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right');
 
     const deltaX = state.currentX;
-
-    // If long press was triggered, don't do anything else
-    if (state.isLongPress) {
-        state.isLongPress = false;
-        card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-        card.style.transform = 'translateX(0) rotate(0) scale(1)';
-        setTimeout(() => { card.style.transition = ''; }, 300);
-        state.currentX = 0;
-        return;
-    }
 
     if (Math.abs(deltaX) > state.dragThreshold) {
         triggerHaptic('medium');
@@ -1409,15 +1435,8 @@ function handleDragEnd(e, card, story) {
             // Swipe LEFT: Skip to next card
             animateCardExit(card, 'left', () => nextCard());
         }
-    } else if (Math.abs(deltaX) < 10) {
-        // TAP: Flip card to show summary
-        triggerHaptic('light');
-        flipCard(card, story);
-        card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-        card.style.transform = 'translateX(0) rotate(0) scale(1)';
-        setTimeout(() => { card.style.transition = ''; }, 300);
     } else {
-        // Small drag, snap back
+        // Tap or small drag: snap back (flip is ONLY via "Tap to flip" button)
         card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
         card.style.transform = 'translateX(0) rotate(0) scale(1)';
         setTimeout(() => { card.style.transition = ''; }, 300);
@@ -1496,7 +1515,16 @@ function prevCard() {
 
 function updatePrevButtonVisibility() {
     if (elements.prevStoryBtn) {
-        elements.prevStoryBtn.classList.toggle('hidden', state.currentIndex === 0);
+        // Hide prev button on first story, unless we came from completion screen
+        const shouldHide = state.currentIndex === 0 && !state.cameFromCompletion && !state.inRecapView;
+        elements.prevStoryBtn.classList.toggle('hidden', shouldHide);
+    }
+}
+
+// Show prev button when navigating from completion screen to history/recap
+function updatePrevButtonForCompletionNav() {
+    if (elements.prevStoryBtn && state.cameFromCompletion) {
+        elements.prevStoryBtn.classList.remove('hidden');
     }
 }
 
@@ -1534,9 +1562,36 @@ function showCompletion() {
     elements.progressFill.style.width = '100%';
     if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
 
-    // Update completion title with user's name
+    // Update completion title with user's name - "Take a break, [name]"
     if (state.userName && elements.completionTitle) {
-        elements.completionTitle.textContent = `You're all caught up, ${state.userName}`;
+        elements.completionTitle.textContent = `Take a break, ${state.userName}`;
+    }
+
+    // Update button labels based on archive mode
+    updateCompletionButtons();
+}
+
+function updateCompletionButtons() {
+    // "Review Stories" button - loops within current context
+    const reviewBtn = elements.reviewStoriesBtn;
+    if (reviewBtn) {
+        const reviewText = reviewBtn.querySelector('span');
+        if (state.archiveMode) {
+            reviewText.textContent = 'Review archives';
+        } else {
+            reviewText.textContent = 'Review stories';
+        }
+    }
+
+    // "Go to Archives" button - switches context
+    const archiveBtn = elements.recapWeekBtn;
+    if (archiveBtn) {
+        const archiveText = archiveBtn.querySelector('span');
+        if (state.archiveMode) {
+            archiveText.textContent = "Back to today";
+        } else {
+            archiveText.textContent = 'Go to archives';
+        }
     }
 }
 
@@ -2137,9 +2192,14 @@ function switchSection(sectionName) {
     if (sectionName === 'today') {
         elements.sectionToday.classList.add('active');
         if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
+        // Reset navigation state when returning to today
+        state.cameFromCompletion = false;
+        updatePrevButtonVisibility();
     } else {
         elements.sectionHistory.classList.add('active');
         if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
+        // Show prev button if came from completion
+        updatePrevButtonForCompletionNav();
     }
 }
 
@@ -2536,28 +2596,42 @@ function setupEventListeners() {
     if (elements.yourQuestionsBtn) {
         elements.yourQuestionsBtn.addEventListener('click', () => {
             triggerHaptic('light');
+            state.cameFromCompletion = true; // Track that we came from completion
             switchSection('history');
         });
     }
 
-    // Prev Story button
+    // Prev Story button - handles both card navigation AND returning from completion-accessed pages
     if (elements.prevStoryBtn) {
         elements.prevStoryBtn.addEventListener('click', () => {
+            // If we're in history section (came from completion's "Your Questions")
+            if (state.currentSection === 'history' && state.cameFromCompletion) {
+                // Return to completion screen
+                state.cameFromCompletion = false;
+                switchSection('today');
+                elements.completionScreen.classList.add('visible');
+                return;
+            }
+            // If we're in recap view (came from completion's "Go to archives")
+            if (state.inRecapView && state.cameFromCompletion) {
+                hideRecapView();
+                return;
+            }
+            // Default: go to previous card
             prevCard();
         });
     }
 
-    // Recap This Week button
+    // Recap This Week / Back to Today button - toggles between modes
     if (elements.recapWeekBtn) {
         elements.recapWeekBtn.addEventListener('click', () => {
-            showRecapView();
-        });
-    }
-
-    // Recap back button
-    if (elements.recapBackBtn) {
-        elements.recapBackBtn.addEventListener('click', () => {
-            hideRecapView();
+            if (state.archiveMode) {
+                // In archive mode: go back to today's stories
+                exitArchiveMode();
+            } else {
+                // In today mode: go to archives
+                showRecapView();
+            }
         });
     }
 
@@ -2571,10 +2645,7 @@ function setupEventListeners() {
         });
     }
 
-    // History back button
-    elements.historyBackBtn.addEventListener('click', () => {
-        switchSection('today');
-    });
+    // History back button - REMOVED from HTML, functionality moved to global Prev button
 
     // Welcome modal submit
     if (elements.welcomeSubmitBtn) {
