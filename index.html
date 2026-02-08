@@ -68,14 +68,31 @@
             </div>
         </div>
 
-        <!-- Date Display -->
-        <div class="date-display" id="dateDisplay">
-            <!-- Date will be injected by JS -->
-        </div>
+        <!-- Story Navigation Bar -->
+        <div class="story-nav-bar">
+            <!-- Top row: Prev button + Dots -->
+            <div class="story-nav-row">
+                <!-- Prev Button -->
+                <button class="prev-story-btn hidden" id="prevStoryBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                    <span>Prev</span>
+                </button>
 
-        <!-- Progress Dots -->
-        <div class="progress-dots" id="progressDots">
-            <!-- Dots will be injected by JS -->
+                <!-- Progress Dots -->
+                <div class="progress-dots" id="progressDots">
+                    <!-- Dots will be injected by JS -->
+                </div>
+
+                <!-- Spacer for balance -->
+                <div class="nav-spacer"></div>
+            </div>
+
+            <!-- Bottom row: Date -->
+            <div class="date-display" id="dateDisplay">
+                <!-- Date will be injected by JS -->
+            </div>
         </div>
 
         <!-- Pull to Refresh Indicator -->
@@ -123,8 +140,15 @@
                             <button class="secondary-button" id="reviewStoriesBtn">
                                 <span>Review stories</span>
                             </button>
+                            <button class="secondary-button" id="yourQuestionsBtn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span>Your questions</span>
+                            </button>
                             <button class="secondary-button" id="recapWeekBtn">
-                                <span>Recap this week</span>
+                                <span>Go to archives</span>
                             </button>
                         </div>
                     </div>
@@ -139,7 +163,7 @@
                             </svg>
                             <span>Back</span>
                         </button>
-                        <h2 class="recap-title">This Week's Stories</h2>
+                        <h2 class="recap-title">Archives</h2>
                     </div>
                     <div class="recap-stories-list" id="recapStoriesList">
                         <!-- Past week stories will be injected -->
@@ -183,14 +207,14 @@
             </section>
         </main>
 
-        <!-- History Toggle Button -->
-        <button class="history-toggle" id="historyToggle">
+        <!-- History Toggle Button - REMOVED, now in completion screen -->
+        <!-- <button class="history-toggle" id="historyToggle">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span>Your Questions</span>
-        </button>
+        </button> -->
 
         <!-- Q&A Modal -->
         <div class="modal-backdrop" id="modalBackdrop">
@@ -221,6 +245,11 @@
 
                 <!-- Answer View -->
                 <div class="modal-view hidden" id="answerView">
+                    <button class="modal-prev" id="answerViewPrev">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"/>
+                        </svg>
+                    </button>
                     <div class="answer-header">
                         <span class="answer-label" id="answerLabel">A</span>
                         <p class="answer-question" id="answerQuestion"></p>
@@ -250,6 +279,11 @@
 
                 <!-- Dig Deeper View -->
                 <div class="modal-view hidden" id="digDeeperView">
+                    <button class="modal-prev" id="digDeeperViewPrev">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"/>
+                        </svg>
+                    </button>
                     <div class="dig-deeper-header">
                         <h3 class="dig-deeper-title">Dig Deeper</h3>
                         <p class="dig-deeper-subtitle">Curiosity never killed the cat</p>
@@ -261,6 +295,11 @@
 
                 <!-- Deep Answer View -->
                 <div class="modal-view hidden" id="deepAnswerView">
+                    <button class="modal-prev" id="deepAnswerViewPrev">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"/>
+                        </svg>
+                    </button>
                     <div class="answer-header">
                         <span class="answer-label">✦</span>
                         <p class="answer-question" id="deepAnswerQuestion"></p>
