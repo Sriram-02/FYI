@@ -365,13 +365,61 @@ button {
 }
 
 /* Date Display */
+/* Story Navigation Bar */
+.story-nav-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-lg);
+    gap: var(--spacing-xs);
+}
+
+.story-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.nav-spacer {
+    width: 60px; /* Same as prev button min-width for balance */
+}
+
+.prev-story-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--accent);
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), opacity var(--transition-fast);
+    min-width: 60px;
+}
+
+.prev-story-btn:hover {
+    background: var(--bg-card);
+}
+
+.prev-story-btn:active {
+    opacity: 0.7;
+}
+
+.prev-story-btn.hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .date-display {
     text-align: center;
     font-family: var(--font-body);
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-secondary);
-    padding: var(--spacing-xs) 0;
 }
 
 /* Progress Dots */
@@ -379,7 +427,6 @@ button {
     display: flex;
     justify-content: center;
     gap: var(--spacing-xs);
-    padding-bottom: var(--spacing-sm);
 }
 
 .progress-dot {
@@ -561,16 +608,18 @@ button {
     position: absolute;
     width: calc(100% - var(--spacing-xl) * 2);
     max-width: 400px;
-    background: var(--bg-card);
+    height: auto;
+    min-height: 420px;
+    background: transparent;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card);
     cursor: grab;
     touch-action: pan-y;
     user-select: none;
     transform-origin: center center;
-    transition: box-shadow var(--transition-normal), background var(--transition-normal);
+    transition: box-shadow var(--transition-normal);
     will-change: transform;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .story-card:active {
@@ -675,16 +724,12 @@ button {
     transform: translateY(0) scale(1);
 }
 
-.story-card[data-position="1"] {
-    z-index: 2;
-    transform: translateY(8px) scale(0.96);
-    opacity: 0.7;
-}
-
+/* Hide all cards except the top one - no stacked card visibility */
+.story-card[data-position="1"],
 .story-card[data-position="2"] {
-    z-index: 1;
-    transform: translateY(16px) scale(0.92);
-    opacity: 0.4;
+    display: none;
+    visibility: hidden;
+    opacity: 0;
 }
 
 /* Premium Swipe Visual Feedback - subtle gradient overlays */
@@ -712,6 +757,116 @@ button {
 
 .story-card.swiping-right .card-swipe-overlay.right {
     opacity: 1;
+}
+
+/* ==========================================
+   Card Flip Styles
+   ========================================== */
+
+.story-card {
+    perspective: 1000px;
+}
+
+.card-flipper {
+    position: relative;
+    width: 100%;
+    min-height: 420px;
+    transform-style: preserve-3d;
+    transition: transform 450ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.story-card.flipped .card-flipper {
+    transform: rotateY(180deg);
+}
+
+.card-face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 420px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: var(--bg-card);
+    box-shadow: var(--shadow-card);
+}
+
+.card-front {
+    z-index: 2;
+}
+
+.card-back {
+    transform: rotateY(180deg);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-back-content {
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-xl) + 48px);
+    flex: 1;
+    overflow-y: auto;
+}
+
+.card-back-header {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: var(--spacing-lg);
+    text-align: center;
+}
+
+.card-summary-text {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    line-height: var(--line-height-relaxed);
+}
+
+/* Bottom Navigation Indicators */
+.card-nav-indicators {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(transparent, var(--bg-card) 40%);
+    z-index: 10;
+}
+
+.nav-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+}
+
+.nav-skip {
+    color: var(--text-tertiary);
+}
+
+.nav-flip,
+.nav-flip-back {
+    color: var(--text-primary);
+}
+
+.nav-curious {
+    color: var(--accent);
+}
+
+.nav-arrow {
+    flex-shrink: 0;
+}
+
+.nav-indicator.hidden {
+    visibility: hidden;
 }
 
 /* ==========================================
@@ -1234,6 +1389,38 @@ button {
 
 .modal-close:active {
     transform: scale(0.92);
+}
+
+/* Modal Prev Button - 20% smaller */
+.modal-prev {
+    position: absolute;
+    top: var(--spacing-md);
+    left: var(--spacing-md);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    /* Only transition colors, not position - prevents glitching */
+    transition: background var(--transition-fast), color var(--transition-fast);
+    z-index: 10;
+}
+
+.modal-prev svg {
+    width: 16px;
+    height: 16px;
+}
+
+.modal-prev:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.modal-prev:active {
+    opacity: 0.7;
 }
 
 /* Modal Views */
@@ -1985,6 +2172,56 @@ button {
     background: rgba(255, 235, 120, 0.35);
     padding: 0 3px;
     border-radius: 2px;
+}
+
+/* Lookup: Orange underlined clickable word */
+.text-lookup {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    transition: text-decoration-style var(--transition-fast);
+}
+
+.text-lookup:hover {
+    text-decoration-style: solid;
+}
+
+/* Lookup Tooltip */
+.lookup-tooltip {
+    position: fixed;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-elevated);
+    z-index: var(--z-toast);
+    max-width: 280px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+}
+
+.lookup-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.lookup-tooltip-header {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--spacing-xs);
+}
+
+.lookup-tooltip-content {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    line-height: var(--line-height-relaxed);
 }
 
 /* Light mode adjustments for text formatting */
