@@ -811,9 +811,11 @@ button {
     flex-direction: column;
 }
 
-/* Summary tile - starts higher on screen with reduced top padding */
+/* Summary tile - positioned with two-line gap from date
+   Two lines = font-size-sm (14px) * line-height-normal (1.5) * 2 = 42px
+   Using calc for proper spacing */
 .card-back-content {
-    padding: var(--spacing-sm) var(--spacing-lg);
+    padding: calc(var(--font-size-sm) * var(--line-height-normal) * 2) var(--spacing-lg);
     padding-bottom: calc(var(--spacing-xl) + 48px);
     flex: 1;
     overflow-y: auto;
@@ -825,6 +827,7 @@ button {
     font-weight: 700;
     color: var(--accent);
     margin-bottom: var(--spacing-md);
+    margin-top: 0;
     text-align: center;
 }
 
