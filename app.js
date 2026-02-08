@@ -748,6 +748,40 @@ function exitArchiveMode() {
     showToast('✓', "Back to today's stories");
 }
 
+// Exit archive mode and return to completion screen (used by Prev button)
+function exitArchiveModeToCompletion() {
+    if (!state.archiveMode) return;
+
+    state.archiveMode = false;
+    state.cameFromCompletion = false;
+    state.inRecapView = false;
+
+    // Restore today's stories
+    state.stories = state.originalStories;
+    state.totalStories = state.stories.length;
+    state.currentIndex = state.totalStories; // Set to end so completion shows
+    state.viewedStories = [];
+    state.archiveStories = [];
+    state.originalStories = [];
+
+    // Clear all cards from DOM
+    elements.cardContainer.innerHTML = '';
+
+    // Show completion screen
+    elements.completionScreen.classList.add('visible');
+    elements.progressFill.style.width = '100%';
+    if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
+
+    // Update completion title
+    if (state.userName && elements.completionTitle) {
+        elements.completionTitle.textContent = `Take a break, ${state.userName}`;
+    }
+
+    updateCompletionButtons();
+    updatePrevButtonVisibility();
+    triggerHaptic('light');
+}
+
 function renderRecapStories(stories) {
     // Group stories by date
     const groupedByDate = {};
@@ -1502,6 +1536,28 @@ function nextCard() {
 }
 
 function prevCard() {
+    // If on completion screen, clear it first and show last story
+    if (elements.completionScreen.classList.contains('visible')) {
+        elements.completionScreen.classList.remove('visible');
+        // Restore history toggle if present
+        if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
+        // Decrement to show last story
+        if (state.currentIndex > 0) {
+            state.currentIndex--;
+        } else {
+            // If at index 0, we need to go to last story (totalStories - 1)
+            state.currentIndex = Math.max(0, state.totalStories - 1);
+        }
+        saveToStorage();
+        updateProgress();
+        renderProgressDots();
+        renderCards();
+        updatePrevButtonVisibility();
+        triggerHaptic('light');
+        return;
+    }
+
+    // Normal prev card navigation
     if (state.currentIndex > 0) {
         state.currentIndex--;
         saveToStorage();
@@ -2615,6 +2671,11 @@ function setupEventListeners() {
             // If we're in recap view (came from completion's "Go to archives")
             if (state.inRecapView && state.cameFromCompletion) {
                 hideRecapView();
+                return;
+            }
+            // If in archive mode on first card, exit archive mode and show completion
+            if (state.archiveMode && state.currentIndex === 0) {
+                exitArchiveModeToCompletion();
                 return;
             }
             // Default: go to previous card
