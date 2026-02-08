@@ -365,31 +365,34 @@ button {
 }
 
 /* Date Display */
-/* Story Navigation Bar */
+/* Story Navigation Bar - centered layout */
 .story-nav-bar {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: var(--spacing-xs) var(--spacing-lg);
     gap: var(--spacing-xs);
+    position: relative;
 }
 
+/* Dots and date are ALWAYS centered - independent of Prev button */
 .story-nav-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     width: 100%;
+    position: relative;
 }
 
-.nav-spacer {
-    width: 60px; /* Same as prev button min-width for balance */
-}
-
+/* Prev button is absolutely positioned to NOT affect centering */
+/* Font size matches date display (font-size-sm) */
 .prev-story-btn {
+    position: absolute;
+    left: 0;
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--accent);
     padding: 4px 8px;
@@ -398,7 +401,6 @@ button {
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: background var(--transition-fast), opacity var(--transition-fast);
-    min-width: 60px;
 }
 
 .prev-story-btn:hover {
@@ -412,6 +414,11 @@ button {
 .prev-story-btn.hidden {
     visibility: hidden;
     pointer-events: none;
+}
+
+/* Spacer no longer needed - remove from layout */
+.nav-spacer {
+    display: none;
 }
 
 .date-display {
@@ -804,8 +811,9 @@ button {
     flex-direction: column;
 }
 
+/* Summary tile - starts higher on screen with reduced top padding */
 .card-back-content {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-sm) var(--spacing-lg);
     padding-bottom: calc(var(--spacing-xl) + 48px);
     flex: 1;
     overflow-y: auto;
@@ -816,7 +824,7 @@ button {
     font-size: var(--font-size-xl);
     font-weight: 700;
     color: var(--accent);
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
     text-align: center;
 }
 
@@ -840,21 +848,37 @@ button {
     z-index: 10;
 }
 
+/* Nav indicator buttons - clickable */
 .nav-indicator {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
     font-size: var(--font-size-sm);
     font-weight: 500;
+    background: none;
+    border: none;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.nav-indicator:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-indicator:active {
+    opacity: 0.7;
 }
 
 .nav-skip {
     color: var(--text-tertiary);
 }
 
+/* Flip button text - subdued */
 .nav-flip,
 .nav-flip-back {
-    color: var(--text-primary);
+    color: var(--text-tertiary);
 }
 
 .nav-curious {
@@ -996,15 +1020,15 @@ button {
     transform: scale(1);
 }
 
-.completion-icon {
-    font-size: 64px;
+/* Completion image - width matches title text */
+.completion-image {
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 150px;
     margin-bottom: var(--spacing-lg);
-    animation: completion-pulse 2s ease-in-out infinite;
-}
-
-@keyframes completion-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.1); }
+    border-radius: var(--radius-lg);
+    object-fit: contain;
 }
 
 .completion-title {
@@ -1366,20 +1390,26 @@ button {
     color: var(--text-tertiary);
 }
 
+/* Modal close button - matches modal prev button size (32px) */
 .modal-close {
     position: absolute;
     top: var(--spacing-md);
     right: var(--spacing-md);
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-full);
     background: var(--bg-elevated);
     color: var(--text-secondary);
-    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-    z-index: 1;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    z-index: 10;
+}
+
+.modal-close svg {
+    width: 16px;
+    height: 16px;
 }
 
 .modal-close:hover {
@@ -2167,6 +2197,11 @@ button {
     color: #4ECDC4;
 }
 
+/* Color 3: Plum/Purple */
+.text-color3 {
+    color: #6B5C8A;
+}
+
 /* Mark: Yellow highlight background */
 .text-mark {
     background: rgba(255, 235, 120, 0.35);
@@ -2303,4 +2338,24 @@ button {
     font-size: var(--font-size-md);
     color: var(--text-secondary);
     line-height: var(--line-height-relaxed);
+}
+
+/* ==========================================
+   Global Footer
+   ========================================== */
+
+.global-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    padding-bottom: calc(var(--spacing-sm) + var(--safe-bottom));
+    font-family: 'Satoshi', var(--font-body);
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    background: linear-gradient(transparent, var(--bg-primary) 50%);
+    pointer-events: none;
+    z-index: 50;
 }
