@@ -116,27 +116,45 @@
 }
 
 /* ==========================================
-   Cross-Platform Normalization
-   Ensures consistent rendering on iOS Safari and Android Chrome
+   Cross-Platform Text Rendering Normalization
+   Prevents Chrome-based browsers from applying automatic text scaling
+   Ensures consistent rendering on iOS Safari, iOS Chrome, and Android Chrome
    ========================================== */
 
 html {
+    /* Fixed base font size - prevents browser scaling */
     font-size: 16px;
-    /* Prevent automatic text size adjustment */
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+
+    /* CRITICAL: Disable all automatic text size adjustments
+       This prevents Chrome from scaling text beyond CSS values */
+    -webkit-text-size-adjust: none;
+    -moz-text-size-adjust: none;
+    -ms-text-size-adjust: none;
+    text-size-adjust: none;
+
+    /* Disable tap highlight */
     -webkit-tap-highlight-color: transparent;
-    /* Use border-box sizing globally for predictable layouts */
+
+    /* Global box-sizing for predictable layouts */
     box-sizing: border-box;
+
+    /* Prevent font inflation on narrow screens (Android Chrome) */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
 }
 
 *, *::before, *::after {
     box-sizing: inherit;
+    /* Inherit text-size-adjust to ensure no element overrides it */
+    -webkit-text-size-adjust: inherit;
+    text-size-adjust: inherit;
 }
 
 body {
     font-family: var(--font-body);
     font-weight: 400;
+    /* Explicit font-size to prevent inheritance issues */
+    font-size: 16px;
     background: var(--bg-primary);
     color: var(--text-primary);
     /* Explicit numeric line-height for cross-platform consistency */
@@ -144,12 +162,13 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     overflow: hidden;
+    /* Consistent text rendering across platforms */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: geometricPrecision;
+    /* Prevent Chrome's font boosting algorithm */
+    max-height: 999999px;
     transition: background var(--transition-normal), color var(--transition-normal);
-    /* Prevent text size adjustment on orientation change */
-    text-size-adjust: 100%;
-    -webkit-text-size-adjust: 100%;
 }
 
 /* Headlines use Cabinet Grotesk Variable */
@@ -158,11 +177,80 @@ h1, h2, h3, .card-headline, .modal-headline, .completion-title, .empty-title, .s
     font-weight: 700;
     font-variation-settings: 'wght' 700;
     letter-spacing: -0.02em;
+    /* Prevent Chrome text inflation */
+    text-rendering: geometricPrecision;
+}
+
+/* ==========================================
+   Explicit Font Sizing for Cross-Platform Consistency
+   All primary text elements have explicit font-size and line-height
+   to prevent Chrome's automatic text scaling
+   ========================================== */
+
+/* Body text - 16px */
+p, span, div {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+/* Small text - 14px */
+.date-display,
+.nav-indicator,
+.prev-story-btn,
+.card-hint,
+.toast-message,
+.rating-label,
+.global-footer span {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Extra small text - 12px */
+.modal-drag-hint .drag-text,
+.swipe-hint span {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Medium text - 16px */
+.card-teaser,
+.answer-text,
+.info-modal-content,
+.question-text,
+.deep-question-text,
+.summary-bullet-text,
+.card-summary-text {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+/* Large text - 18px */
+.completion-subtitle,
+.welcome-subtitle {
+    font-size: 18px;
+    line-height: 1.5;
+}
+
+/* Headline text - 24px */
+.modal-headline,
+.card-back-header,
+.section-title,
+.recap-title {
+    font-size: 24px;
+    line-height: 1.3;
+}
+
+/* Large headline - 28px */
+.card-headline,
+.completion-title {
+    font-size: 28px;
+    line-height: 1.2;
 }
 
 button {
     font-family: var(--font-body);
-    font-size: inherit;
+    /* Explicit font-size for buttons */
+    font-size: 16px;
     border: none;
     background: none;
     cursor: pointer;
@@ -1597,10 +1685,11 @@ button {
 }
 
 .question-text {
-    font-size: var(--font-size-md);
+    /* Explicit sizing for cross-platform consistency */
+    font-size: 16px;
+    line-height: 1.5;
     font-weight: 500;
     color: var(--text-primary);
-    line-height: var(--line-height-normal);
     padding-top: 2px;
 }
 
@@ -1625,10 +1714,11 @@ button {
 }
 
 .answer-question {
-    font-size: var(--font-size-lg);
+    /* Explicit sizing for cross-platform consistency */
+    font-size: 18px;
+    line-height: 1.5;
     font-weight: 500;
     color: var(--text-primary);
-    line-height: var(--line-height-normal);
 }
 
 .answer-content {
@@ -1640,9 +1730,10 @@ button {
 }
 
 .answer-text {
-    font-size: var(--font-size-md);
+    /* Explicit sizing for cross-platform consistency */
+    font-size: 16px;
+    line-height: 1.7;
     color: var(--text-secondary);
-    line-height: var(--line-height-relaxed);
 }
 
 /* Star Rating */
@@ -2053,10 +2144,11 @@ button {
 }
 
 .deep-question-text {
-    font-size: var(--font-size-md);
+    /* Explicit sizing for cross-platform consistency */
+    font-size: 16px;
+    line-height: 1.5;
     font-weight: 500;
     color: var(--text-primary);
-    line-height: var(--line-height-normal);
     padding-top: 2px;
 }
 
@@ -2374,9 +2466,10 @@ button {
 }
 
 .summary-bullet-text {
-    font-size: var(--font-size-md);
+    /* Explicit sizing for cross-platform consistency */
+    font-size: 16px;
+    line-height: 1.7;
     color: var(--text-secondary);
-    line-height: var(--line-height-relaxed);
 }
 
 /* ==========================================
@@ -2392,7 +2485,9 @@ button {
     padding: var(--spacing-sm) var(--spacing-md);
     padding-bottom: calc(var(--spacing-sm) + var(--safe-bottom));
     font-family: 'Satoshi', var(--font-body);
-    font-size: var(--font-size-xs);
+    /* Explicit font-size for cross-platform consistency */
+    font-size: 12px;
+    line-height: 1.5;
     color: var(--text-tertiary);
     background: linear-gradient(transparent, var(--bg-primary) 50%);
     pointer-events: none;
