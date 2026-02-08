@@ -116,59 +116,152 @@
 }
 
 /* ==========================================
-   Cross-Platform Text Rendering Normalization
-   Prevents Chrome-based browsers from applying automatic text scaling
-   Ensures consistent rendering on iOS Safari, iOS Chrome, and Android Chrome
+   ANDROID/CHROME RENDERING NORMALIZATION
+   ==========================================
+
+   Problem: Android Chrome and iOS Chrome apply automatic scaling that
+   makes the UI appear 1.1x-1.2x larger than Safari iOS.
+
+   This section implements multiple defensive layers to prevent:
+   1. Font inflation / text autosizing
+   2. Viewport scaling
+   3. Touch-based zoom adjustments
+   4. Device pixel ratio misinterpretation
+   5. Chrome-specific font boosting algorithms
+
    ========================================== */
 
+/* LAYER 1: Root element - prevent all automatic adjustments */
 html {
-    /* Fixed base font size - prevents browser scaling */
-    font-size: 16px;
+    /* Lock font size to exactly 16px - no scaling */
+    font-size: 16px !important;
 
-    /* CRITICAL: Disable all automatic text size adjustments
-       This prevents Chrome from scaling text beyond CSS values */
-    -webkit-text-size-adjust: none;
-    -moz-text-size-adjust: none;
-    -ms-text-size-adjust: none;
-    text-size-adjust: none;
+    /* CRITICAL: Disable ALL text size adjustments across all browsers
+       Using 100% instead of 'none' for better Android compatibility */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 
-    /* Disable tap highlight */
+    /* Prevent tap highlight that can cause layout shifts */
     -webkit-tap-highlight-color: transparent;
 
-    /* Global box-sizing for predictable layouts */
+    /* Predictable box model */
     box-sizing: border-box;
 
-    /* Prevent font inflation on narrow screens (Android Chrome) */
+    /* Prevent font smoothing differences */
     -webkit-font-smoothing: antialiased;
-    text-rendering: geometricPrecision;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Force precise text rendering - prevents font metric differences */
+    text-rendering: optimizeLegibility;
+
+    /* Prevent iOS text inflation during orientation changes */
+    -webkit-text-size-adjust: 100%;
+
+    /* Lock the root to prevent any zoom */
+    touch-action: pan-x pan-y;
+
+    /* Prevent overscroll behaviors that can trigger zoom */
+    overscroll-behavior: none;
 }
 
+/* LAYER 2: Universal selector - propagate anti-scaling to all elements */
 *, *::before, *::after {
     box-sizing: inherit;
-    /* Inherit text-size-adjust to ensure no element overrides it */
-    -webkit-text-size-adjust: inherit;
-    text-size-adjust: inherit;
+
+    /* Propagate text-size-adjust to ALL elements */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+
+    /* Prevent any element from triggering font boosting */
+    max-height: 1000000px;
 }
 
+/* LAYER 3: Body - explicit dimensions and anti-inflation */
 body {
     font-family: var(--font-body);
     font-weight: 400;
-    /* Explicit font-size to prevent inheritance issues */
-    font-size: 16px;
+
+    /* CRITICAL: Explicit font-size in px, not rem or em */
+    font-size: 16px !important;
+
     background: var(--bg-primary);
     color: var(--text-primary);
-    /* Explicit numeric line-height for cross-platform consistency */
+
+    /* Unitless line-height for consistent calculation */
     line-height: 1.5;
+
+    /* Use dvh for accurate mobile viewport */
+    min-height: 100vh;
+    min-height: 100dvh;
+
+    /* Prevent body scroll that can trigger Chrome behaviors */
+    overflow: hidden;
+
+    /* Anti-aliasing for consistent rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+
+    /* CRITICAL: max-height trick to disable Chrome's font boosting
+       Chrome's algorithm triggers when content height > 1.5x viewport */
+    max-height: 1000000px;
+
+    /* Prevent touch-based zoom/scale on Android */
+    touch-action: pan-x pan-y;
+
+    /* Disable overscroll that can trigger UI scaling */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+
+    /* Ensure no transforms are applied */
+    transform: none;
+
+    /* Prevent any implicit width expansion */
+    width: 100%;
+    max-width: 100vw;
+
+    transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+/* LAYER 4: App container - constrain to viewport */
+#app {
+    width: 100%;
+    max-width: 100vw;
     min-height: 100vh;
     min-height: 100dvh;
     overflow: hidden;
-    /* Consistent text rendering across platforms */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: geometricPrecision;
-    /* Prevent Chrome's font boosting algorithm */
-    max-height: 999999px;
-    transition: background var(--transition-normal), color var(--transition-normal);
+
+    /* Prevent any flex/grid expansion beyond viewport */
+    display: flex;
+    flex-direction: column;
+}
+
+/* LAYER 5: Prevent font boosting on specific container types
+   Chrome triggers font boosting on elements that appear to be
+   "narrow columns" - we explicitly mark containers as full-width */
+main, section, article, div, header, footer, nav {
+    max-height: 1000000px;
+
+    /* Prevent width-based font boosting triggers */
+    width: auto;
+}
+
+/* LAYER 6: All text elements - explicit anti-inflation */
+p, span, label, a, li, td, th, dt, dd, figcaption, blockquote, cite, code, pre {
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* LAYER 7: Form elements - prevent Chrome scaling */
+input, textarea, select, button {
+    font-size: 16px !important; /* Minimum 16px prevents iOS zoom on focus */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    max-height: 1000000px;
 }
 
 /* Headlines use Cabinet Grotesk Variable */
@@ -177,8 +270,12 @@ h1, h2, h3, .card-headline, .modal-headline, .completion-title, .empty-title, .s
     font-weight: 700;
     font-variation-settings: 'wght' 700;
     letter-spacing: -0.02em;
-    /* Prevent Chrome text inflation */
-    text-rendering: geometricPrecision;
+
+    /* Anti-inflation for headlines */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    max-height: 1000000px;
 }
 
 /* ==========================================
@@ -649,6 +746,11 @@ button {
     flex: 1;
     position: relative;
     overflow: hidden;
+
+    /* Anti-inflation: explicit dimensions prevent Chrome font boosting */
+    width: 100%;
+    max-width: 100vw;
+    max-height: 1000000px;
 }
 
 /* Sections */
@@ -661,6 +763,9 @@ button {
     transition: opacity var(--transition-normal), visibility var(--transition-normal), transform var(--transition-normal);
     overflow-y: auto;
     overscroll-behavior: contain;
+
+    /* Anti-inflation for sections */
+    max-height: 1000000px;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -712,12 +817,17 @@ button {
     align-items: flex-start;
     justify-content: center;
     /* Two-line gap from date: 14px * 1.5 * 2 = 42px */
-    padding-top: calc(var(--font-size-sm) * 1.5 * 2);
-    padding-left: var(--spacing-lg);
-    padding-right: var(--spacing-lg);
+    padding-top: calc(14px * 1.5 * 2);
+    padding-left: 24px;
+    padding-right: 24px;
     /* Two-line gap before footer */
-    padding-bottom: calc(var(--font-size-sm) * 1.5 * 2 + 40px);
+    padding-bottom: calc(14px * 1.5 * 2 + 40px);
     perspective: 1000px;
+
+    /* Anti-inflation: prevent Chrome font boosting */
+    width: 100%;
+    max-width: 100vw;
+    max-height: 1000000px;
 }
 
 /* ==========================================
@@ -726,12 +836,13 @@ button {
 
 .story-card {
     position: absolute;
-    width: calc(100% - var(--spacing-xl) * 2);
+    /* Use explicit px values instead of calc with vars for Android consistency */
+    width: calc(100% - 64px);
     max-width: 400px;
     /* Height determined by content, not fixed min-height */
     height: auto;
     background: transparent;
-    border-radius: var(--radius-xl);
+    border-radius: 24px;
     box-shadow: var(--shadow-card);
     cursor: grab;
     touch-action: pan-y;
@@ -740,6 +851,11 @@ button {
     transition: box-shadow var(--transition-normal);
     will-change: transform;
     overflow: visible;
+
+    /* Anti-inflation: prevent font boosting inside cards */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 .story-card:active {
@@ -790,8 +906,12 @@ button {
 /* Card Content */
 .card-body {
     position: relative;
-    padding: var(--spacing-lg);
-    padding-bottom: calc(var(--spacing-xl) + 32px);
+    /* Explicit px values for Android consistency */
+    padding: 24px;
+    padding-bottom: calc(32px + 32px);
+
+    /* Anti-inflation */
+    max-height: 1000000px;
 }
 
 /* Emoji removed from cards - keeping selector for backwards compatibility */
@@ -800,24 +920,34 @@ button {
 }
 
 .card-headline {
-    font-size: var(--font-size-2xl);
-    /* Explicit line-height for cross-platform consistency */
+    /* Explicit px for Android - 28px */
+    font-size: 28px;
     line-height: 1.2;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: 12px;
     color: var(--text-primary);
+
+    /* Anti-inflation */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 .card-teaser {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    /* Explicit line-height for cross-platform consistency */
+    /* Explicit px for Android - 16px */
+    font-size: 16px;
     line-height: 1.6;
-    margin-bottom: var(--spacing-xl);
+    color: var(--text-secondary);
+    margin-bottom: 32px;
     /* Allow 5 lines of text */
     display: -webkit-box;
     -webkit-line-clamp: 5;
     -webkit-box-orient: vertical;
     overflow: hidden;
+
+    /* Anti-inflation */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 .card-hint {
@@ -1159,14 +1289,26 @@ button {
 }
 
 .completion-title {
-    font-size: var(--font-size-2xl);
-    margin-bottom: var(--spacing-sm);
+    /* Explicit px - 28px */
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 12px;
+
+    /* Anti-inflation */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 .completion-subtitle {
-    font-size: var(--font-size-lg);
+    /* Explicit px - 18px */
+    font-size: 18px;
+    line-height: 1.5;
     color: var(--text-secondary);
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: 32px;
+
+    /* Anti-inflation */
+    max-height: 1000000px;
 }
 
 /* Story Thumbnails - removed, simplified completion screen */
@@ -1618,17 +1760,28 @@ button {
 }
 
 .modal-headline {
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-tight);
+    /* Explicit px for Android - 24px */
+    font-size: 24px;
+    line-height: 1.2;
+
+    /* Anti-inflation */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 .modal-subheading {
-    font-size: var(--font-size-sm);
+    /* Explicit px - 14px */
+    font-size: 14px;
+    line-height: 1.5;
     color: var(--text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: 500;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: 16px;
+
+    /* Anti-inflation */
+    max-height: 1000000px;
 }
 
 /* Question Buttons */
@@ -1691,6 +1844,11 @@ button {
     font-weight: 500;
     color: var(--text-primary);
     padding-top: 2px;
+
+    /* Anti-inflation */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 /* Answer View */
@@ -1734,6 +1892,11 @@ button {
     font-size: 16px;
     line-height: 1.7;
     color: var(--text-secondary);
+
+    /* Anti-inflation */
+    max-height: 1000000px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 /* Star Rating */
