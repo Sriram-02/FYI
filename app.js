@@ -22,7 +22,7 @@ const SHEET_NAME = 'Sheet1';
 // Add your Plausible domain here after signing up at plausible.io
 // Example: const PLAUSIBLE_DOMAIN = 'fyi.yourdomain.com';
 // Leave as empty string to disable analytics
-const PLAUSIBLE_DOMAIN = '';
+const PLAUSIBLE_DOMAIN = 'https://fyi-news.netlify.app/';
 
 // ==========================================
 // Analytics Helper Functions
@@ -108,6 +108,103 @@ function trackThemeChanged(theme) {
         theme: theme
     });
 }
+
+/**
+ * Track card swipe event
+ * @param {string} direction - 'skip' (left) or 'curious' (right)
+ * @param {string} headline - The story headline
+ * @param {number} storyNumber - Which story (1, 2, or 3)
+ */
+function trackSwipe(direction, headline, storyNumber) {
+    trackEvent('Card Swiped', {
+        direction: direction,
+        story: storyNumber,
+        headline: headline.substring(0, 50)
+    });
+}
+
+/**
+ * Track card flip event
+ * @param {string} headline - The story headline
+ * @param {string} side - 'to_summary' or 'to_front'
+ */
+function trackCardFlip(headline, side) {
+    trackEvent('Card Flipped', {
+        side: side,
+        headline: headline.substring(0, 50)
+    });
+}
+
+/**
+ * Track completion screen viewed
+ * @param {number} storiesRead - Number of stories completed
+ * @param {number} curiousCount - Number of stories swiped curious
+ */
+function trackCompletionViewed(storiesRead, curiousCount) {
+    trackEvent('Completion Viewed', {
+        stories_read: storiesRead,
+        curious_count: curiousCount
+    });
+}
+
+/**
+ * Track Dig Deeper interaction
+ * @param {string} headline - The story headline
+ * @param {string} deepQuestion - The deep question clicked
+ */
+function trackDigDeeper(headline, deepQuestion) {
+    trackEvent('Dig Deeper Clicked', {
+        headline: headline.substring(0, 50),
+        question: deepQuestion.substring(0, 100)
+    });
+}
+
+/**
+ * Track archive/recap viewed
+ * @param {string} source - 'completion_button' or 'header_recap'
+ */
+function trackRecapViewed(source) {
+    trackEvent('Recap Viewed', {
+        source: source
+    });
+}
+
+/**
+ * Track archive story opened
+ * @param {string} headline - The story headline
+ * @param {string} date - The story date
+ */
+function trackArchiveStoryOpened(headline, date) {
+    trackEvent('Archive Story Opened', {
+        headline: headline.substring(0, 50),
+        date: date
+    });
+}
+
+/**
+ * Track skip question (when user skips all questions)
+ * @param {string} headline - The story headline
+ */
+function trackQuestionsSkipped(headline) {
+    trackEvent('Questions Skipped', {
+        headline: headline.substring(0, 50)
+    });
+}
+
+/**
+ * Track session duration when user leaves
+ * Called on page unload
+ */
+function trackSessionEnd() {
+    const sessionDuration = Math.round((Date.now() - sessionStartTime) / 1000);
+    trackEvent('Session Ended', {
+        duration_seconds: sessionDuration,
+        stories_completed: state.currentIndex
+    });
+}
+
+// Session start time for duration tracking
+const sessionStartTime = Date.now();
 
 // ==========================================
 // Fallback Story Data (used when sheet not configured)
@@ -414,6 +511,7 @@ async function init() {
     loadFromStorage();
     applyTheme();
     setupEventListeners();
+    setupSessionTracking();
 
     // Check if user has set their name
     const savedName = localStorage.getItem('fyi_user_name');
@@ -431,6 +529,23 @@ async function init() {
 
     // Track app opened
     trackAppOpened();
+}
+
+/**
+ * Setup session tracking for when user leaves the app
+ */
+function setupSessionTracking() {
+    // Track session end when page is about to unload
+    window.addEventListener('pagehide', () => {
+        trackSessionEnd();
+    });
+
+    // Also track on visibility change (when user switches tabs/apps on mobile)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            trackSessionEnd();
+        }
+    });
 }
 
 async function loadAppContent() {
@@ -839,6 +954,9 @@ function openRecapStoryModal(story) {
     // Set the current story for modal interaction
     state.currentStory = story;
     state.currentQuestion = null;
+
+    // Track archive story opened
+    trackArchiveStoryOpened(story.headline, story.date);
 
     // Open the Q&A modal
     openModal(story);
@@ -1333,10 +1451,12 @@ function flipCard(card, story) {
         // Flip back to front
         card.classList.remove('flipped');
         card.dataset.flipped = 'false';
+        trackCardFlip(story.headline, 'to_front');
     } else {
         // Flip to back (summary)
         card.classList.add('flipped');
         card.dataset.flipped = 'true';
+        trackCardFlip(story.headline, 'to_summary');
 
         // Hide the "Tap to flip" hint permanently after first flip
         if (localStorage.getItem('fyi_has_flipped') !== 'true') {
@@ -1379,6 +1499,7 @@ function setupNavButtonHandlers(card, story) {
             if (action === 'skip') {
                 // Skip: animate card left and go to next
                 triggerHaptic('light');
+                trackSwipe('skip', story.headline, state.currentIndex + 1);
                 animateCardExit(card, 'left', () => nextCard());
             } else if (action === 'flip') {
                 // Flip: toggle card flip
@@ -1387,6 +1508,7 @@ function setupNavButtonHandlers(card, story) {
             } else if (action === 'curious') {
                 // Curious: open Q&A modal
                 triggerHaptic('medium');
+                trackSwipe('curious', story.headline, state.currentIndex + 1);
                 animateCardExitWithModal(card, 'right', () => {}, story);
             }
         });
@@ -1462,11 +1584,13 @@ function handleDragEnd(e, card, story) {
         triggerHaptic('medium');
         if (deltaX > 0) {
             // Swipe RIGHT: Card glides off smoothly to the right while Q&A modal opens
+            trackSwipe('curious', story.headline, state.currentIndex + 1);
             animateCardExitWithModal(card, 'right', () => {
                 // Card has exited, modal is already open
             }, story);
         } else {
             // Swipe LEFT: Skip to next card
+            trackSwipe('skip', story.headline, state.currentIndex + 1);
             animateCardExit(card, 'left', () => nextCard());
         }
     } else {
@@ -1623,6 +1747,10 @@ function showCompletion() {
         elements.completionTitle.textContent = `Take a break, ${state.userName}`;
     }
 
+    // Track completion - count curious swipes from the state
+    const curiousCount = state.viewedStories.length;
+    trackCompletionViewed(state.totalStories, curiousCount);
+
     // Update button labels based on archive mode
     updateCompletionButtons();
 }
@@ -1704,6 +1832,7 @@ function openModal(story) {
     `;
     skipButton.addEventListener('click', () => {
         triggerHaptic('light');
+        trackQuestionsSkipped(story.headline);
         closeModal();
         // Animate current card out and move to next
         setTimeout(() => {
@@ -2006,6 +2135,7 @@ function showDigDeeper() {
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
+            trackDigDeeper(state.currentStory.headline, dq.text);
             showDeepAnswer(dq);
         });
         elements.deepQuestionsContainer.appendChild(button);
@@ -2691,6 +2821,7 @@ function setupEventListeners() {
                 exitArchiveMode();
             } else {
                 // In today mode: go to archives
+                trackRecapViewed('completion_button');
                 showRecapView();
             }
         });
