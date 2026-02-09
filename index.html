@@ -20,16 +20,12 @@
 
     <link rel="stylesheet" href="style.css">
 
-    <!-- Plausible Analytics - Privacy-friendly usage tracking -->
-    <!--
-        To enable analytics:
-        1. Sign up at plausible.io
-        2. Add your domain
-        3. Replace YOUR_DOMAIN below with your actual domain (e.g., fyi.example.com)
-        4. Update PLAUSIBLE_DOMAIN in app.js to match
-    -->
-    <script defer data-domain="https://fyi-news.netlify.app/" src="https://plausible.io/js/script.js"></script>
-    <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+    <!-- Privacy-friendly analytics by Plausible -->
+    <script async src="https://plausible.io/js/pa-lkhb852Hvi-BjtmMCK26T.js"></script>
+    <script>
+      window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+      plausible.init()
+    </script>
 </head>
 <body>
     <div id="app">
