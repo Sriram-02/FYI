@@ -2779,54 +2779,7 @@ function setupEventListeners() {
 }
 
 // ==========================================
-// Android/Chrome Anti-Scaling Defense
-// ==========================================
-
-/**
- * Applies defensive measures against Chrome's automatic text scaling
- * This runs before init() to ensure the layout is correct from the start
- */
-function applyAntiScalingDefense() {
-    // Force text-size-adjust on all elements via injected style
-    const style = document.createElement('style');
-    style.id = 'anti-scaling-defense';
-    style.textContent = `
-        * {
-            -webkit-text-size-adjust: 100% !important;
-            text-size-adjust: 100% !important;
-        }
-    `;
-    document.head.appendChild(style);
-
-    // Ensure viewport meta is correctly set for Android
-    let viewport = document.querySelector('meta[name="viewport"]');
-    if (viewport) {
-        viewport.setAttribute('content',
-            'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover'
-        );
-    }
-
-    // Prevent any zoom gestures on iOS
-    document.addEventListener('gesturestart', function(e) {
-        e.preventDefault();
-    }, { passive: false });
-
-    // Prevent double-tap zoom on all platforms
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', function(e) {
-        const now = Date.now();
-        if (now - lastTouchEnd <= 300) {
-            e.preventDefault();
-        }
-        lastTouchEnd = now;
-    }, { passive: false });
-}
-
-// ==========================================
 // Start App
 // ==========================================
-
-// Apply anti-scaling defense immediately when script loads
-applyAntiScalingDefense();
 
 document.addEventListener('DOMContentLoaded', init);
