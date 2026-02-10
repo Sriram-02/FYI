@@ -2257,6 +2257,75 @@ button {
     cursor: not-allowed;
 }
 
+/* Welcome Choice Modal - Two Button Style */
+.welcome-choice-modal {
+    max-width: 340px;
+}
+
+.welcome-choice-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.welcome-button.primary {
+    background: var(--accent);
+    color: white;
+}
+
+.welcome-button.secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.welcome-button.secondary:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--text-tertiary);
+}
+
+/* ==========================================
+   No Stories State - Redesigned
+   ========================================== */
+
+.no-stories-content {
+    text-align: center;
+    padding: var(--spacing-xl);
+}
+
+.no-stories-image {
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 150px;
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    object-fit: contain;
+}
+
+.no-stories-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    width: 100%;
+    max-width: 280px;
+    margin: var(--spacing-lg) auto 0;
+}
+
+.no-stories-buttons .secondary-button {
+    width: 100%;
+}
+
+.secondary-button.primary-action {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+
+.secondary-button.primary-action:hover {
+    background: var(--accent-light);
+}
+
 /* ==========================================
    Logo with User Name - Inter Font
    ========================================== */
