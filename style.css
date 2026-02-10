@@ -2284,6 +2284,48 @@ button {
     border-color: var(--text-tertiary);
 }
 
+/* Welcome Back Button */
+.welcome-back-btn {
+    position: absolute;
+    top: var(--spacing-md);
+    left: var(--spacing-md);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.welcome-back-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.welcome-modal {
+    position: relative; /* For absolute positioning of back button */
+}
+
+/* ==========================================
+   FAQ Title Styling - Large and Striking
+   ========================================== */
+
+.faq-title-display {
+    font-family: var(--font-body); /* Satoshi */
+    font-size: clamp(1.25rem, 5vw, 1.5rem); /* Responsive, fits on one line */
+    font-weight: 600;
+    color: var(--accent);
+    text-align: center;
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ==========================================
    No Stories State - Redesigned
    ========================================== */
