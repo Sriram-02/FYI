@@ -410,8 +410,245 @@ const state = {
     showedWelcomeChoice: false,
     showFAQsAfterName: false, // Flag to show FAQs after name entry
     // Track if entered archives from no-stories page
-    enteredArchivesFromNoStories: false
+    enteredArchivesFromNoStories: false,
+    // App mode state machine: 'welcome', 'faqs', 'stories', 'archives', 'no_stories'
+    appMode: 'welcome'
 };
+
+// ==========================================
+// STATE MACHINE - App Mode Management
+// ==========================================
+
+/**
+ * Comprehensive cleanup function that removes ALL UI elements
+ * Must be called before ANY state transition
+ */
+function cleanupCurrentState() {
+    console.log('[STATE] Cleaning up current state:', state.appMode);
+
+    // Close all modals
+    if (elements.modalBackdrop) {
+        elements.modalBackdrop.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+    }
+    if (elements.summaryModalBackdrop) {
+        elements.summaryModalBackdrop.classList.remove('visible');
+    }
+    if (elements.whatIsFYIModal) {
+        elements.whatIsFYIModal.classList.remove('visible');
+    }
+    if (elements.ourPhilosophyModal) {
+        elements.ourPhilosophyModal.classList.remove('visible');
+    }
+
+    // Hide completion screen
+    if (elements.completionScreen) {
+        elements.completionScreen.classList.remove('visible');
+    }
+
+    // Hide no-stories state
+    if (elements.noStoriesState) {
+        elements.noStoriesState.classList.remove('visible');
+        elements.noStoriesState.style.display = 'none';
+    }
+
+    // Hide recap view
+    if (elements.recapWeekView) {
+        elements.recapWeekView.classList.remove('visible');
+    }
+
+    // Clear card container
+    if (elements.cardContainer) {
+        elements.cardContainer.innerHTML = '';
+    }
+
+    // Reset modal views to initial state
+    resetAllModalViews();
+
+    // Clear navigation state
+    state.cameFromCompletion = false;
+    state.inRecapView = false;
+
+    // Remove any stray backdrop overlays
+    document.body.classList.remove('no-scroll');
+
+    console.log('[STATE] Cleanup complete');
+}
+
+/**
+ * Transition to a new app mode with proper cleanup and initialization
+ * @param {string} newMode - 'welcome', 'faqs', 'stories', 'archives', 'no_stories'
+ * @param {object} options - Additional options for the transition
+ */
+async function transitionToMode(newMode, options = {}) {
+    const previousMode = state.appMode;
+    console.log(`[STATE TRANSITION] ${previousMode} → ${newMode}`, options);
+
+    // Skip cleanup for welcome → name input transitions
+    if (!(previousMode === 'welcome' && newMode === 'welcome')) {
+        cleanupCurrentState();
+    }
+
+    // Update state
+    state.appMode = newMode;
+
+    // Reset mode-specific flags
+    state.faqMode = (newMode === 'faqs');
+    state.archiveMode = (newMode === 'archives');
+    state.enteredArchivesFromNoStories = options.fromNoStories || false;
+
+    // Clear connection to previous FAQ state when leaving FAQs
+    if (previousMode === 'faqs' && newMode !== 'faqs') {
+        state.faqStories = [];
+        state.faqIndex = 0;
+        // Mark FAQ as completed if user went through FAQs
+        if (!state.faqCompleted && state.currentIndex > 0) {
+            state.faqCompleted = true;
+            localStorage.setItem('fyi_faq_completed', 'true');
+        }
+    }
+
+    // Initialize the new mode
+    switch (newMode) {
+        case 'faqs':
+            await initFAQMode();
+            break;
+        case 'stories':
+            await initStoriesMode(options);
+            break;
+        case 'archives':
+            await initArchivesMode(options);
+            break;
+        case 'no_stories':
+            initNoStoriesMode();
+            break;
+        case 'welcome':
+            // Welcome is handled separately
+            break;
+    }
+
+    // Update Prev button visibility
+    updatePrevButtonVisibility();
+
+    console.log(`[STATE] Transition complete. Now in: ${state.appMode}`);
+}
+
+/**
+ * Initialize FAQ mode - load FAQ cards fresh
+ */
+async function initFAQMode() {
+    console.log('[initFAQMode] Loading FAQ content');
+
+    showLoading(true);
+
+    const faqs = await fetchFAQs();
+    state.faqStories = faqs;
+    state.stories = faqs;
+    state.totalStories = faqs.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    showLoading(false);
+
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+
+    trackEvent('FAQ Mode Entered');
+}
+
+/**
+ * Initialize Stories mode - load today's stories
+ */
+async function initStoriesMode(options = {}) {
+    console.log('[initStoriesMode] Loading today\'s stories');
+
+    // Clear FAQ state completely
+    state.faqMode = false;
+    state.faqStories = [];
+
+    showLoading(true);
+    await fetchStories();
+    showLoading(false);
+
+    // Check if we have stories
+    if (state.stories.length === 0) {
+        // No stories - transition to no_stories mode
+        state.appMode = 'no_stories';
+        initNoStoriesMode();
+        return;
+    }
+
+    // Reset to first story unless specified otherwise
+    if (!options.preserveIndex) {
+        state.currentIndex = 0;
+        state.viewedStories = [];
+    }
+
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+    updateProgress();
+
+    if (state.currentIndex === 0) {
+        showSwipeHint();
+    }
+}
+
+/**
+ * Initialize Archives mode - load archive stories
+ */
+async function initArchivesMode(options = {}) {
+    console.log('[initArchivesMode] Loading archive stories');
+
+    showLoading(true);
+
+    const archiveStories = await fetchArchiveStories();
+
+    showLoading(false);
+
+    if (archiveStories.length === 0) {
+        showToast('⚠', 'No archive stories available');
+        // Fall back to stories mode
+        await transitionToMode('stories');
+        return;
+    }
+
+    state.archiveStories = archiveStories;
+    state.stories = archiveStories;
+    state.totalStories = archiveStories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    // Store original stories if coming from stories mode
+    if (options.originalStories) {
+        state.originalStories = options.originalStories;
+    }
+
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+    updateProgress();
+
+    trackEvent('Archive Mode Entered', { source: options.source || 'unknown' });
+}
+
+/**
+ * Initialize No Stories mode - show empty state
+ */
+function initNoStoriesMode() {
+    console.log('[initNoStoriesMode] Showing no stories page');
+
+    if (elements.noStoriesState) {
+        elements.noStoriesState.style.display = 'flex';
+        elements.noStoriesState.classList.add('visible');
+    }
+
+    updateDateDisplay();
+}
 
 // ==========================================
 // DOM Elements
@@ -504,6 +741,7 @@ function cacheElements() {
     elements.welcomeModalBackdrop = document.getElementById('welcomeModalBackdrop');
     elements.welcomeNameInput = document.getElementById('welcomeNameInput');
     elements.welcomeSubmitBtn = document.getElementById('welcomeSubmitBtn');
+    elements.welcomeBackBtn = document.getElementById('welcomeBackBtn');
 
     // FAQs Menu Button
     elements.faqsBtn = document.getElementById('faqsBtn');
@@ -599,9 +837,19 @@ function setupSessionTracking() {
 }
 
 async function loadAppContent() {
+    // Set app mode to stories
+    state.appMode = 'stories';
+    state.faqMode = false;
+    state.archiveMode = false;
+
     showLoading(true);
     await fetchStories();
     showLoading(false);
+
+    // Check if we have stories
+    if (state.stories.length === 0) {
+        state.appMode = 'no_stories';
+    }
 
     renderCards();
     updateProgress();
@@ -614,9 +862,13 @@ async function loadAppContent() {
 
 // Format and display today's date (or appropriate text for FAQ/archive mode)
 function updateDateDisplay() {
+    // Reset any FAQ-specific styling first
+    elements.dateDisplay.classList.remove('faq-title-display');
+
     if (state.faqMode) {
-        // Show "FAQs" instead of date
-        elements.dateDisplay.textContent = 'Frequently Asked Questions';
+        // Show FAQ title with special styling
+        elements.dateDisplay.textContent = 'FAQs: See what we\'re all about';
+        elements.dateDisplay.classList.add('faq-title-display');
     } else if (state.archiveMode) {
         // Show "Archives" instead of date
         elements.dateDisplay.textContent = 'Archives';
@@ -1019,45 +1271,21 @@ function getFallbackFAQs() {
 /**
  * Load FAQ content and enter FAQ mode
  */
+/**
+ * Enter FAQ mode using the state machine
+ * This is the main entry point for FAQ mode from anywhere in the app
+ */
 async function enterFAQMode() {
-    console.log('[enterFAQMode] Starting FAQ mode');
-    state.faqMode = true;
-    state.contentMode = 'faqs';
-    state.archiveMode = false;
-
-    showLoading(true);
-
-    // Fetch FAQs
-    const faqs = await fetchFAQs();
-    state.faqStories = faqs;
-    state.stories = faqs;
-    state.totalStories = faqs.length;
-    state.currentIndex = 0;
-
-    showLoading(false);
-
-    // Update UI
-    updateDateDisplay();
-    renderProgressDots();
-    renderCards();
-    updatePrevButtonVisibility();
-
-    // Track FAQ mode entered
-    trackEvent('FAQ Mode Entered');
+    console.log('[enterFAQMode] Transitioning to FAQ mode via state machine');
+    await transitionToMode('faqs');
 }
 
 /**
- * Exit FAQ mode and return to stories
+ * Exit FAQ mode and return to stories using state machine
  */
-function exitFAQMode() {
-    console.log('[exitFAQMode] Exiting FAQ mode');
-    state.faqMode = false;
-    state.contentMode = 'stories';
-    state.faqStories = [];
-
-    // Mark FAQ as completed
-    state.faqCompleted = true;
-    localStorage.setItem('fyi_faq_completed', 'true');
+async function exitFAQMode() {
+    console.log('[exitFAQMode] Transitioning to stories mode via state machine');
+    await transitionToMode('stories');
 }
 
 function getPastWeekDates() {
@@ -2134,21 +2362,25 @@ function showCompletion() {
     elements.progressFill.style.width = '100%';
     if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
 
-    // Update completion title based on mode
+    // Update completion title and subtitle based on mode
+    const subtitle = elements.completionScreen.querySelector('.completion-subtitle');
+
     if (state.userName && elements.completionTitle) {
         if (state.faqMode) {
-            // FAQ completion title
-            elements.completionTitle.textContent = `You're all caught up, ${state.userName}`;
-            // Update subtitle for FAQ completion
-            const subtitle = elements.completionScreen.querySelector('.completion-subtitle');
+            // FAQ completion - welcoming and action-oriented
+            elements.completionTitle.textContent = `Ready to jump in, ${state.userName}?`;
             if (subtitle) {
-                subtitle.textContent = "Now you know what FYI is all about.";
+                subtitle.textContent = "We will make it worth your time.";
+            }
+        } else if (state.archiveMode) {
+            // Archive completion
+            elements.completionTitle.textContent = `All caught up, ${state.userName}`;
+            if (subtitle) {
+                subtitle.textContent = "You've reviewed the archives.";
             }
         } else {
-            // Regular completion title
+            // Regular stories completion
             elements.completionTitle.textContent = `Take a break, ${state.userName}`;
-            // Reset subtitle
-            const subtitle = elements.completionScreen.querySelector('.completion-subtitle');
             if (subtitle) {
                 subtitle.textContent = "That's your daily dose of critical thinking.";
             }
@@ -3123,21 +3355,14 @@ function setupEventListeners() {
         }
     });
 
-    // Logo click - always returns to today's stories
+    // Logo click - ALWAYS returns to today's Story 1, from ANY state
     elements.headerLogo.addEventListener('click', async () => {
+        console.log('[LOGO CLICKED] Forcing transition to Story 1');
         triggerHaptic('light');
-        if (state.faqMode) {
-            // Exit FAQ mode and go to today's stories
-            exitFAQMode();
-            await loadAppContent();
-            showToast('✓', "Back to today's stories");
-        } else if (state.archiveMode) {
-            // Exit archive mode and return to today's stories
-            exitArchiveMode();
-        } else if (state.stories.length > 0 && (state.currentIndex > 0 || elements.completionScreen.classList.contains('visible'))) {
-            resetApp();
-            showToast('✓', 'Back to first story');
-        }
+
+        // Always transition to stories mode with fresh state
+        await transitionToMode('stories');
+        showToast('✓', "Back to today's stories");
     });
 
     // Empty state refresh
@@ -3234,8 +3459,9 @@ function setupEventListeners() {
 
             // In FAQ mode, this button becomes "Go to stories"
             if (elements.yourQuestionsBtn.dataset.faqAction === 'go-to-stories') {
-                exitFAQMode();
-                await loadAppContent();
+                console.log('[Go to stories] Transitioning from FAQ completion to Story 1');
+                // Use state machine to properly transition to stories
+                await transitionToMode('stories');
                 return;
             }
 
@@ -3245,9 +3471,11 @@ function setupEventListeners() {
         });
     }
 
-    // Prev Story button - handles both card navigation AND returning from completion-accessed pages
+    // Prev Story button - handles card navigation with mode-aware behavior
     if (elements.prevStoryBtn) {
-        elements.prevStoryBtn.addEventListener('click', () => {
+        elements.prevStoryBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+
             // If we're in history section (came from completion's "Your Questions")
             if (state.currentSection === 'history' && state.cameFromCompletion) {
                 // Return to completion screen
@@ -3256,27 +3484,48 @@ function setupEventListeners() {
                 elements.completionScreen.classList.add('visible');
                 return;
             }
+
             // If we're in recap view (came from completion's "Go to archives")
             if (state.inRecapView && state.cameFromCompletion) {
                 hideRecapView();
                 return;
             }
-            // If in FAQ mode on first card, exit FAQ mode
+
+            // If in FAQ mode on first card, exit to stories
             if (state.faqMode && state.currentIndex === 0) {
-                exitFAQMode();
-                loadAppContent();
+                console.log('[Prev] Exiting FAQ mode on first card');
+                await transitionToMode('stories');
                 return;
             }
+
             // If in archive mode on first card from no-stories page
             if (state.archiveMode && state.currentIndex === 0 && state.enteredArchivesFromNoStories) {
-                exitArchiveModeFromNoStories();
+                console.log('[Prev] Returning to no-stories from archives');
+                await transitionToMode('stories'); // Will show no-stories if still empty
                 return;
             }
-            // If in archive mode on first card, exit archive mode and show completion
+
+            // If in archive mode on first card, return to stories completion
             if (state.archiveMode && state.currentIndex === 0) {
-                exitArchiveModeToCompletion();
+                console.log('[Prev] Exiting archive mode on first card');
+                // Go back to stories and show completion
+                cleanupCurrentState();
+                state.archiveMode = false;
+                state.appMode = 'stories';
+                state.stories = state.originalStories || [];
+                state.totalStories = state.stories.length;
+                state.currentIndex = state.totalStories; // At end = completion
+                state.originalStories = [];
+
+                // Show completion
+                elements.completionScreen.classList.add('visible');
+                elements.progressFill.style.width = '100%';
+                updateCompletionButtons();
+                updateDateDisplay();
+                updatePrevButtonVisibility();
                 return;
             }
+
             // Default: go to previous card
             prevCard();
         });
@@ -3285,18 +3534,25 @@ function setupEventListeners() {
     // Recap This Week / Back to Today / Go to Archives button - behavior depends on mode
     if (elements.recapWeekBtn) {
         elements.recapWeekBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+
             if (state.faqMode) {
-                // In FAQ mode: "Go to archives" - exit FAQ and enter archives
-                exitFAQMode();
+                // In FAQ mode: "Go to archives" - use state machine
+                console.log('[Go to archives] Transitioning from FAQ to archives');
                 trackRecapViewed('faq_completion');
-                await showRecapView();
+                await transitionToMode('archives', { source: 'faq_completion' });
             } else if (state.archiveMode) {
                 // In archive mode: go back to today's stories
-                exitArchiveMode();
+                console.log('[Back to today] Transitioning from archives to stories');
+                await transitionToMode('stories');
             } else {
                 // In today mode: go to archives
+                console.log('[Go to archives] Transitioning from stories to archives');
                 trackRecapViewed('completion_button');
-                showRecapView();
+                await transitionToMode('archives', {
+                    source: 'completion_button',
+                    originalStories: [...state.stories]
+                });
             }
         });
     }
@@ -3330,6 +3586,15 @@ function setupEventListeners() {
             state.showFAQsAfterName = false; // Skip FAQs, go to stories
             hideWelcomeChoice();
             showWelcomeModal();
+        });
+    }
+
+    // Welcome Back button - returns to welcome choice
+    if (elements.welcomeBackBtn) {
+        elements.welcomeBackBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            hideWelcomeModal();
+            showWelcomeChoice();
         });
     }
 
