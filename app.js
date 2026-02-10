@@ -16,6 +16,9 @@ const SHEET_ID = '1WfcDbDicaZBmTumU4dqG_349UQIRwfP4eMr8NN7TmYs';
 // Sheet name (tab name at bottom of spreadsheet)
 const SHEET_NAME = 'Sheet1';
 
+// FAQ Sheet name (separate tab for FAQ content)
+const FAQ_SHEET_NAME = 'FAQs';
+
 // ==========================================
 // PLAUSIBLE ANALYTICS CONFIGURATION
 // ==========================================
@@ -394,7 +397,20 @@ const state = {
     // Track if navigated from completion screen
     cameFromCompletion: false,
     // Track if in recap view (accessed from completion)
-    inRecapView: false
+    inRecapView: false,
+    // FAQ mode
+    faqMode: false,
+    faqStories: [],
+    faqIndex: 0,
+    faqCompleted: false, // Track if user has completed FAQ onboarding
+    // Content mode: 'stories', 'faqs', or 'archives'
+    contentMode: 'stories',
+    // First-time user choice tracking
+    isFirstTimeUser: true,
+    showedWelcomeChoice: false,
+    showFAQsAfterName: false, // Flag to show FAQs after name entry
+    // Track if entered archives from no-stories page
+    enteredArchivesFromNoStories: false
 };
 
 // ==========================================
@@ -479,10 +495,21 @@ function cacheElements() {
     elements.digDeeperViewPrev = document.getElementById('digDeeperViewPrev');
     elements.deepAnswerViewPrev = document.getElementById('deepAnswerViewPrev');
 
-    // Welcome Modal
+    // Welcome Modal - Choice Screen
+    elements.welcomeChoiceBackdrop = document.getElementById('welcomeChoiceBackdrop');
+    elements.welcomeNewUserBtn = document.getElementById('welcomeNewUserBtn');
+    elements.welcomeReturningBtn = document.getElementById('welcomeReturningBtn');
+
+    // Welcome Modal - Name Input
     elements.welcomeModalBackdrop = document.getElementById('welcomeModalBackdrop');
     elements.welcomeNameInput = document.getElementById('welcomeNameInput');
     elements.welcomeSubmitBtn = document.getElementById('welcomeSubmitBtn');
+
+    // FAQs Menu Button
+    elements.faqsBtn = document.getElementById('faqsBtn');
+
+    // No Stories - Archives Button
+    elements.emptyArchivesBtn = document.getElementById('emptyArchivesBtn');
 
     // User Name Display
     elements.fyiUserName = document.getElementById('fyiUserName');
@@ -515,12 +542,17 @@ async function init() {
 
     // Check if user has set their name
     const savedName = localStorage.getItem('fyi_user_name');
+    const faqCompleted = localStorage.getItem('fyi_faq_completed') === 'true';
+
     if (savedName && savedName.trim().length > 0) {
         state.userName = savedName.trim();
+        state.faqCompleted = faqCompleted;
+        state.isFirstTimeUser = false;
         updateUserNameDisplay();
     } else {
-        // Show welcome modal for first-time users
-        showWelcomeModal();
+        // First-time user - show welcome choice modal
+        state.isFirstTimeUser = true;
+        showWelcomeChoice();
         return; // Don't load content until name is set
     }
 
@@ -529,6 +561,24 @@ async function init() {
 
     // Track app opened
     trackAppOpened();
+}
+
+/**
+ * Show the welcome choice modal (New here? / Been here before?)
+ */
+function showWelcomeChoice() {
+    if (elements.welcomeChoiceBackdrop) {
+        elements.welcomeChoiceBackdrop.classList.add('visible');
+    }
+}
+
+/**
+ * Hide the welcome choice modal
+ */
+function hideWelcomeChoice() {
+    if (elements.welcomeChoiceBackdrop) {
+        elements.welcomeChoiceBackdrop.classList.remove('visible');
+    }
 }
 
 /**
@@ -562,12 +612,21 @@ async function loadAppContent() {
     registerServiceWorker();
 }
 
-// Format and display today's date
+// Format and display today's date (or appropriate text for FAQ/archive mode)
 function updateDateDisplay() {
-    const today = new Date();
-    const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    const formattedDate = today.toLocaleDateString('en-US', options);
-    elements.dateDisplay.textContent = formattedDate;
+    if (state.faqMode) {
+        // Show "FAQs" instead of date
+        elements.dateDisplay.textContent = 'Frequently Asked Questions';
+    } else if (state.archiveMode) {
+        // Show "Archives" instead of date
+        elements.dateDisplay.textContent = 'Archives';
+    } else {
+        // Show today's date
+        const today = new Date();
+        const options = { month: 'short', day: 'numeric', year: 'numeric' };
+        const formattedDate = today.toLocaleDateString('en-US', options);
+        elements.dateDisplay.textContent = formattedDate;
+    }
 }
 
 function registerServiceWorker() {
@@ -756,6 +815,251 @@ async function fetchArchiveStories() {
     }
 }
 
+// ==========================================
+// FAQ Functions
+// ==========================================
+
+/**
+ * Fetch FAQ content from the FAQs sheet
+ * FAQs use the same column structure as stories but:
+ * - No date filtering (FAQs are evergreen)
+ * - Only 3 questions displayed (Question 4 is always "Skip this FAQ")
+ * - No Dig Deeper functionality (deep question columns are empty)
+ */
+async function fetchFAQs() {
+    // Check if sheet ID is configured
+    if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
+        console.log('Sheet ID not configured, using fallback FAQs');
+        return getFallbackFAQs();
+    }
+
+    try {
+        // Fetch FAQ sheet as CSV
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(FAQ_SHEET_NAME)}`;
+
+        const response = await fetch(csvUrl);
+        if (!response.ok) {
+            throw new Error('Failed to fetch FAQ sheet');
+        }
+
+        const csvText = await response.text();
+        const faqs = parseCSV(csvText);
+
+        // FAQs don't need date filtering - return all
+        if (faqs.length > 0) {
+            // Process FAQs - ensure no deep questions are shown
+            return faqs.map(faq => ({
+                ...faq,
+                isFAQ: true,
+                // Override banner image for FAQs
+                imageUrl: faq.imageUrl || 'images/cat-sleep.jpg',
+                // Strip deep questions from FAQ questions
+                questions: faq.questions.map(q => ({
+                    ...q,
+                    deepQuestions: [] // FAQs don't have dig deeper
+                }))
+            }));
+        }
+
+        return getFallbackFAQs();
+    } catch (error) {
+        console.error('Error fetching FAQs:', error);
+        return getFallbackFAQs();
+    }
+}
+
+/**
+ * Fallback FAQ content when sheet is not configured
+ */
+function getFallbackFAQs() {
+    return [
+        {
+            id: 'faq-1',
+            isFAQ: true,
+            headline: "Why do I need another news app?",
+            teaser: "We know you've been here before—another news service promising \"high-quality\" news that \"cuts the clutter.\" We get the eye roll. But hear us out.",
+            summary: "✦ We're not trying to keep you informed about everything—that's impossible and exhausting<br>✦ We curate 3-5 stories daily that actually matter for conversations you'll have with real people<br>✦ We teach you how to think about news, not just what happened—questions beat headlines every time",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "News apps have just not worked for me, I'm still skeptical",
+                    answer: "We get it. This exact skepticism is what got us to start FYI in the first place. Most news apps either overwhelm you with notifications or simplify things to the point of uselessness. We're not here to replace your news diet—we're here to make you sharper in the 15 minutes you actually have to engage with what's happening.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "What are your qualifications to report on this?",
+                    answer: "Fair question. We're students at IIM Bangalore with 6+ years of competitive debate experience—meaning we're trained to interrogate arguments, spot BS, and explain complex ideas simply. Think of us as your smart friend who reads too much and can't help but share what's actually interesting.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "How is this different from reading headlines on Twitter or Reddit?",
+                    answer: "Twitter gives you hot takes. Reddit gives you crowd consensus. We give you the questions you'd ask if you had time to dig deeper. Plus, our stuff is curated—you're not scrolling through an algorithm designed to keep you angry and engaged. You get in, get smarter, get out.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-2',
+            isFAQ: true,
+            headline: "What kind of stories do you report on?",
+            teaser: "We don't break headlines. We don't give you an endless stream of stories. So why should you pick us?",
+            summary: "✦ We report on stories you'll actually discuss—the ones where people say \"Did you see that thing about...\"<br>✦ Business, geopolitics, tech, culture—anything that reveals how the world actually works<br>✦ If a story won't teach you something or make you sound smarter in conversation, we skip it",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "Do you plan to personalize stories further?",
+                    answer: "Yes, soon! Right now we're keeping it simple—5 stories a day that we think work for most curious people. But we're building features to let you pick topics you care about most. Politics bore you? Skip them. Obsessed with AI? Get more. We want FYI to feel like it's made for you, not for \"users.\"",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "Will you ever cover local news or niche topics?",
+                    answer: "Maybe. We're focused on stories with broad relevance right now—things that matter whether you're in Mumbai, Delhi, or Bangalore. But if there's enough interest in hyperlocal stuff or niche deep-dives, we're open to experimenting. Let us know what you want to see.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "How do you decide what's \"conversation-worthy\"?",
+                    answer: "Simple test: Would this come up at dinner with smart friends? If yes, it's in. We avoid breaking news that'll be outdated in 6 hours, clickbait that sounds important but isn't, and niche wonkery that only policy nerds care about. We're optimizing for \"Oh, I read about this\" moments, not \"I saw a headline\" moments.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-3',
+            isFAQ: true,
+            headline: "Do you store my data?",
+            teaser: "We're a bunch of 20-somethings who forget to store our friends' phone numbers. Relax—we're not tracking you.",
+            summary: "✦ Nope. We use Plausible Analytics—made in the EU, privacy-focused, no cookies, no creepy tracking<br>✦ We only see aggregate data: how many people read a story, which questions get clicked most<br>✦ We can't see who you are, what device you're on, or where you're reading from—and we like it that way",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "But you ask for my name—is that stored on your server?",
+                    answer: "Nope. Your name is stored in localStorage on your device—basically your phone remembers it, not us. That's why the app sometimes glitches and asks you again—if it were on our server, that wouldn't happen. We genuinely have no idea who you are, and that's by design.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "So what kind of data are you actually interested in?",
+                    answer: "We care about what you like. Do you swipe left on all our stories? (Hopefully not.) Which questions do people dig into most? Do people finish all 5 stories or bail after 2? That helps us get better at picking stories and writing questions—but it doesn't tell us anything about you personally.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "All news apps store data. Why not you?",
+                    answer: "We don't run ads. That's the whole game. Most news apps store data because advertisers pay for targeting—show this person shoe ads, that person finance stuff. We're not doing that. We'd rather charge you ₹15/week and keep your reading experience clean than make ₹5/week per user by selling your attention to brands.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-4',
+            isFAQ: true,
+            headline: "What are your political inclinations?",
+            teaser: "Fair question. Are we a propaganda machine in disguise?",
+            summary: "✦ We like capitalism but recognize it has real limitations—markets aren't magic, regulation isn't always bad<br>✦ We're skeptical of ideology in general—left or right—because reality is messy and most loud opinions are performative<br>✦ If we've done our job right, you shouldn't be able to guess our politics from what we write",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "But everyone has biases. What are yours?",
+                    answer: "Sure. We probably lean slightly left on social issues and slightly pro-market on economic ones, but honestly we care more about \"what's actually happening\" than \"what should happen.\" Our bias is toward curiosity over certainty. We'd rather ask good questions than pretend we have all the answers.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "Will you ever take a strong stance on controversial issues?",
+                    answer: "Only when it's intellectually honest. If there's a genuine debate with smart people on both sides, we'll lay it out. But if one side is clearly wrong or acting in bad faith, we're not going to \"both sides\" it for balance. We're not activists, but we're also not stenographers. We call it like we see it.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "How do you handle stories where there's no \"both sides\"?",
+                    answer: "We don't pretend neutrality exists where it doesn't. Some stories genuinely have one defensible interpretation—climate change is real, vaccines work, election fraud claims in 2020 were baseless. In those cases, we explain the facts and move on. Treating every issue as a debate isn't fair—it's lazy.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-5',
+            isFAQ: true,
+            headline: "How do you make money?",
+            teaser: "If you're reading this, you're probably one of our earliest users. We hope the answer at the back of this card changes soon.",
+            summary: "✦ Right now? We don't. This is a passion project run by students who should be studying for exams<br>✦ Everyone gets a 30-day free trial to test if FYI actually makes you smarter and more engaged with the world<br>✦ When we do charge, it'll be ₹15/week—less than a cup of coffee, more than a dopamine scroll",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "That doesn't seem sustainable. Will you even survive?",
+                    answer: "Right now we're just students at IIM Bangalore, so surviving assignments and exams is a bigger worry than surviving as a business. This is an experiment—if people love it, we'll figure out how to make it work. If not, at least we built something we're proud of. Call it freshman idealism.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "Will you ever allow ads?",
+                    answer: "No. Call it naive, but we won't. Ads ruin the reading experience—they optimize for clicks and outrage, not understanding. Our whole model is \"you pay us, we serve you.\" No middlemen, no tracking, no algorithmic manipulation. If we can't make that work, we'd rather shut down than compromise.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "What happens after the free trial?",
+                    answer: "You decide if it's worth ₹15/week. If you've used FYI for 30 days and feel smarter, more engaged, and more confident in conversations—keep going. If not, cancel with zero guilt. We're not locking you into annual plans or guilt-tripping you with notifications. Pay if it's valuable. That's the deal.",
+                    deepQuestions: []
+                }
+            ]
+        }
+    ];
+}
+
+/**
+ * Load FAQ content and enter FAQ mode
+ */
+async function enterFAQMode() {
+    console.log('[enterFAQMode] Starting FAQ mode');
+    state.faqMode = true;
+    state.contentMode = 'faqs';
+    state.archiveMode = false;
+
+    showLoading(true);
+
+    // Fetch FAQs
+    const faqs = await fetchFAQs();
+    state.faqStories = faqs;
+    state.stories = faqs;
+    state.totalStories = faqs.length;
+    state.currentIndex = 0;
+
+    showLoading(false);
+
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    // Track FAQ mode entered
+    trackEvent('FAQ Mode Entered');
+}
+
+/**
+ * Exit FAQ mode and return to stories
+ */
+function exitFAQMode() {
+    console.log('[exitFAQMode] Exiting FAQ mode');
+    state.faqMode = false;
+    state.contentMode = 'stories';
+    state.faqStories = [];
+
+    // Mark FAQ as completed
+    state.faqCompleted = true;
+    localStorage.setItem('fyi_faq_completed', 'true');
+}
+
 function getPastWeekDates() {
     const dates = [];
     const today = new Date();
@@ -895,6 +1199,84 @@ function exitArchiveModeToCompletion() {
     updateCompletionButtons();
     updatePrevButtonVisibility();
     triggerHaptic('light');
+}
+
+/**
+ * Enter archive mode from the no-stories page
+ * Similar to regular archive mode but tracks source for proper Prev button behavior
+ */
+async function enterArchiveModeFromNoStories() {
+    console.log('[enterArchiveModeFromNoStories] Starting archive mode from no-stories page');
+
+    showLoading(true);
+
+    // Fetch archive stories
+    const archiveStories = await fetchArchiveStories();
+
+    showLoading(false);
+
+    if (archiveStories.length === 0) {
+        showToast('⚠', 'No archive stories available');
+        return;
+    }
+
+    // Enter archive mode
+    state.archiveMode = true;
+    state.contentMode = 'archives';
+    state.enteredArchivesFromNoStories = true;
+    state.originalStories = []; // No today's stories to restore
+    state.archiveStories = archiveStories;
+    state.stories = archiveStories;
+    state.totalStories = archiveStories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    // Hide no-stories state
+    elements.noStoriesState.classList.remove('visible');
+    elements.noStoriesState.style.display = 'none';
+
+    // Render archive cards
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    showToast('✓', 'Browsing archives');
+    trackEvent('Archive Mode Entered', { source: 'no_stories_page' });
+}
+
+/**
+ * Exit archive mode when entered from no-stories page
+ * Returns to no-stories page if today still has no stories, otherwise shows today's stories
+ */
+async function exitArchiveModeFromNoStories() {
+    state.archiveMode = false;
+    state.enteredArchivesFromNoStories = false;
+    state.contentMode = 'stories';
+    state.archiveStories = [];
+
+    // Re-fetch today's stories to check if any have been added
+    showLoading(true);
+    await fetchStories();
+    showLoading(false);
+
+    // Check if we now have stories
+    if (state.stories.length > 0) {
+        // Stories have been added! Show them
+        state.currentIndex = 0;
+        elements.cardContainer.innerHTML = '';
+        renderCards();
+        updateProgress();
+        renderProgressDots();
+        updatePrevButtonVisibility();
+        showToast('✓', 'New stories available!');
+    } else {
+        // Still no stories - show no-stories page again
+        elements.cardContainer.innerHTML = '';
+        elements.noStoriesState.style.display = 'flex';
+        elements.noStoriesState.classList.add('visible');
+        updatePrevButtonVisibility();
+    }
 }
 
 function renderRecapStories(stories) {
@@ -1163,16 +1545,24 @@ function formatUserName(name) {
     return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 }
 
-function saveUserName(name) {
+async function saveUserName(name) {
     const formatted = formatUserName(name);
     if (formatted) {
         localStorage.setItem('fyi_user_name', formatted);
         state.userName = formatted;
+        state.isFirstTimeUser = false;
         updateUserNameDisplay();
         hideWelcomeModal();
-        // Now load the app content
-        loadAppContent();
         trackAppOpened();
+
+        // Check if we should show FAQs (new user flow) or stories (returning user flow)
+        if (state.showFAQsAfterName) {
+            // New user: show FAQs first
+            await enterFAQMode();
+        } else {
+            // Returning user: go straight to stories
+            await loadAppContent();
+        }
     }
 }
 
@@ -1311,11 +1701,13 @@ function renderCards() {
 
     // Check if no stories
     if (state.stories.length === 0) {
+        elements.noStoriesState.style.display = 'flex';
         elements.noStoriesState.classList.add('visible');
         if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
         return;
     }
 
+    elements.noStoriesState.style.display = 'none';
     elements.noStoriesState.classList.remove('visible');
     if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
 
@@ -1742,39 +2134,76 @@ function showCompletion() {
     elements.progressFill.style.width = '100%';
     if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
 
-    // Update completion title with user's name - "Take a break, [name]"
+    // Update completion title based on mode
     if (state.userName && elements.completionTitle) {
-        elements.completionTitle.textContent = `Take a break, ${state.userName}`;
+        if (state.faqMode) {
+            // FAQ completion title
+            elements.completionTitle.textContent = `You're all caught up, ${state.userName}`;
+            // Update subtitle for FAQ completion
+            const subtitle = elements.completionScreen.querySelector('.completion-subtitle');
+            if (subtitle) {
+                subtitle.textContent = "Now you know what FYI is all about.";
+            }
+        } else {
+            // Regular completion title
+            elements.completionTitle.textContent = `Take a break, ${state.userName}`;
+            // Reset subtitle
+            const subtitle = elements.completionScreen.querySelector('.completion-subtitle');
+            if (subtitle) {
+                subtitle.textContent = "That's your daily dose of critical thinking.";
+            }
+        }
     }
 
     // Track completion - count curious swipes from the state
     const curiousCount = state.viewedStories.length;
     trackCompletionViewed(state.totalStories, curiousCount);
 
-    // Update button labels based on archive mode
+    // Update button labels based on mode
     updateCompletionButtons();
 }
 
 function updateCompletionButtons() {
-    // "Review Stories" button - loops within current context
     const reviewBtn = elements.reviewStoriesBtn;
-    if (reviewBtn) {
-        const reviewText = reviewBtn.querySelector('span');
-        if (state.archiveMode) {
-            reviewText.textContent = 'Review archives';
-        } else {
-            reviewText.textContent = 'Review stories';
-        }
-    }
-
-    // "Go to Archives" button - switches context
+    const questionsBtn = elements.yourQuestionsBtn;
     const archiveBtn = elements.recapWeekBtn;
-    if (archiveBtn) {
-        const archiveText = archiveBtn.querySelector('span');
-        if (state.archiveMode) {
-            archiveText.textContent = "Back to today";
-        } else {
-            archiveText.textContent = 'Go to archives';
+
+    if (state.faqMode) {
+        // FAQ completion buttons: "Review FAQs", "Go to stories", "Go to archives"
+        if (reviewBtn) {
+            reviewBtn.querySelector('span').textContent = 'Review FAQs';
+        }
+        if (questionsBtn) {
+            questionsBtn.querySelector('span').textContent = 'Go to stories';
+            // Change functionality for FAQ mode
+            questionsBtn.dataset.faqAction = 'go-to-stories';
+        }
+        if (archiveBtn) {
+            archiveBtn.querySelector('span').textContent = 'Go to archives';
+        }
+    } else if (state.archiveMode) {
+        // Archives completion buttons: "Review stories", "Your questions", "Back to today"
+        if (reviewBtn) {
+            reviewBtn.querySelector('span').textContent = 'Review stories';
+        }
+        if (questionsBtn) {
+            questionsBtn.querySelector('span').textContent = 'Your questions';
+            questionsBtn.dataset.faqAction = '';
+        }
+        if (archiveBtn) {
+            archiveBtn.querySelector('span').textContent = 'Back to today';
+        }
+    } else {
+        // Stories completion buttons: "Review stories", "Your questions", "Go to archives"
+        if (reviewBtn) {
+            reviewBtn.querySelector('span').textContent = 'Review stories';
+        }
+        if (questionsBtn) {
+            questionsBtn.querySelector('span').textContent = 'Your questions';
+            questionsBtn.dataset.faqAction = '';
+        }
+        if (archiveBtn) {
+            archiveBtn.querySelector('span').textContent = 'Go to archives';
         }
     }
 }
@@ -1805,11 +2234,15 @@ function openModal(story) {
     const storyIndex = state.stories.findIndex(s => s.id === story.id);
     trackStoryViewed(storyIndex + 1, story.headline);
 
-    elements.modalEmoji.textContent = story.emoji;
+    elements.modalEmoji.textContent = story.emoji || '✦';
     elements.modalHeadline.textContent = story.headline;
 
     elements.questionsContainer.innerHTML = '';
-    story.questions.forEach((q) => {
+
+    // For FAQs, only show first 3 questions (Question 4 is "Skip this FAQ")
+    const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
+
+    questionsToShow.forEach((q) => {
         const button = document.createElement('button');
         button.className = 'question-button';
         button.innerHTML = `
@@ -1823,12 +2256,13 @@ function openModal(story) {
         elements.questionsContainer.appendChild(button);
     });
 
-    // Add skip button - this advances to next story
+    // Add skip button - text differs for FAQs vs stories
     const skipButton = document.createElement('button');
     skipButton.className = 'question-button skip';
+    const skipText = story.isFAQ ? 'Skip this FAQ' : 'Skip this story';
     skipButton.innerHTML = `
         <span class="question-label">✦</span>
-        <span class="question-text">Skip this story</span>
+        <span class="question-text">${skipText}</span>
     `;
     skipButton.addEventListener('click', () => {
         triggerHaptic('light');
@@ -2656,6 +3090,16 @@ function setupEventListeners() {
         }
     });
 
+    // FAQs menu button
+    if (elements.faqsBtn) {
+        elements.faqsBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+            elements.dropdownMenu.classList.remove('visible');
+            trackEvent('FAQs Menu Clicked');
+            await enterFAQMode();
+        });
+    }
+
     // Our Philosophy modal
     elements.ourPhilosophyBtn.addEventListener('click', () => {
         triggerHaptic('light');
@@ -2679,10 +3123,15 @@ function setupEventListeners() {
         }
     });
 
-    // Logo click to reset to Story 1
-    elements.headerLogo.addEventListener('click', () => {
+    // Logo click - always returns to today's stories
+    elements.headerLogo.addEventListener('click', async () => {
         triggerHaptic('light');
-        if (state.archiveMode) {
+        if (state.faqMode) {
+            // Exit FAQ mode and go to today's stories
+            exitFAQMode();
+            await loadAppContent();
+            showToast('✓', "Back to today's stories");
+        } else if (state.archiveMode) {
             // Exit archive mode and return to today's stories
             exitArchiveMode();
         } else if (state.stories.length > 0 && (state.currentIndex > 0 || elements.completionScreen.classList.contains('visible'))) {
@@ -2778,10 +3227,19 @@ function setupEventListeners() {
         resetApp();
     });
 
-    // Your Questions button (on completion screen)
+    // Your Questions button (on completion screen) - behavior changes in FAQ mode
     if (elements.yourQuestionsBtn) {
-        elements.yourQuestionsBtn.addEventListener('click', () => {
+        elements.yourQuestionsBtn.addEventListener('click', async () => {
             triggerHaptic('light');
+
+            // In FAQ mode, this button becomes "Go to stories"
+            if (elements.yourQuestionsBtn.dataset.faqAction === 'go-to-stories') {
+                exitFAQMode();
+                await loadAppContent();
+                return;
+            }
+
+            // Default behavior: show question history
             state.cameFromCompletion = true; // Track that we came from completion
             switchSection('history');
         });
@@ -2803,6 +3261,17 @@ function setupEventListeners() {
                 hideRecapView();
                 return;
             }
+            // If in FAQ mode on first card, exit FAQ mode
+            if (state.faqMode && state.currentIndex === 0) {
+                exitFAQMode();
+                loadAppContent();
+                return;
+            }
+            // If in archive mode on first card from no-stories page
+            if (state.archiveMode && state.currentIndex === 0 && state.enteredArchivesFromNoStories) {
+                exitArchiveModeFromNoStories();
+                return;
+            }
             // If in archive mode on first card, exit archive mode and show completion
             if (state.archiveMode && state.currentIndex === 0) {
                 exitArchiveModeToCompletion();
@@ -2813,10 +3282,15 @@ function setupEventListeners() {
         });
     }
 
-    // Recap This Week / Back to Today button - toggles between modes
+    // Recap This Week / Back to Today / Go to Archives button - behavior depends on mode
     if (elements.recapWeekBtn) {
-        elements.recapWeekBtn.addEventListener('click', () => {
-            if (state.archiveMode) {
+        elements.recapWeekBtn.addEventListener('click', async () => {
+            if (state.faqMode) {
+                // In FAQ mode: "Go to archives" - exit FAQ and enter archives
+                exitFAQMode();
+                trackRecapViewed('faq_completion');
+                await showRecapView();
+            } else if (state.archiveMode) {
                 // In archive mode: go back to today's stories
                 exitArchiveMode();
             } else {
@@ -2839,6 +3313,26 @@ function setupEventListeners() {
 
     // History back button - REMOVED from HTML, functionality moved to global Prev button
 
+    // Welcome Choice - New User button
+    if (elements.welcomeNewUserBtn) {
+        elements.welcomeNewUserBtn.addEventListener('click', () => {
+            triggerHaptic('medium');
+            state.showFAQsAfterName = true; // Flag to show FAQs after name entry
+            hideWelcomeChoice();
+            showWelcomeModal();
+        });
+    }
+
+    // Welcome Choice - Returning User button
+    if (elements.welcomeReturningBtn) {
+        elements.welcomeReturningBtn.addEventListener('click', () => {
+            triggerHaptic('medium');
+            state.showFAQsAfterName = false; // Skip FAQs, go to stories
+            hideWelcomeChoice();
+            showWelcomeModal();
+        });
+    }
+
     // Welcome modal submit
     if (elements.welcomeSubmitBtn) {
         elements.welcomeSubmitBtn.addEventListener('click', () => {
@@ -2860,6 +3354,15 @@ function setupEventListeners() {
                     saveUserName(name);
                 }
             }
+        });
+    }
+
+    // No Stories - Go to Archives button
+    if (elements.emptyArchivesBtn) {
+        elements.emptyArchivesBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+            trackRecapViewed('no_stories_page');
+            await enterArchiveModeFromNoStories();
         });
     }
 
