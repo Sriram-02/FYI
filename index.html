@@ -370,7 +370,7 @@
                 <h2 class="welcome-title">Welcome to FYI!</h2>
                 <p class="welcome-subtitle">Your daily dose of critical thinking</p>
                 <div class="welcome-choice-buttons">
-                    <button class="welcome-button primary" id="welcomeNewUserBtn">New here? See what we're all about</button>
+                    <button class="welcome-button primary" id="welcomeNewUserBtn">New here?</button>
                     <button class="welcome-button secondary" id="welcomeReturningBtn">I've been here before</button>
                 </div>
             </div>
@@ -379,6 +379,11 @@
         <!-- Welcome Modal (First Time User) - Step 2: Name Input -->
         <div class="welcome-modal-backdrop" id="welcomeModalBackdrop">
             <div class="welcome-modal">
+                <button class="welcome-back-btn" id="welcomeBackBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
                 <h2 class="welcome-title">Welcome to FYI!</h2>
                 <p class="welcome-subtitle">What should we call you?</p>
                 <input type="text" class="welcome-input" id="welcomeNameInput" maxlength="15" placeholder="Your name" autocomplete="off" autocapitalize="words">
