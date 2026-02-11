@@ -2432,11 +2432,12 @@ button {
     color: #6B5C8A;
 }
 
-/* Mark: Yellow highlight background */
+/* Mark: Golden yellow highlight background - vibrant and visible in both themes */
 .text-mark {
-    background: rgba(255, 235, 120, 0.35);
-    padding: 0 3px;
-    border-radius: 2px;
+    background: rgba(255, 215, 0, 0.4); /* Golden yellow (#FFD700) with transparency */
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: inherit;
 }
 
 /* Lookup: Orange underlined clickable word */
@@ -2495,7 +2496,7 @@ button {
 }
 
 :root.light-mode .text-mark {
-    background: rgba(255, 235, 120, 0.5);
+    background: rgba(255, 193, 7, 0.45); /* Slightly darker gold (#FFC107) for light backgrounds */
 }
 
 /* ==========================================
