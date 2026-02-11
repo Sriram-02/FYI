@@ -511,7 +511,7 @@ async function transitionToMode(newMode, options = {}) {
     // Initialize the new mode
     switch (newMode) {
         case 'faqs':
-            await initFAQMode();
+            await initFAQMode(options.isNewUserOnboarding || false, options.forceRefresh || false);
             break;
         case 'stories':
             await initStoriesMode(options);
@@ -535,13 +535,17 @@ async function transitionToMode(newMode, options = {}) {
 
 /**
  * Initialize FAQ mode - load FAQ cards fresh
+ * @param {boolean} isNewUserOnboarding - True when this is part of new user welcome flow
+ * @param {boolean} forceRefresh - True to bypass cache and fetch fresh data
  */
-async function initFAQMode() {
-    console.log('[initFAQMode] Loading FAQ content');
+async function initFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
+    console.log('[initFAQMode] Loading FAQ content, isNewUserOnboarding:', isNewUserOnboarding, 'forceRefresh:', forceRefresh);
 
-    showLoading(true);
+    // Use custom loading text for new user onboarding
+    const loadingText = isNewUserOnboarding ? "Let's show you around" : "Loading FAQs...";
+    showLoading(true, loadingText);
 
-    const faqs = await fetchFAQs();
+    const faqs = await fetchFAQs(forceRefresh);
     state.faqStories = faqs;
     state.stories = faqs;
     state.totalStories = faqs.length;
@@ -672,6 +676,7 @@ function cacheElements() {
     elements.progressDots = document.getElementById('progressDots');
     elements.pullIndicator = document.getElementById('pullIndicator');
     elements.loadingState = document.getElementById('loadingState');
+    elements.loadingText = document.querySelector('.loading-text');
     elements.mainContent = document.getElementById('mainContent');
     elements.cardContainer = document.getElementById('cardContainer');
     elements.noStoriesState = document.getElementById('noStoriesState');
@@ -1072,17 +1077,45 @@ async function fetchArchiveStories() {
 // ==========================================
 
 /**
- * Fetch FAQ content from the FAQs sheet
+ * Fetch FAQ content from the FAQs sheet with caching
  * FAQs use the same column structure as stories but:
  * - No date filtering (FAQs are evergreen)
  * - Only 3 questions displayed (Question 4 is always "Skip this FAQ")
  * - No Dig Deeper functionality (deep question columns are empty)
+ *
+ * Caching: FAQ data is cached in localStorage for 24 hours
+ * Cache key: 'fyi_faq_data'
+ * Cache timestamp key: 'fyi_faq_timestamp'
  */
-async function fetchFAQs() {
+async function fetchFAQs(forceRefresh = false) {
+    const CACHE_KEY = 'fyi_faq_data';
+    const CACHE_TIMESTAMP_KEY = 'fyi_faq_timestamp';
+    const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
     // Check if sheet ID is configured
     if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
         console.log('Sheet ID not configured, using fallback FAQs');
         return getFallbackFAQs();
+    }
+
+    // Check cache unless force refresh is requested
+    if (!forceRefresh) {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+
+        if (cachedData && cachedTimestamp) {
+            const cacheAge = Date.now() - parseInt(cachedTimestamp, 10);
+            if (cacheAge < CACHE_DURATION_MS) {
+                console.log('[FAQ] Using cached FAQ data (age:', Math.round(cacheAge / 1000 / 60), 'minutes)');
+                try {
+                    return JSON.parse(cachedData);
+                } catch (e) {
+                    console.warn('[FAQ] Cache parse error, fetching fresh data');
+                }
+            } else {
+                console.log('[FAQ] Cache expired, fetching fresh data');
+            }
+        }
     }
 
     try {
@@ -1099,23 +1132,56 @@ async function fetchFAQs() {
 
         // FAQs don't need date filtering - return all
         if (faqs.length > 0) {
+            // Log warning if not exactly 5 FAQs
+            if (faqs.length !== 5) {
+                console.warn(`[FAQ] Expected 5 FAQs, found ${faqs.length}`);
+            }
+
             // Process FAQs - ensure no deep questions are shown
-            return faqs.map(faq => ({
+            const processedFaqs = faqs.map(faq => ({
                 ...faq,
                 isFAQ: true,
-                // Override banner image for FAQs
-                imageUrl: faq.imageUrl || 'images/cat-sleep.jpg',
+                // Use image from sheet or fall back to cat image
+                imageUrl: faq.imageUrl || '/images/cat-sleep.jpg',
                 // Strip deep questions from FAQ questions
                 questions: faq.questions.map(q => ({
                     ...q,
                     deepQuestions: [] // FAQs don't have dig deeper
                 }))
             }));
+
+            // Cache the processed FAQs
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(processedFaqs));
+                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                console.log('[FAQ] Cached', processedFaqs.length, 'FAQs from Google Sheets');
+            } catch (e) {
+                console.warn('[FAQ] Failed to cache FAQs:', e.message);
+            }
+
+            return processedFaqs;
         }
 
+        // Sheet exists but is empty - show updating message
+        console.warn('[FAQ] FAQ sheet is empty');
+        showToast('ℹ️', 'FAQs are being updated. Please check back soon.');
         return getFallbackFAQs();
     } catch (error) {
         console.error('Error fetching FAQs:', error);
+
+        // Try to use cached data even if expired
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+            console.log('[FAQ] Using expired cache due to fetch error');
+            try {
+                return JSON.parse(cachedData);
+            } catch (e) {
+                // Cache corrupted
+            }
+        }
+
+        // Show error message and return fallback
+        showToast('⚠️', "We're having trouble loading FAQs. Please try refreshing.");
         return getFallbackFAQs();
     }
 }
@@ -1269,15 +1335,14 @@ function getFallbackFAQs() {
 }
 
 /**
- * Load FAQ content and enter FAQ mode
- */
-/**
  * Enter FAQ mode using the state machine
  * This is the main entry point for FAQ mode from anywhere in the app
+ * @param {boolean} isNewUserOnboarding - True when this is part of new user welcome flow
+ * @param {boolean} forceRefresh - True to bypass cache and fetch fresh FAQ data (used when accessed from menu)
  */
-async function enterFAQMode() {
-    console.log('[enterFAQMode] Transitioning to FAQ mode via state machine');
-    await transitionToMode('faqs');
+async function enterFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
+    console.log('[enterFAQMode] Transitioning to FAQ mode via state machine, isNewUserOnboarding:', isNewUserOnboarding, 'forceRefresh:', forceRefresh);
+    await transitionToMode('faqs', { isNewUserOnboarding, forceRefresh });
 }
 
 /**
@@ -1532,7 +1597,7 @@ function renderRecapStories(stories) {
                 <div class="recap-story-card" data-recap-date="${date}" data-recap-index="${index}">
                     <span class="recap-story-emoji">${story.emoji || '📰'}</span>
                     <div class="recap-story-info">
-                        <h4 class="recap-story-headline">${story.headline}</h4>
+                        <h4 class="recap-story-headline">${parseFormattedText(story.headline)}</h4>
                     </div>
                     <svg class="recap-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="9 18 15 12 9 6"/>
@@ -1785,8 +1850,8 @@ async function saveUserName(name) {
 
         // Check if we should show FAQs (new user flow) or stories (returning user flow)
         if (state.showFAQsAfterName) {
-            // New user: show FAQs first
-            await enterFAQMode();
+            // New user: show FAQs first with custom onboarding loading text
+            await enterFAQMode(true);
         } else {
             // Returning user: go straight to stories
             await loadAppContent();
@@ -1836,14 +1901,62 @@ function adjustLogoFontSize() {
 }
 
 // ==========================================
-// HTML Text Formatting
+// HTML Text Formatting with Sanitization
 // ==========================================
 
+/**
+ * Sanitize HTML by removing dangerous tags while preserving safe formatting tags
+ * Whitelist approach: only allow specific safe tags
+ */
+function sanitizeHTML(text) {
+    if (!text) return text;
+
+    // First, temporarily preserve allowed tags by replacing them with placeholders
+    const preservedTags = [];
+    const allowedTagPatterns = [
+        /<color1>(.*?)<\/color1>/gi,
+        /<color2>(.*?)<\/color2>/gi,
+        /<color3>(.*?)<\/color3>/gi,
+        /<mark>(.*?)<\/mark>/gi,
+        /<br\s*\/?>/gi,
+        /<strong>(.*?)<\/strong>/gi,
+        /<em>(.*?)<\/em>/gi,
+        /<b>(.*?)<\/b>/gi,
+        /<i>(.*?)<\/i>/gi,
+        /<lookup\s+def="[^"]*">(.*?)<\/lookup>/gi
+    ];
+
+    let sanitized = text;
+
+    // Preserve allowed tags with placeholders
+    allowedTagPatterns.forEach((pattern, index) => {
+        sanitized = sanitized.replace(pattern, (match) => {
+            preservedTags.push(match);
+            return `__PRESERVED_TAG_${preservedTags.length - 1}__`;
+        });
+    });
+
+    // Remove all remaining HTML tags (potentially dangerous ones like <script>, <iframe>, etc.)
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+    // Restore preserved tags
+    preservedTags.forEach((tag, index) => {
+        sanitized = sanitized.replace(`__PRESERVED_TAG_${index}__`, tag);
+    });
+
+    return sanitized;
+}
+
+/**
+ * Parse custom HTML-like tags for text formatting
+ * Converts safe custom tags to styled spans
+ * Includes XSS protection via sanitization
+ */
 function parseFormattedText(text) {
     if (!text) return text;
 
-    // Parse custom HTML-like tags for formatting
-    let formatted = text;
+    // Sanitize first to remove any dangerous HTML
+    let formatted = sanitizeHTML(text);
 
     // <color1>text</color1> -> orange accent color
     formatted = formatted.replace(/<color1>(.*?)<\/color1>/gi, '<span class="text-color1">$1</span>');
@@ -1854,8 +1967,16 @@ function parseFormattedText(text) {
     // <color3>text</color3> -> plum/purple color (#6B5C8A)
     formatted = formatted.replace(/<color3>(.*?)<\/color3>/gi, '<span class="text-color3">$1</span>');
 
-    // <mark>text</mark> -> yellow highlight background
+    // <mark>text</mark> -> golden yellow highlight background
     formatted = formatted.replace(/<mark>(.*?)<\/mark>/gi, '<span class="text-mark">$1</span>');
+
+    // <strong>text</strong> or <b>text</b> -> bold text
+    formatted = formatted.replace(/<strong>(.*?)<\/strong>/gi, '<strong>$1</strong>');
+    formatted = formatted.replace(/<b>(.*?)<\/b>/gi, '<strong>$1</strong>');
+
+    // <em>text</em> or <i>text</i> -> italic text
+    formatted = formatted.replace(/<em>(.*?)<\/em>/gi, '<em>$1</em>');
+    formatted = formatted.replace(/<i>(.*?)<\/i>/gi, '<em>$1</em>');
 
     // <lookup def="definition">word</lookup> -> clickable orange underlined word
     formatted = formatted.replace(
@@ -1915,9 +2036,19 @@ function toggleTheme() {
 // Loading State
 // ==========================================
 
-function showLoading(show) {
+function showLoading(show, customText = null) {
     state.isLoading = show;
     elements.loadingState.classList.toggle('visible', show);
+
+    // Update loading text if provided, otherwise reset to default
+    if (elements.loadingText) {
+        if (show && customText) {
+            elements.loadingText.textContent = customText;
+        } else if (!show) {
+            // Reset to default when hiding
+            elements.loadingText.textContent = "Loading today's stories...";
+        }
+    }
 }
 
 // ==========================================
@@ -1999,8 +2130,8 @@ function createCardElement(story, position) {
                 <div class="card-swipe-overlay right"></div>
                 ${bannerHTML}
                 <div class="card-body">
-                    <h2 class="card-headline">${story.headline}</h2>
-                    <p class="card-teaser">${teaserText}</p>
+                    <h2 class="card-headline">${parseFormattedText(story.headline)}</h2>
+                    <p class="card-teaser">${parseFormattedText(teaserText)}</p>
                 </div>
                 <!-- Bottom Navigation Indicators - All clickable -->
                 <div class="card-nav-indicators">
@@ -2467,7 +2598,7 @@ function openModal(story) {
     trackStoryViewed(storyIndex + 1, story.headline);
 
     elements.modalEmoji.textContent = story.emoji || '✦';
-    elements.modalHeadline.textContent = story.headline;
+    elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
 
     elements.questionsContainer.innerHTML = '';
 
@@ -2479,7 +2610,7 @@ function openModal(story) {
         button.className = 'question-button';
         button.innerHTML = `
             <span class="question-label">✦</span>
-            <span class="question-text">${q.text}</span>
+            <span class="question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
@@ -2576,7 +2707,7 @@ function showAnswer(question) {
 
     // Prepare answer view content before showing
     elements.answerLabel.textContent = '✦';
-    elements.answerQuestion.textContent = question.text;
+    elements.answerQuestion.innerHTML = parseFormattedText(question.text);
     elements.answerText.innerHTML = parseFormattedText(question.answer);
 
     // Show/hide Dig Deeper button based on availability
@@ -2706,7 +2837,7 @@ function openSummaryModal(story) {
     const storyIndex = state.stories.findIndex(s => s.id === story.id);
     trackStoryViewed(storyIndex + 1, story.headline);
 
-    elements.summaryModalHeadline.textContent = story.headline;
+    elements.summaryModalHeadline.innerHTML = parseFormattedText(story.headline);
 
     // Parse summary with bullets and HTML formatting
     const summaryText = story.summary || story.teaser;
@@ -2797,7 +2928,7 @@ function showDigDeeper() {
         button.className = 'deep-question-button';
         button.innerHTML = `
             <span class="deep-question-label">✦</span>
-            <span class="deep-question-text">${dq.text}</span>
+            <span class="deep-question-text">${parseFormattedText(dq.text)}</span>
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
@@ -2844,7 +2975,7 @@ function showDeepAnswer(deepQuestion) {
     resetAllModalViews();
 
     // Prepare deep answer content
-    elements.deepAnswerQuestion.textContent = deepQuestion.text;
+    elements.deepAnswerQuestion.innerHTML = parseFormattedText(deepQuestion.text);
     elements.deepAnswerText.innerHTML = parseFormattedText(deepQuestion.answer);
 
     // Show deep answer view
@@ -2997,13 +3128,13 @@ function showHistoryAnswer(entry) {
     state.currentHistoryEntry = entry;
 
     elements.modalEmoji.textContent = story.emoji;
-    elements.modalHeadline.textContent = story.headline;
+    elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
 
     elements.qaView.classList.add('hidden');
     elements.answerView.classList.remove('hidden');
 
     elements.answerLabel.textContent = '✦';
-    elements.answerQuestion.textContent = entry.question;
+    elements.answerQuestion.innerHTML = parseFormattedText(entry.question);
     // Apply HTML formatting to history answer
     elements.answerText.innerHTML = parseFormattedText(entry.answer);
 
@@ -3322,13 +3453,14 @@ function setupEventListeners() {
         }
     });
 
-    // FAQs menu button
+    // FAQs menu button - force refresh to get latest FAQ content
     if (elements.faqsBtn) {
         elements.faqsBtn.addEventListener('click', async () => {
             triggerHaptic('light');
             elements.dropdownMenu.classList.remove('visible');
             trackEvent('FAQs Menu Clicked');
-            await enterFAQMode();
+            // Force refresh when explicitly accessing FAQs from menu
+            await enterFAQMode(false, true);
         });
     }
 
