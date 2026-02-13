@@ -2087,13 +2087,28 @@ function renderCards() {
         return;
     }
 
-    // Render remaining cards (up to 3 visible in stack)
-    const cardsToRender = state.stories.slice(state.currentIndex, state.currentIndex + 3);
+    // RENDER PREVIOUS CARD (off-screen left) for progressive animation
+    if (state.currentIndex > 0) {
+        const prevStory = state.stories[state.currentIndex - 1];
+        const prevCard = createCardElement(prevStory, -1);
+        prevCard.dataset.cardType = 'prev';
+        elements.cardContainer.appendChild(prevCard);
+    }
 
-    cardsToRender.forEach((story, index) => {
-        const card = createCardElement(story, index);
-        elements.cardContainer.appendChild(card);
-    });
+    // RENDER CURRENT CARD
+    const currentStory = state.stories[state.currentIndex];
+    const currentCard = createCardElement(currentStory, 0);
+    currentCard.dataset.cardType = 'current';
+    elements.cardContainer.appendChild(currentCard);
+    setupCardInteractions(currentCard, currentStory);
+
+    // RENDER NEXT CARD (off-screen right) for progressive animation
+    if (state.currentIndex < state.totalStories - 1) {
+        const nextStory = state.stories[state.currentIndex + 1];
+        const nextCard = createCardElement(nextStory, 1);
+        nextCard.dataset.cardType = 'next';
+        elements.cardContainer.appendChild(nextCard);
+    }
 
     // Update prev button visibility
     updatePrevButtonVisibility();
@@ -2219,12 +2234,40 @@ function setupCardInteractions(card, story) {
         if (state.isDragging) handleDragEnd(e, card, story);
     });
 
-    // NOTE: Nav hints are now visual only - no click handlers
-    // All navigation is via swipe gestures or keyboard arrows
+    // Setup click handlers for nav hints
+    setupNavHintClickHandlers(card, story);
 }
 
-// Nav hints are now visual only - no button handlers needed
-// Removed setupNavButtonHandlers - navigation is entirely swipe/keyboard driven
+// Click handlers for nav hints
+function setupNavHintClickHandlers(card, story) {
+    const prevHint = card.querySelector('.nav-hint-prev');
+    const centerHint = card.querySelector('.nav-hint-center');
+    const nextHint = card.querySelector('.nav-hint-next');
+
+    if (prevHint && !prevHint.classList.contains('hidden')) {
+        prevHint.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            handleSwipeLeft(card, story);
+        });
+    }
+
+    if (centerHint) {
+        centerHint.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            handleSwipeUp(card, story);
+        });
+    }
+
+    if (nextHint && !nextHint.classList.contains('hidden')) {
+        nextHint.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            handleSwipeRight(card, story);
+        });
+    }
+}
 
 // ==========================================
 // NEW SWIPE MECHANICS (Part 1 Implementation)
@@ -2281,6 +2324,32 @@ function handleDragMove(e, card) {
         // Show visual indicators for swipe direction
         card.classList.toggle('swiping-left', deltaX < -20);
         card.classList.toggle('swiping-right', deltaX > 20);
+
+        // PROGRESSIVE REVEAL: Animate adjacent card proportionally during drag
+        const screenWidth = window.innerWidth;
+        const dragProgress = Math.min(Math.abs(deltaX) / (screenWidth * 0.35), 1);
+
+        if (deltaX < 0) {
+            // Swiping LEFT (toward NEXT story)
+            const nextCard = document.querySelector('.story-card[data-card-type="next"]');
+            if (nextCard) {
+                const nextOffset = 110 - (dragProgress * 110);
+                const nextOpacity = 0.7 + (dragProgress * 0.3);
+                nextCard.style.transform = `translateX(${nextOffset}%)`;
+                nextCard.style.opacity = nextOpacity;
+                nextCard.style.transition = 'none';
+            }
+        } else {
+            // Swiping RIGHT (toward PREV story)
+            const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
+            if (prevCard) {
+                const prevOffset = -110 + (dragProgress * 110);
+                const prevOpacity = 0.7 + (dragProgress * 0.3);
+                prevCard.style.transform = `translateX(${prevOffset}%)`;
+                prevCard.style.opacity = prevOpacity;
+                prevCard.style.transition = 'none';
+            }
+        }
     } else {
         // Vertical swipe - apply vertical transform
         if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
@@ -2308,6 +2377,17 @@ function handleDragEnd(e, card, story) {
     const deltaY = state.currentY;
     const swipeDuration = Date.now() - state.swipeStartTime;
 
+    // NEW: Detect TAP (minimal movement, quick touch) - Instagram style
+    const isTap = Math.abs(deltaX) < 15 && Math.abs(deltaY) < 15 && swipeDuration < 300;
+
+    if (isTap) {
+        handleTapZone(e, card, story);
+        snapCardBack(card);
+        state.currentX = 0;
+        state.currentY = 0;
+        return;
+    }
+
     // Calculate velocity (px/ms)
     const velocityX = Math.abs(deltaX) / swipeDuration;
     const velocityY = Math.abs(deltaY) / swipeDuration;
@@ -2325,11 +2405,11 @@ function handleDragEnd(e, card, story) {
         triggerHaptic('light');
 
         if (deltaX < 0) {
-            // LEFT SWIPE = Previous story
-            handleSwipeLeft(card, story);
-        } else {
-            // RIGHT SWIPE = Next story
+            // LEFT SWIPE = Next story (swipe toward next)
             handleSwipeRight(card, story);
+        } else {
+            // RIGHT SWIPE = Previous story (swipe toward prev)
+            handleSwipeLeft(card, story);
         }
     } else if (isVertical && meetsVerticalThreshold) {
         // VERTICAL SWIPE: layer navigation
@@ -2349,6 +2429,36 @@ function handleDragEnd(e, card, story) {
 
     state.currentX = 0;
     state.currentY = 0;
+}
+
+/**
+ * Handle TAP based on screen position - Instagram style
+ * Left 1/3 = Previous story
+ * Center 1/3 = Flip card / Reveal
+ * Right 1/3 = Next story
+ */
+function handleTapZone(e, card, story) {
+    const tapX = e.type.includes('touch')
+        ? (e.changedTouches ? e.changedTouches[0].clientX : state.startX)
+        : e.clientX;
+
+    const screenWidth = window.innerWidth;
+    const leftThird = screenWidth / 3;
+    const rightThird = screenWidth * 2 / 3;
+
+    if (tapX < leftThird) {
+        // LEFT THIRD = Previous story
+        triggerHaptic('light');
+        handleSwipeLeft(card, story);
+    } else if (tapX > rightThird) {
+        // RIGHT THIRD = Next story
+        triggerHaptic('light');
+        handleSwipeRight(card, story);
+    } else {
+        // CENTER THIRD = Flip card / Reveal (same as swipe up)
+        triggerHaptic('light');
+        handleSwipeUp(card, story);
+    }
 }
 
 /**
@@ -2440,7 +2550,28 @@ function handleSwipeDown(card, story) {
 function snapCardBack(card) {
     card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
     card.style.transform = 'translateX(0) translateY(0) rotate(0) scale(1)';
-    setTimeout(() => { card.style.transition = ''; }, 300);
+
+    // Reset adjacent cards to their off-screen positions
+    const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
+    const nextCard = document.querySelector('.story-card[data-card-type="next"]');
+
+    if (prevCard) {
+        prevCard.style.transition = 'transform 300ms ease, opacity 300ms ease';
+        prevCard.style.transform = 'translateX(-110%)';
+        prevCard.style.opacity = '0.7';
+    }
+
+    if (nextCard) {
+        nextCard.style.transition = 'transform 300ms ease, opacity 300ms ease';
+        nextCard.style.transform = 'translateX(110%)';
+        nextCard.style.opacity = '0.7';
+    }
+
+    setTimeout(() => {
+        card.style.transition = '';
+        if (prevCard) prevCard.style.transition = '';
+        if (nextCard) nextCard.style.transition = '';
+    }, 300);
 }
 
 /**
@@ -2466,18 +2597,34 @@ function openQuestionsWithPushTransition(story) {
 }
 
 function animateCardExit(card, direction, callback) {
-    const exitX = direction === 'left' ? -window.innerWidth : window.innerWidth;
-    const rotation = direction === 'left' ? -15 : 15;
+    const swipeDuration = Date.now() - state.swipeStartTime;
+    const velocity = Math.abs(state.currentX) / swipeDuration;
+
+    // Faster swipe = faster animation (150-350ms range)
+    const exitDuration = Math.max(150, Math.min(350, 250 / (velocity + 0.3)));
+
+    const exitX = direction === 'left' ? '-110%' : '110%';
 
     card.classList.add('exiting');
-    card.style.transition = 'transform 350ms cubic-bezier(0.32, 0.72, 0, 1), opacity 350ms ease-out';
-    card.style.transform = `translateX(${exitX}px) rotate(${rotation}deg) scale(0.9)`;
+    card.style.transition = `transform ${exitDuration}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${exitDuration}ms ease-out`;
+    card.style.transform = `translateX(${exitX})`;
     card.style.opacity = '0';
+
+    // Animate incoming card to center position
+    const incomingCard = direction === 'left'
+        ? document.querySelector('.story-card[data-card-type="next"]')
+        : document.querySelector('.story-card[data-card-type="prev"]');
+
+    if (incomingCard) {
+        incomingCard.style.transition = `transform ${exitDuration}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${exitDuration}ms ease-out`;
+        incomingCard.style.transform = 'translateX(0)';
+        incomingCard.style.opacity = '1';
+    }
 
     setTimeout(() => {
         card.style.transition = '';
         if (callback) callback();
-    }, 350);
+    }, exitDuration);
 }
 
 // Legacy function - kept for compatibility but now simplified
@@ -2811,9 +2958,6 @@ function showAnswer(question) {
 
     console.log('[showAnswer] Transitioning from Q&A to answer view');
 
-    // Reset all views first
-    resetAllModalViews();
-
     // Prepare answer view content before showing
     elements.answerLabel.textContent = '✦';
     elements.answerQuestion.innerHTML = parseFormattedText(question.text);
@@ -2827,64 +2971,51 @@ function showAnswer(question) {
 
     resetStars();
 
-    // Now show answer view
+    // SLIDE TRANSITION: Q&A slides left, Answer slides in from right
+    elements.qaView.classList.add('slide-out-left');
     elements.answerView.classList.remove('hidden');
-    elements.answerView.style.display = 'block';
-    elements.answerView.style.visibility = 'visible';
-    elements.answerView.style.opacity = '1';
 
-    // Force reflow
-    void elements.answerView.offsetHeight;
+    setTimeout(() => {
+        elements.qaView.classList.add('hidden');
+        elements.qaView.classList.remove('slide-out-left');
+    }, 350);
 }
 
 function showQAView() {
     console.log('[showQAView] Starting transition to Q&A view');
 
-    // STRATEGY 1: Complete reset of all modal views
-    const allViews = [elements.qaView, elements.answerView, elements.digDeeperView, elements.deepAnswerView].filter(v => v);
+    // Find which view is currently visible
+    const currentView = [elements.answerView, elements.digDeeperView, elements.deepAnswerView]
+        .find(v => v && !v.classList.contains('hidden'));
 
-    // First, immediately hide all views without animation
-    allViews.forEach(v => {
-        v.classList.add('hidden');
-        v.classList.remove('fade-out', 'fade-in');
-        // Reset ALL possible inline styles
-        v.style.cssText = '';
-        v.style.zIndex = '';
-        v.style.opacity = '';
-        v.style.visibility = '';
-        v.style.pointerEvents = '';
-        v.style.display = '';
-        v.style.position = '';
-        v.style.transform = '';
-    });
+    if (currentView) {
+        // SLIDE TRANSITION: Current view slides out right, Q&A slides in from left
+        elements.qaView.style.transform = 'translateX(-100%)';
+        elements.qaView.classList.remove('hidden');
 
-    // STRATEGY 2: Force reflow to ensure styles are applied
-    void document.body.offsetHeight;
+        // Force reflow
+        void elements.qaView.offsetHeight;
 
-    // STRATEGY 3: Explicitly show Q&A view
-    elements.qaView.classList.remove('hidden');
-    elements.qaView.style.display = 'block';
-    elements.qaView.style.visibility = 'visible';
-    elements.qaView.style.opacity = '1';
-    elements.qaView.style.pointerEvents = 'auto';
+        elements.qaView.style.transform = '';
+        currentView.classList.add('slide-out-left');
 
-    // STRATEGY 4: Force another reflow
-    void elements.qaView.offsetHeight;
+        setTimeout(() => {
+            currentView.classList.add('hidden');
+            currentView.classList.remove('slide-out-left');
+            // Reset inline styles
+            currentView.style.cssText = '';
+        }, 350);
+    } else {
+        // Just show Q&A view directly
+        elements.qaView.classList.remove('hidden');
+    }
 
-    // STRATEGY 5: Verify modal backdrop is still correctly visible
+    // Verify modal backdrop is still correctly visible
     if (!elements.modalBackdrop.classList.contains('visible')) {
         elements.modalBackdrop.classList.add('visible');
     }
 
-    // STRATEGY 6: Ensure modal container is on top
-    elements.qaModal.style.zIndex = '301';
-
     console.log('[showQAView] Q&A view should now be visible');
-    console.log('[showQAView] qaView hidden?', elements.qaView.classList.contains('hidden'));
-    console.log('[showQAView] qaView display:', getComputedStyle(elements.qaView).display);
-
-    // Verify function - check everything is correct
-    verifyModalState();
 }
 
 function verifyModalState() {
