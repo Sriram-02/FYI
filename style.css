@@ -1506,47 +1506,57 @@ button {
 }
 
 /* ==========================================
-   Modal
+   Q&A Card System (Card-based, not modal overlay)
+   Q&A and Answer cards match story card dimensions
    ========================================== */
 
-/* Full-screen modal backdrop - solid background, no blur */
+/* Q&A backdrop - positions in card area, NOT covering header/progress */
 .modal-backdrop {
     position: fixed;
-    inset: 0;
-    background: var(--bg-primary);
+    /* Position below header and progress area */
+    top: calc(var(--safe-top) + 140px);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
     z-index: var(--z-modal-backdrop);
     opacity: 0;
     visibility: hidden;
     transition: opacity 400ms ease, visibility 400ms ease;
+    pointer-events: none;
 }
 
 .modal-backdrop.visible {
     opacity: 1;
     visibility: visible;
-    /* Solid background - no blur/semi-transparency */
+    pointer-events: auto;
 }
 
-/* Full-screen modal - PowerPoint-style push */
+/* Q&A Card - matches story card dimensions and styling */
 .modal {
-    position: fixed;
-    inset: 0;
-    max-height: 100vh;
-    max-height: 100dvh;
-    height: 100%;
-    background: var(--bg-secondary);
-    border-radius: 0;
+    position: absolute;
+    /* Match story card sizing */
+    width: calc(100% - var(--spacing-lg) * 2);
+    max-width: min(400px, 90vw);
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%) translateY(100%);
+    /* Card styling to match story cards */
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
     padding: var(--spacing-lg);
-    padding-top: calc(var(--safe-top) + var(--spacing-lg));
     padding-bottom: calc(var(--safe-bottom) + var(--spacing-lg));
     z-index: var(--z-modal);
-    transform: translateY(100%);
     transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Match story card max height */
+    max-height: calc(100% - var(--spacing-lg));
 }
 
 .modal-backdrop.visible .modal {
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
 }
 
 /* Push transition for swipe-up navigation */
@@ -1555,16 +1565,17 @@ button {
 }
 
 .modal-backdrop.push-transition.visible .modal {
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
 }
 
-/* Modal drag hint */
+/* Q&A Card navigation hint - matches story card nav hints */
 .modal-drag-hint {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-xs);
-    padding-bottom: var(--spacing-md);
+    padding: var(--spacing-md) 0;
+    margin-top: auto;
 }
 
 .drag-bar {
@@ -1575,8 +1586,29 @@ button {
 }
 
 .drag-text {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+/* Q&A Card bottom nav hint - same style as story card */
+.qa-card-nav-hint {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: 48px;
+    background: linear-gradient(transparent, var(--bg-card) 50%);
+}
+
+.qa-card-nav-hint .nav-hint {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
 }
 
 /* Modal close button - matches modal prev button size (32px) */
@@ -1642,28 +1674,25 @@ button {
     opacity: 0.7;
 }
 
-/* Modal Views - PowerPoint-style slide transitions */
+/* Modal Views - Card-internal slide transitions */
 .modal-view {
-    position: absolute;
-    inset: 0;
-    padding: var(--spacing-lg);
-    padding-top: calc(var(--safe-top) + 60px);
-    padding-bottom: calc(var(--safe-bottom) + var(--spacing-lg));
+    position: relative;
+    padding: 0;
     overflow-y: auto;
-    background: var(--bg-secondary);
+    background: transparent;
     transition: transform 350ms cubic-bezier(0.32, 0.72, 0, 1), opacity 350ms ease;
 }
 
-/* Hidden views positioned off-screen right */
+/* Hidden views */
 .modal-view.hidden {
-    transform: translateX(100%);
+    display: none;
     visibility: hidden;
     opacity: 0;
 }
 
-/* Active view in center */
+/* Active view */
 .modal-view:not(.hidden) {
-    transform: translateX(0);
+    display: block;
     visibility: visible;
     opacity: 1;
 }
