@@ -379,7 +379,10 @@ const state = {
     startX: 0,
     startY: 0,
     currentX: 0,
-    dragThreshold: 100,
+    currentY: 0, // Track vertical movement for up/down swipes
+    dragThreshold: 50, // Reduced from 100 for new swipe mechanics
+    swipeVelocityThreshold: 0.3, // px/ms velocity threshold
+    swipeStartTime: 0, // Track swipe start time for velocity calculation
     hasShownHint: false,
     rating: 0,
     history: [],
@@ -412,7 +415,15 @@ const state = {
     // Track if entered archives from no-stories page
     enteredArchivesFromNoStories: false,
     // App mode state machine: 'welcome', 'faqs', 'stories', 'archives', 'no_stories'
-    appMode: 'welcome'
+    appMode: 'welcome',
+
+    // NEW: Card layer stack for navigation
+    // Layers: 'headline' (front) -> 'summary' (flipped) -> 'questions' -> 'answer' -> 'deep-questions' -> 'deep-answer'
+    cardLayer: 'headline', // Current visible layer
+    modalStack: [], // Stack of modal states for back navigation
+
+    // NEW: Track if card is flipped (on summary side)
+    isCardFlipped: false
 };
 
 // ==========================================
@@ -2122,9 +2133,13 @@ function createCardElement(story, position) {
     const hasFlippedBefore = localStorage.getItem('fyi_has_flipped') === 'true';
     const flipHintClass = hasFlippedBefore ? 'hidden' : '';
 
+    // Determine visibility of prev/next based on position
+    const isFirstStory = state.currentIndex === 0;
+    const isLastStory = state.currentIndex >= state.totalStories - 1;
+
     card.innerHTML = `
         <div class="card-flipper">
-            <!-- FRONT FACE -->
+            <!-- FRONT FACE (Headline) -->
             <div class="card-face card-front">
                 <div class="card-swipe-overlay left"></div>
                 <div class="card-swipe-overlay right"></div>
@@ -2133,29 +2148,15 @@ function createCardElement(story, position) {
                     <h2 class="card-headline">${parseFormattedText(story.headline)}</h2>
                     <p class="card-teaser">${parseFormattedText(teaserText)}</p>
                 </div>
-                <!-- Bottom Navigation Indicators - All clickable -->
-                <div class="card-nav-indicators">
-                    <button class="nav-indicator nav-skip" data-action="skip">
-                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 14L4 9l5-5"/>
-                            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
-                        </svg>
-                        <span>Skip</span>
-                    </button>
-                    <button class="nav-indicator nav-flip" data-action="flip" id="flipHint-${story.id}">
-                        <span>Tap to flip</span>
-                    </button>
-                    <button class="nav-indicator nav-curious" data-action="curious">
-                        <span>Curious</span>
-                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M15 14l5-5-5-5"/>
-                            <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
-                        </svg>
-                    </button>
+                <!-- Bottom Navigation Hints (visual only, not clickable) -->
+                <div class="card-nav-hints">
+                    <span class="nav-hint nav-hint-prev ${isFirstStory ? 'hidden' : ''}">← Prev</span>
+                    <span class="nav-hint nav-hint-center">Read ahead ↑</span>
+                    <span class="nav-hint nav-hint-next ${isLastStory ? 'hidden' : ''}">Next →</span>
                 </div>
             </div>
 
-            <!-- BACK FACE -->
+            <!-- BACK FACE (Summary) -->
             <div class="card-face card-back">
                 <div class="card-swipe-overlay left"></div>
                 <div class="card-swipe-overlay right"></div>
@@ -2163,25 +2164,9 @@ function createCardElement(story, position) {
                     <h3 class="card-back-header">Summary</h3>
                     <div class="card-summary-text">${summaryHTML}</div>
                 </div>
-                <!-- Bottom Navigation Indicators - All clickable -->
-                <div class="card-nav-indicators">
-                    <button class="nav-indicator nav-skip" data-action="skip">
-                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 14L4 9l5-5"/>
-                            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
-                        </svg>
-                        <span>Skip</span>
-                    </button>
-                    <button class="nav-indicator nav-flip-back" data-action="flip">
-                        <span>Tap to flip back</span>
-                    </button>
-                    <button class="nav-indicator nav-curious" data-action="curious">
-                        <span>Curious</span>
-                        <svg class="nav-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M15 14l5-5-5-5"/>
-                            <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
-                        </svg>
-                    </button>
+                <!-- Summary face: subtle hint to swipe up for questions -->
+                <div class="card-nav-hints card-nav-hints-summary">
+                    <span class="nav-hint nav-hint-center-subtle">↑</span>
                 </div>
             </div>
         </div>
@@ -2221,7 +2206,7 @@ function flipCard(card, story) {
 }
 
 function setupCardInteractions(card, story) {
-    // Touch events for swiping
+    // Touch events for swiping - NEW NAVIGATION SYSTEM
     card.addEventListener('touchstart', (e) => handleDragStart(e, card, story), { passive: true });
     card.addEventListener('touchmove', (e) => handleDragMove(e, card), { passive: false });
     card.addEventListener('touchend', (e) => handleDragEnd(e, card, story));
@@ -2234,49 +2219,20 @@ function setupCardInteractions(card, story) {
         if (state.isDragging) handleDragEnd(e, card, story);
     });
 
-    // Setup click handlers for nav buttons (Skip, Flip, Curious)
-    setupNavButtonHandlers(card, story);
+    // NOTE: Nav hints are now visual only - no click handlers
+    // All navigation is via swipe gestures or keyboard arrows
 }
 
-function setupNavButtonHandlers(card, story) {
-    // Find all nav indicator buttons
-    const navButtons = card.querySelectorAll('.nav-indicator');
-
-    navButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent swipe handler from triggering
-            const action = btn.dataset.action;
-
-            if (action === 'skip') {
-                // Skip: animate card left and go to next
-                triggerHaptic('light');
-                trackSwipe('skip', story.headline, state.currentIndex + 1);
-                animateCardExit(card, 'left', () => nextCard());
-            } else if (action === 'flip') {
-                // Flip: toggle card flip
-                triggerHaptic('light');
-                flipCard(card, story);
-            } else if (action === 'curious') {
-                // Curious: open Q&A modal
-                triggerHaptic('medium');
-                trackSwipe('curious', story.headline, state.currentIndex + 1);
-                animateCardExitWithModal(card, 'right', () => {}, story);
-            }
-        });
-
-        // Prevent touch events on buttons from triggering swipe
-        btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-        }, { passive: true });
-
-        btn.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-        });
-    });
-}
+// Nav hints are now visual only - no button handlers needed
+// Removed setupNavButtonHandlers - navigation is entirely swipe/keyboard driven
 
 // ==========================================
-// Drag/Swipe Handling
+// NEW SWIPE MECHANICS (Part 1 Implementation)
+// ==========================================
+// Left swipe = Previous story (navigate to prev story headline)
+// Right swipe = Next story (navigate to next story headline)
+// Swipe up = Flip card / Reveal next layer (headline->summary->questions)
+// Swipe down = Return to previous layer (questions->summary->headline)
 // ==========================================
 
 function handleDragStart(e, card, story) {
@@ -2285,12 +2241,13 @@ function handleDragStart(e, card, story) {
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
     state.startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
     state.currentX = 0;
+    state.currentY = 0;
+    state.swipeStartTime = Date.now();
     card.classList.add('dragging');
     hideSwipeHint();
-    // Long-press flip REMOVED - flip is now only via "Tap to flip" button
 }
 
-// Long-press timer functions REMOVED - flip is now only via "Tap to flip" button
+// Legacy function kept for compatibility
 function clearLongPressTimer() {
     // No-op: long press timer removed
 }
@@ -2304,87 +2261,231 @@ function handleDragMove(e, card) {
     const deltaX = clientX - state.startX;
     const deltaY = clientY - state.startY;
 
-    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaX) < 10) {
-        return;
-    }
-
-    if (e.type === 'touchmove' && Math.abs(deltaX) > 10) {
-        e.preventDefault();
-    }
-
     state.currentX = deltaX;
+    state.currentY = deltaY;
 
-    const rotation = deltaX * 0.05;
-    const scale = Math.max(0.95, 1 - Math.abs(deltaX) * 0.0002);
+    // Determine dominant axis
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
 
-    card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg) scale(${scale})`;
+    if (isHorizontal) {
+        // Horizontal swipe - apply card transform
+        if (e.type === 'touchmove' && Math.abs(deltaX) > 10) {
+            e.preventDefault();
+        }
 
-    card.classList.toggle('swiping-left', deltaX < -30);
-    card.classList.toggle('swiping-right', deltaX > 30);
+        const rotation = deltaX * 0.03; // Reduced rotation for subtler effect
+        const scale = Math.max(0.97, 1 - Math.abs(deltaX) * 0.0001);
+
+        card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg) scale(${scale})`;
+
+        // Show visual indicators for swipe direction
+        card.classList.toggle('swiping-left', deltaX < -20);
+        card.classList.toggle('swiping-right', deltaX > 20);
+    } else {
+        // Vertical swipe - apply vertical transform
+        if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
+            e.preventDefault();
+        }
+
+        // Limit vertical drag distance
+        const constrainedY = Math.max(-100, Math.min(100, deltaY));
+        const scale = Math.max(0.97, 1 - Math.abs(constrainedY) * 0.0003);
+
+        card.style.transform = `translateY(${constrainedY * 0.5}px) scale(${scale})`;
+
+        card.classList.toggle('swiping-up', deltaY < -20);
+        card.classList.toggle('swiping-down', deltaY > 20);
+    }
 }
 
 function handleDragEnd(e, card, story) {
     if (!state.isDragging) return;
 
     state.isDragging = false;
-    card.classList.remove('dragging', 'swiping-left', 'swiping-right');
+    card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down');
 
     const deltaX = state.currentX;
+    const deltaY = state.currentY;
+    const swipeDuration = Date.now() - state.swipeStartTime;
 
-    if (Math.abs(deltaX) > state.dragThreshold) {
-        triggerHaptic('medium');
-        if (deltaX > 0) {
-            // Swipe RIGHT: Card glides off smoothly to the right while Q&A modal opens
-            trackSwipe('curious', story.headline, state.currentIndex + 1);
-            animateCardExitWithModal(card, 'right', () => {
-                // Card has exited, modal is already open
-            }, story);
+    // Calculate velocity (px/ms)
+    const velocityX = Math.abs(deltaX) / swipeDuration;
+    const velocityY = Math.abs(deltaY) / swipeDuration;
+
+    // Determine dominant axis
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    const isVertical = Math.abs(deltaY) > Math.abs(deltaX);
+
+    // Check if swipe meets threshold (distance OR velocity)
+    const meetsHorizontalThreshold = Math.abs(deltaX) > state.dragThreshold || velocityX > state.swipeVelocityThreshold;
+    const meetsVerticalThreshold = Math.abs(deltaY) > state.dragThreshold || velocityY > state.swipeVelocityThreshold;
+
+    if (isHorizontal && meetsHorizontalThreshold) {
+        // HORIZONTAL SWIPE: left/right navigation
+        triggerHaptic('light');
+
+        if (deltaX < 0) {
+            // LEFT SWIPE = Previous story
+            handleSwipeLeft(card, story);
         } else {
-            // Swipe LEFT: Skip to next card
-            trackSwipe('skip', story.headline, state.currentIndex + 1);
-            animateCardExit(card, 'left', () => nextCard());
+            // RIGHT SWIPE = Next story
+            handleSwipeRight(card, story);
+        }
+    } else if (isVertical && meetsVerticalThreshold) {
+        // VERTICAL SWIPE: layer navigation
+        triggerHaptic('light');
+
+        if (deltaY < 0) {
+            // SWIPE UP = Reveal next layer
+            handleSwipeUp(card, story);
+        } else {
+            // SWIPE DOWN = Return to previous layer
+            handleSwipeDown(card, story);
         }
     } else {
-        // Tap or small drag: snap back (flip is ONLY via "Tap to flip" button)
-        card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-        card.style.transform = 'translateX(0) rotate(0) scale(1)';
-        setTimeout(() => { card.style.transition = ''; }, 300);
+        // Small drag or tap: snap back
+        snapCardBack(card);
     }
 
     state.currentX = 0;
+    state.currentY = 0;
+}
+
+/**
+ * Handle LEFT swipe = Navigate to PREVIOUS story
+ */
+function handleSwipeLeft(card, story) {
+    if (state.currentIndex <= 0) {
+        // Already at first story - bounce back
+        showToast('', "You're at the first story");
+        snapCardBack(card);
+        return;
+    }
+
+    // Track the navigation
+    trackEvent('Story Swiped', { direction: 'prev', from: state.currentIndex + 1, to: state.currentIndex });
+
+    // Navigate to previous story (always to headline, not summary)
+    state.isCardFlipped = false;
+    state.cardLayer = 'headline';
+    prevCard();
+}
+
+/**
+ * Handle RIGHT swipe = Navigate to NEXT story
+ */
+function handleSwipeRight(card, story) {
+    if (state.currentIndex >= state.totalStories - 1) {
+        // At last story - show completion or bounce
+        if (!elements.completionScreen.classList.contains('visible')) {
+            showCompletion();
+        } else {
+            showToast('', "You've seen all stories");
+            snapCardBack(card);
+        }
+        return;
+    }
+
+    // Track the navigation
+    trackEvent('Story Swiped', { direction: 'next', from: state.currentIndex + 1, to: state.currentIndex + 2 });
+
+    // Navigate to next story (always to headline)
+    state.isCardFlipped = false;
+    state.cardLayer = 'headline';
+    nextCard();
+}
+
+/**
+ * Handle SWIPE UP = Reveal next layer
+ * From headline -> flip to summary
+ * From summary -> open questions modal
+ */
+function handleSwipeUp(card, story) {
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (!isFlipped) {
+        // Currently on HEADLINE - flip to SUMMARY
+        flipCard(card, story);
+        state.isCardFlipped = true;
+        state.cardLayer = 'summary';
+    } else {
+        // Currently on SUMMARY - reveal QUESTIONS modal
+        state.cardLayer = 'questions';
+        openQuestionsWithPushTransition(story);
+    }
+}
+
+/**
+ * Handle SWIPE DOWN = Return to previous layer
+ * From summary -> flip back to headline
+ * From headline -> do nothing (already at top)
+ */
+function handleSwipeDown(card, story) {
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (isFlipped) {
+        // Currently on SUMMARY - flip back to HEADLINE
+        flipCard(card, story);
+        state.isCardFlipped = false;
+        state.cardLayer = 'headline';
+    } else {
+        // Already on HEADLINE - bounce back, nothing to do
+        snapCardBack(card);
+    }
+}
+
+/**
+ * Snap card back to original position with spring animation
+ */
+function snapCardBack(card) {
+    card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+    card.style.transform = 'translateX(0) translateY(0) rotate(0) scale(1)';
+    setTimeout(() => { card.style.transition = ''; }, 300);
+}
+
+/**
+ * Open Questions modal with push-from-bottom transition
+ * This is called when user swipes up from Summary card
+ */
+function openQuestionsWithPushTransition(story) {
+    // Push current state to modal stack
+    state.modalStack.push({ type: 'summary', storyId: story.id });
+
+    // Update state
+    state.currentStory = story;
+
+    // Open the Q&A modal with push transition
+    // The transition animation will be handled in CSS
+    elements.modalBackdrop.classList.add('push-transition');
+    openModal(story);
+
+    // Remove transition class after animation
+    setTimeout(() => {
+        elements.modalBackdrop.classList.remove('push-transition');
+    }, 400);
 }
 
 function animateCardExit(card, direction, callback) {
     const exitX = direction === 'left' ? -window.innerWidth : window.innerWidth;
-    const rotation = direction === 'left' ? -30 : 30;
+    const rotation = direction === 'left' ? -15 : 15;
 
     card.classList.add('exiting');
-    card.style.transform = `translateX(${exitX}px) rotate(${rotation}deg) scale(0.8)`;
+    card.style.transition = 'transform 350ms cubic-bezier(0.32, 0.72, 0, 1), opacity 350ms ease-out';
+    card.style.transform = `translateX(${exitX}px) rotate(${rotation}deg) scale(0.9)`;
     card.style.opacity = '0';
-
-    setTimeout(callback, 400);
-}
-
-function animateCardExitWithModal(card, direction, callback, story) {
-    // Smoothly animate card off screen while opening modal simultaneously
-    const exitX = direction === 'left' ? -window.innerWidth : window.innerWidth * 0.7;
-    const rotation = direction === 'left' ? -20 : 12;
-
-    // Use smooth easing for premium feel
-    card.style.transition = 'transform 450ms cubic-bezier(0.32, 0.72, 0, 1), opacity 450ms cubic-bezier(0.32, 0.72, 0, 1)';
-    card.classList.add('exiting');
-    card.style.transform = `translateX(${exitX}px) rotate(${rotation}deg) scale(0.85)`;
-    card.style.opacity = '0';
-
-    // Open modal immediately for coordinated animation
-    openModal(story);
 
     setTimeout(() => {
         card.style.transition = '';
-        // Don't remove the card - keep it invisible until modal closes
-        // This prevents visual issues if user closes modal early
         if (callback) callback();
-    }, 450);
+    }, 350);
+}
+
+// Legacy function - kept for compatibility but now simplified
+function animateCardExitWithModal(card, direction, callback, story) {
+    // For new swipe mechanics, modal is opened via swipe up
+    // This function now just opens the modal directly
+    openModal(story);
+    if (callback) callback();
 }
 
 // ==========================================
@@ -2392,6 +2493,10 @@ function animateCardExitWithModal(card, direction, callback, story) {
 // ==========================================
 
 function nextCard() {
+    // Reset card layer state for new navigation
+    state.isCardFlipped = false;
+    state.cardLayer = 'headline';
+
     // Mark current story as viewed
     if (state.stories[state.currentIndex]) {
         state.viewedStories.push(state.stories[state.currentIndex].id);
@@ -2411,6 +2516,10 @@ function nextCard() {
 }
 
 function prevCard() {
+    // Reset card layer state for new navigation
+    state.isCardFlipped = false;
+    state.cardLayer = 'headline';
+
     // If on completion screen, clear it first and show last story
     if (elements.completionScreen.classList.contains('visible')) {
         elements.completionScreen.classList.remove('visible');
@@ -2804,9 +2913,13 @@ function verifyModalState() {
 }
 
 function closeModal() {
-    elements.modalBackdrop.classList.remove('visible');
+    elements.modalBackdrop.classList.remove('visible', 'push-transition');
     document.body.classList.remove('no-scroll');
     elements.qaModal.style.transform = '';
+
+    // Update layer state - return to summary (since we came from there via swipe up)
+    state.cardLayer = 'summary';
+    state.modalStack.pop(); // Remove questions from stack
 
     // Reset modal state after animation completes
     setTimeout(() => {
@@ -3773,40 +3886,77 @@ function setupEventListeners() {
     // Pull to refresh
     setupPullToRefresh();
 
-    // Keyboard shortcuts
+    // Keyboard shortcuts - NEW NAVIGATION SYSTEM
     document.addEventListener('keydown', (e) => {
-        // Escape closes modals
+        // Escape closes modals (returns to previous layer)
         if (e.key === 'Escape') {
-            if (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible')) {
-                closeSummaryModal();
-            } else if (elements.modalBackdrop.classList.contains('visible')) {
-                closeModal();
-            }
+            handleKeyboardBack();
+            return;
         }
 
-        // Arrow keys for card navigation (when no modal is open)
-        const anyModalOpen = (elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible')) ||
-                             (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible'));
+        // Check modal states
+        const qaModalOpen = elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible');
+        const summaryModalOpen = elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible');
 
-        if (state.currentSection === 'today' && !anyModalOpen) {
+        // When in Q&A modal - only down arrow works (to go back)
+        if (qaModalOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                closeModal();
+            }
+            return;
+        }
+
+        // When in summary modal - only down arrow works (to go back)
+        if (summaryModalOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                closeSummaryModal();
+            }
+            return;
+        }
+
+        // Card navigation (when no modal is open)
+        if (state.currentSection === 'today') {
+            const card = document.querySelector('.story-card[data-position="0"]');
+            const story = state.stories[state.currentIndex];
+
             if (e.key === 'ArrowLeft') {
-                const card = document.querySelector('.story-card[data-position="0"]');
-                if (card) {
-                    animateCardExit(card, 'left', nextCard);
-                }
+                // LEFT = Previous story
+                e.preventDefault();
+                if (card && story) handleSwipeLeft(card, story);
             }
             if (e.key === 'ArrowRight') {
-                const story = state.stories[state.currentIndex];
-                if (story) openModal(story);
-            }
-            if (e.key === ' ' || e.key === 'Enter') {
-                // Space/Enter opens Summary Modal
+                // RIGHT = Next story
                 e.preventDefault();
-                const story = state.stories[state.currentIndex];
-                if (story) openSummaryModal(story);
+                if (card && story) handleSwipeRight(card, story);
+            }
+            if (e.key === 'ArrowUp') {
+                // UP = Flip to summary / Reveal questions
+                e.preventDefault();
+                if (card && story) handleSwipeUp(card, story);
+            }
+            if (e.key === 'ArrowDown') {
+                // DOWN = Flip back to headline
+                e.preventDefault();
+                if (card && story) handleSwipeDown(card, story);
             }
         }
     });
+}
+
+/**
+ * Handle keyboard back navigation (Escape key)
+ * Pops from modal stack and returns to previous layer
+ */
+function handleKeyboardBack() {
+    // Check what's currently visible and close it
+    if (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible')) {
+        closeSummaryModal();
+    } else if (elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible')) {
+        closeModal();
+    }
+    // If nothing is open, Escape does nothing
 }
 
 // ==========================================
