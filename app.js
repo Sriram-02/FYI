@@ -542,6 +542,9 @@ async function transitionToMode(newMode, options = {}) {
     updatePrevButtonVisibility();
 
     console.log(`[STATE] Transition complete. Now in: ${state.appMode}`);
+
+    // Verify clean state after transition
+    setTimeout(verifyCleanState, 450);
 }
 
 /**
@@ -2575,8 +2578,9 @@ function snapCardBack(card) {
 }
 
 /**
- * Open Questions modal with push-from-bottom transition
+ * Open Questions card with push-from-bottom transition
  * This is called when user swipes up from Summary card
+ * Q&A card pushes up to replace Summary (like PowerPoint slide)
  */
 function openQuestionsWithPushTransition(story) {
     // Push current state to modal stack
@@ -2584,9 +2588,12 @@ function openQuestionsWithPushTransition(story) {
 
     // Update state
     state.currentStory = story;
+    state.cardLayer = 'questions';
 
-    // Open the Q&A modal with push transition
-    // The transition animation will be handled in CSS
+    // Set initial position for Q&A card (below viewport)
+    elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
+
+    // Open the Q&A card with push transition
     elements.modalBackdrop.classList.add('push-transition');
     openModal(story);
 
@@ -2925,7 +2932,8 @@ function setupModalSwipe() {
 
         if (deltaY > 0 && modal.scrollTop === 0) {
             e.preventDefault();
-            modal.style.transform = `translateY(${deltaY}px)`;
+            // Q&A card uses centered positioning, so preserve translateX(-50%)
+            modal.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
         }
     };
 
@@ -2933,9 +2941,12 @@ function setupModalSwipe() {
         const deltaY = currentY - startY;
 
         if (deltaY > 100) {
+            // Swipe down threshold met - return to Summary
+            triggerHaptic('light');
             closeModal();
         } else {
-            modal.style.transform = '';
+            // Reset position
+            modal.style.transform = 'translateX(-50%) translateY(0)';
         }
 
         startY = 0;
@@ -3044,29 +3055,34 @@ function verifyModalState() {
 }
 
 function closeModal() {
+    // Animate Q&A card sliding down/out
     elements.modalBackdrop.classList.remove('visible', 'push-transition');
     document.body.classList.remove('no-scroll');
-    elements.qaModal.style.transform = '';
+    // Reset transform with centered positioning
+    elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
 
-    // Update layer state - return to summary (since we came from there via swipe up)
+    // CRITICAL: Update layer state - return to SUMMARY (not Headline!)
+    // Q&A swipe down always goes to Summary, which is one layer back
     state.cardLayer = 'summary';
-    state.modalStack.pop(); // Remove questions from stack
+    if (state.modalStack.length > 0) {
+        state.modalStack.pop(); // Remove questions from stack
+    }
 
     // Reset modal state after animation completes
     setTimeout(() => {
-        elements.qaView.classList.remove('hidden', 'fade-out', 'fade-in');
+        elements.qaView.classList.remove('hidden', 'fade-out', 'fade-in', 'slide-out-left');
         elements.answerView.classList.add('hidden');
-        elements.answerView.classList.remove('fade-out', 'fade-in');
+        elements.answerView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
         elements.digDeeperView.classList.add('hidden');
-        elements.digDeeperView.classList.remove('fade-out', 'fade-in');
+        elements.digDeeperView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
         elements.deepAnswerView.classList.add('hidden');
-        elements.deepAnswerView.classList.remove('fade-out', 'fade-in');
-        state.currentStory = null;
+        elements.deepAnswerView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
+
+        // Note: Do NOT clear state.currentStory - we're still on the same story
         state.currentQuestion = null;
         state.currentHistoryEntry = null;
 
-        // Re-render cards to restore any that were animated out for the modal
-        renderCards();
+        // Note: Do NOT re-render cards - the story card (showing Summary) is still there
     }, 300);
 }
 
@@ -3277,12 +3293,80 @@ function resetAllModalViews() {
 
     allViews.forEach(v => {
         v.classList.add('hidden');
-        v.classList.remove('fade-out', 'fade-in');
+        v.classList.remove('fade-out', 'fade-in', 'slide-out-left');
         v.style.cssText = '';
     });
 
     // Force reflow
     void document.body.offsetHeight;
+}
+
+/**
+ * Verify clean navigation state - call after every major transition
+ * Ensures no invisible overlays or broken states
+ */
+function verifyCleanState() {
+    // Check that Q&A modal is either fully visible or fully hidden
+    const modalVisible = elements.modalBackdrop.classList.contains('visible');
+
+    if (!modalVisible) {
+        // Modal should be completely hidden
+        const modalRect = elements.qaModal.getBoundingClientRect();
+        if (modalRect.top < window.innerHeight && modalRect.bottom > 0) {
+            console.warn('[verifyCleanState] Q&A card visible when modal backdrop hidden - forcing cleanup');
+            elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
+        }
+    }
+
+    // Verify no stray backdrop overlays
+    const backdrops = document.querySelectorAll('.modal-backdrop, .summary-modal-backdrop, .info-modal-backdrop');
+    backdrops.forEach(backdrop => {
+        if (!backdrop.classList.contains('visible')) {
+            // Ensure truly hidden
+            backdrop.style.pointerEvents = 'none';
+        }
+    });
+
+    // Log current state for debugging
+    console.log('[verifyCleanState] cardLayer:', state.cardLayer,
+                'modalStack:', state.modalStack.length,
+                'modalVisible:', modalVisible);
+}
+
+/**
+ * Full state reset - returns to Story 1 headline from any state
+ * Used by logo click and other "go home" actions
+ */
+function fullStateReset() {
+    console.log('[fullStateReset] Performing complete navigation reset');
+
+    // Close all modals
+    if (elements.modalBackdrop.classList.contains('visible')) {
+        elements.modalBackdrop.classList.remove('visible', 'push-transition');
+        elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
+    }
+    document.body.classList.remove('no-scroll');
+
+    // Reset all modal views
+    resetAllModalViews();
+
+    // Clear card layer state
+    state.cardLayer = 'headline';
+    state.modalStack = [];
+    state.isCardFlipped = false;
+
+    // Reset story to first
+    state.currentIndex = 0;
+    state.currentStory = null;
+    state.currentQuestion = null;
+
+    // Re-render cards
+    renderCards();
+    updateProgress();
+    renderProgressDots();
+
+    // Verify clean state
+    setTimeout(verifyCleanState, 450);
 }
 
 // ==========================================
@@ -3554,14 +3638,28 @@ function closeLookupTooltip() {
 // Pull to Refresh
 // ==========================================
 
+// Pull-to-refresh requires deliberate action:
+// - Must pull down 150px+ (much more than swipe navigation 50-80px)
+// - Must hold for 300ms after reaching threshold
+// This prevents accidental refresh during normal swipe-down navigation
+
+const PULL_REFRESH_THRESHOLD = 150;  // px - must pull this far
+const PULL_REFRESH_HOLD_TIME = 300;  // ms - must hold after threshold
+
 function setupPullToRefresh() {
     let pullStartY = 0;
     let isPulling = false;
+    let pullHoldTimer = null;
+    let refreshReady = false;
 
     elements.sectionToday.addEventListener('touchstart', (e) => {
+        // Only enable pull-to-refresh when at top of content
         if (elements.sectionToday.scrollTop === 0) {
             pullStartY = e.touches[0].clientY;
             isPulling = true;
+            refreshReady = false;
+            clearTimeout(pullHoldTimer);
+            pullHoldTimer = null;
         }
     }, { passive: true });
 
@@ -3570,10 +3668,31 @@ function setupPullToRefresh() {
 
         const pullDistance = e.touches[0].clientY - pullStartY;
 
-        if (pullDistance > 0 && pullDistance < 150) {
+        // Only show indicator when past the high threshold
+        if (pullDistance > PULL_REFRESH_THRESHOLD) {
             elements.pullIndicator.classList.add('visible');
-            elements.pullIndicator.querySelector('.pull-text').textContent =
-                pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh';
+
+            if (refreshReady) {
+                elements.pullIndicator.querySelector('.pull-text').textContent = 'Release to refresh';
+            } else {
+                elements.pullIndicator.querySelector('.pull-text').textContent = 'Keep pulling...';
+
+                // Start hold timer if not already started
+                if (!pullHoldTimer) {
+                    pullHoldTimer = setTimeout(() => {
+                        refreshReady = true;
+                        // Haptic feedback when refresh is ready
+                        triggerHaptic('medium');
+                        elements.pullIndicator.querySelector('.pull-text').textContent = 'Release to refresh';
+                    }, PULL_REFRESH_HOLD_TIME);
+                }
+            }
+        } else {
+            // Below threshold - hide indicator and reset timer
+            elements.pullIndicator.classList.remove('visible');
+            clearTimeout(pullHoldTimer);
+            pullHoldTimer = null;
+            refreshReady = false;
         }
     }, { passive: true });
 
@@ -3582,16 +3701,22 @@ function setupPullToRefresh() {
 
         const pullDistance = e.changedTouches[0].clientY - pullStartY;
 
-        if (pullDistance > 80) {
-            triggerHaptic('medium');
+        // Only trigger refresh if threshold was met AND hold time completed
+        if (pullDistance > PULL_REFRESH_THRESHOLD && refreshReady) {
+            triggerHaptic('heavy');
             elements.pullIndicator.classList.add('refreshing');
             elements.pullIndicator.querySelector('.pull-text').textContent = 'Refreshing...';
             refreshStories();
         } else {
+            // Not a refresh - just hide indicator
             elements.pullIndicator.classList.remove('visible');
         }
 
+        // Reset state
         isPulling = false;
+        refreshReady = false;
+        clearTimeout(pullHoldTimer);
+        pullHoldTimer = null;
     });
 }
 
