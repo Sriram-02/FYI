@@ -1,3348 +1,5482 @@
-/* ==========================================
-   FYI - Premium News PWA
-   Maroon accent (#670D17), DM Serif + Satoshi fonts
-   Light/Dark mode support
-   ========================================== */
-
-/* CSS Custom Properties - Dark Mode (Default) */
-:root {
-    /* Colors - Dark Mode */
-    --bg-primary: #0A0A0A;
-    --bg-secondary: #111111;
-    --bg-card: #1A1A1A;
-    --bg-card-hover: #222222;
-    --bg-elevated: #252525;
-    --bg-input: #1E1E1E;
-
-    --text-primary: #FFFFFF;
-    --text-secondary: #999999;
-    --text-tertiary: #666666;
-
-    --border-color: #2A2A2A;
-    --border-light: rgba(255, 255, 255, 0.12);
-
-    /* Claude Orange Accent */
-    --accent: #DA7756;
-    --accent-light: #E8956E;
-    --accent-glow: rgba(218, 119, 86, 0.3);
-
-    --success: #4ADE80;
-    --warning: #FBBF24;
-    --danger: #EF4444;
-
-    /* Card shadow for dark mode */
-    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
-    --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-
-    /* Fonts */
-    --font-headline: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-body: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-
-    /* ==========================================
-       FLUID TYPOGRAPHY - scales with viewport
-       Small phones (360px) → Large phones (428px)
-       ========================================== */
-    --font-size-xs: clamp(0.6875rem, 0.625rem + 0.25vw, 0.8125rem);    /* 11px → 13px */
-    --font-size-sm: clamp(0.8125rem, 0.75rem + 0.3125vw, 0.9375rem);   /* 13px → 15px */
-    --font-size-md: clamp(0.9375rem, 0.875rem + 0.3125vw, 1.0625rem);  /* 15px → 17px */
-    --font-size-lg: clamp(1.0625rem, 1rem + 0.3125vw, 1.1875rem);      /* 17px → 19px */
-    --font-size-xl: clamp(1.375rem, 1.25rem + 0.625vw, 1.5625rem);     /* 22px → 25px */
-    --font-size-2xl: clamp(1.5625rem, 1.4375rem + 0.625vw, 1.75rem);   /* 25px → 28px */
-    --font-size-3xl: clamp(1.75rem, 1.625rem + 0.625vw, 2rem);         /* 28px → 32px */
-
-    /* Line heights */
-    --line-height-tight: 1.2;
-    --line-height-normal: 1.5;
-    --line-height-relaxed: 1.7;
-
-    /* ==========================================
-       FLUID SPACING - scales with viewport
-       ========================================== */
-    --spacing-xs: clamp(0.375rem, 0.3125rem + 0.3125vw, 0.5rem);       /* 6px → 8px */
-    --spacing-sm: clamp(0.625rem, 0.5625rem + 0.3125vw, 0.75rem);      /* 10px → 12px */
-    --spacing-md: clamp(0.875rem, 0.8125rem + 0.3125vw, 1rem);         /* 14px → 16px */
-    --spacing-lg: clamp(1.25rem, 1.125rem + 0.625vw, 1.5rem);          /* 20px → 24px */
-    --spacing-xl: clamp(1.625rem, 1.5rem + 0.625vw, 2rem);             /* 26px → 32px */
-    --spacing-2xl: clamp(2.5rem, 2.25rem + 1.25vw, 3rem);              /* 40px → 48px */
-
-    /* Borders - keep fixed for consistency */
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 24px;
-    --radius-full: 9999px;
-
-    /* Transitions */
-    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-
-    /* Z-index layers */
-    --z-cards: 10;
-    --z-header: 100;
-    --z-hint: 50;
-    --z-modal-backdrop: 200;
-    --z-modal: 300;
-    --z-toast: 400;
-    --z-loading: 500;
-
-    /* Safe area insets */
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left: env(safe-area-inset-left, 0px);
-    --safe-right: env(safe-area-inset-right, 0px);
-
-    /* Card Layer System - Fixed dimensions for bug-free positioning */
-    --header-height: 60px;
-    --progress-area-height: 80px;
-    --card-margin-horizontal: 16px;
-    --card-margin-bottom: 24px;
-    --card-border-radius: var(--radius-xl);
-
-    /* Card layer z-indices */
-    --z-flip-card: 10;
-    --z-qa-card: 20;
-    --z-answer-card: 30;
-}
-
-/* Light Mode Variables */
-:root.light-mode {
-    --bg-primary: #F8F8F8;
-    --bg-secondary: #FFFFFF;
-    --bg-card: #FFFFFF;
-    --bg-card-hover: #F0F0F0;
-    --bg-elevated: #FFFFFF;
-    --bg-input: #F5F5F5;
-
-    --text-primary: #1A1A1A;
-    --text-secondary: #666666;
-    --text-tertiary: #999999;
-
-    --border-color: #E0E0E0;
-    --border-light: rgba(0, 0, 0, 0.08);
-
-    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-/* ==========================================
-   Reset & Base Styles
-   ========================================== */
-
-*, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-/* ==========================================
-   RESPONSIVE BASE STYLES
-   Works WITH browser accessibility, not against it
-   ========================================== */
-
-html {
-    /* Use percentage for accessibility - allows user font scaling */
-    font-size: 100%;
-
-    /* Prevent tap highlight */
-    -webkit-tap-highlight-color: transparent;
-
-    /* Smooth font rendering */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-}
-
-body {
-    font-family: var(--font-body);
-    font-weight: 400;
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-normal);
-
-    background: var(--bg-primary);
-    color: var(--text-primary);
-
-    /* Use dvh for accurate mobile viewport */
-    min-height: 100vh;
-    min-height: 100dvh;
-
-    /* Prevent body scroll */
-    overflow: hidden;
-
-    /* Prevent overscroll bounce */
-    overscroll-behavior: none;
-
-    /* Full width */
-    width: 100%;
-
-    transition: background var(--transition-normal), color var(--transition-normal);
-}
-
-/* Headlines use Cabinet Grotesk Variable */
-h1, h2, h3, .card-headline, .modal-headline, .completion-title, .empty-title, .section-title, .info-modal-title {
-    font-family: var(--font-headline);
-    font-weight: 700;
-    font-variation-settings: 'wght' 700;
-    letter-spacing: -0.02em;
-    text-rendering: optimizeLegibility;
-}
-
-/* Inherit font sizes properly */
-p, span, div {
-    font-size: inherit;
-    line-height: inherit;
-}
-
-/* Form elements - 16px minimum prevents iOS zoom on focus */
-input, textarea, select, button {
-    font-size: max(16px, var(--font-size-md));
-}
-
-button {
-    font-family: var(--font-body);
-    border: none;
-    background: none;
-    cursor: pointer;
-    color: inherit;
-}
-
-/* ==========================================
-   App Container
-   ========================================== */
-
-#app {
-    position: relative;
-    width: 100%;
-    height: 100vh;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-/* ==========================================
-   Header
-   ========================================== */
-
-.header {
-    position: relative;
-    z-index: var(--z-header);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: calc(var(--safe-top) + var(--spacing-sm)) var(--spacing-lg) var(--spacing-sm);
-    background: var(--bg-primary);
-    flex-shrink: 0;
-    transition: background var(--transition-normal);
-}
-
-.header-action {
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    color: var(--text-secondary);
-    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-}
-
-.header-action:hover {
-    background: var(--bg-card);
-    color: var(--text-primary);
-}
-
-.header-action:active {
-    transform: scale(0.92);
-}
-
-.header-action.refreshing svg {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* Theme toggle icons */
-.icon-sun, .icon-moon {
-    transition: opacity var(--transition-fast), transform var(--transition-fast);
-}
-
-:root:not(.light-mode) .icon-sun {
-    display: block;
-}
-
-:root:not(.light-mode) .icon-moon {
-    display: none;
-}
-
-:root.light-mode .icon-sun {
-    display: none;
-}
-
-:root.light-mode .icon-moon {
-    display: block;
-}
-
-/* Logo */
-.header-logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: transform var(--transition-fast);
-    flex: 1;
-    max-width: calc(100% - 120px); /* Leave space for hamburger and theme toggle */
-}
-
-.header-logo:active {
-    transform: scale(0.95);
-}
-
-.logo {
-    height: 52px;
-    width: auto;
-}
-
-.logo-fallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.logo-text {
-    font-family: var(--font-headline);
-    font-weight: 700;
-    line-height: 1;
-}
-
-/* Theme-aware logo text colors - keeping for backwards compatibility */
-.logo-text .fyi-dot {
-    color: var(--accent);
-}
-
-:root.light-mode .logo-text .fyi-dot {
-    color: var(--accent);
-}
-
-/* Hamburger Menu */
-.hamburger-btn {
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    color: var(--text-secondary);
-    font-size: 24px;
-    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-}
-
-.hamburger-btn:hover {
-    background: var(--bg-card);
-    color: var(--text-primary);
-}
-
-.hamburger-btn:active {
-    transform: scale(0.92);
-}
-
-/* Dropdown Menu */
-.dropdown-menu {
-    position: absolute;
-    top: 100%;
-    left: var(--spacing-lg);
-    min-width: 200px;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-elevated);
-    overflow: hidden;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-10px);
-    transition: opacity var(--transition-normal), visibility var(--transition-normal), transform var(--transition-normal);
-    z-index: calc(var(--z-header) + 1);
-}
-
-.dropdown-menu.visible {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-.dropdown-item {
-    display: block;
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    text-align: left;
-    font-size: var(--font-size-md);
-    color: var(--text-primary);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: background var(--transition-fast);
-}
-
-.dropdown-item:hover {
-    background: var(--bg-card-hover);
-}
-
-.dropdown-item:active {
-    background: var(--bg-elevated);
-}
-
-/* ==========================================
-   Progress Bar
-   ========================================== */
-
-.progress-bar-container {
-    padding: 0 var(--spacing-lg) var(--spacing-xs);
-    flex-shrink: 0;
-}
-
-.progress-bar {
-    height: 3px;
-    background: var(--border-color);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    transition: background var(--transition-normal);
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: var(--radius-full);
-    width: 0%;
-    transition: width var(--transition-slow);
-}
-
-/* Date Display */
-/* Story Navigation Bar - centered layout */
-.story-nav-bar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: var(--spacing-xs) var(--spacing-lg);
-    gap: var(--spacing-xs);
-    position: relative;
-}
-
-/* Dots and date are ALWAYS centered - independent of Prev button */
-.story-nav-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    position: relative;
-}
-
-/* Prev button is absolutely positioned to NOT affect centering */
-/* Font size matches date display (font-size-sm) */
-.prev-story-btn {
-    position: absolute;
-    left: 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    color: var(--accent);
-    padding: 4px 8px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    border-radius: var(--radius-md);
-    transition: background var(--transition-fast), opacity var(--transition-fast);
-}
-
-.prev-story-btn:hover {
-    background: var(--bg-card);
-}
-
-.prev-story-btn:active {
-    opacity: 0.7;
-}
-
-.prev-story-btn.hidden {
-    visibility: hidden;
-    pointer-events: none;
-}
-
-/* Spacer no longer needed - remove from layout */
-.nav-spacer {
-    display: none;
-}
-
-.date-display {
-    text-align: center;
-    font-family: var(--font-body);
-    font-size: var(--font-size-sm);
-    /* Explicit line-height for cross-platform consistency */
-    line-height: 1.5;
-    font-weight: 500;
-    color: var(--text-secondary);
-}
-
-/* Progress Dots */
-.progress-dots {
-    display: flex;
-    justify-content: center;
-    gap: var(--spacing-xs);
-}
-
-.progress-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    border: 2px solid var(--accent);
-    background: transparent;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.progress-dot.active {
-    background: var(--accent);
-    transform: scale(1.1);
-}
-
-.progress-dot.viewed {
-    background: var(--accent);
-    opacity: 0.5;
-}
-
-/* ==========================================
-   Loading State
-   ========================================== */
-
-.loading-state {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-primary);
-    z-index: var(--z-loading);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-normal), visibility var(--transition-normal);
-}
-
-.loading-state.visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-.loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: var(--spacing-md);
-}
-
-.loading-text {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-}
-
-/* ==========================================
-   Pull to Refresh
-   ========================================== */
-
-.pull-indicator {
-    position: absolute;
-    top: calc(var(--safe-top) + 70px);
-    left: 50%;
-    transform: translateX(-50%) translateY(-60px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-    opacity: 0;
-    transition: transform var(--transition-normal), opacity var(--transition-normal);
-    z-index: var(--z-hint);
-    pointer-events: none;
-}
-
-.pull-indicator.visible {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
-.pull-indicator.refreshing .pull-spinner {
-    animation: spin 1s linear infinite;
-}
-
-.pull-spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--border-color);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-}
-
-.pull-text {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-}
-
-/* ==========================================
-   Main Content
-   ========================================== */
-
-.main-content {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    width: 100%;
-}
-
-/* Sections */
-.section {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateX(20px);
-    transition: opacity var(--transition-normal), visibility var(--transition-normal), transform var(--transition-normal);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-}
-
-.section.active {
-    opacity: 1;
-    visibility: visible;
-    transform: translateX(0);
-}
-
-.section-today {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.section-header {
-    padding: var(--spacing-md) var(--spacing-lg);
-}
-
-.section-title {
-    font-size: var(--font-size-xl);
-    margin-top: var(--spacing-sm);
-}
-
-/* Back button */
-.back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    color: var(--accent);
-    padding: var(--spacing-xs) 0;
-}
-
-.back-button:active {
-    opacity: 0.7;
-}
-
-/* ==========================================
-   Card Container
-   ========================================== */
-
-.card-container {
-    position: relative;
-    flex: 1;
-    display: flex;
-    /* Align cards to top, not center - prevents vertical centering issues */
-    align-items: flex-start;
-    justify-content: center;
-    /* Fluid padding that scales with viewport */
-    padding-top: var(--spacing-xl);
-    padding-left: var(--spacing-lg);
-    padding-right: var(--spacing-lg);
-    /* Space for footer */
-    padding-bottom: calc(var(--spacing-xl) + 40px);
-    perspective: 1000px;
-    width: 100%;
-}
-
-/* ==========================================
-   Story Cards
-   ========================================== */
-
-.story-card {
-    position: absolute;
-    /* Fluid width - uses calc with vw for consistent sizing across devices */
-    width: calc(100% - var(--spacing-lg) * 2);
-    max-width: min(400px, 90vw);
-    /* FIXED HEIGHT - set by JS, fallback to 70vh */
-    height: var(--card-height, 70vh);
-    background: transparent;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    cursor: grab;
-    touch-action: pan-y;
-    user-select: none;
-    transform-origin: center center;
-    transition: box-shadow var(--transition-normal);
-    will-change: transform;
-    /* Hide overflow to prevent content from extending beyond card */
-    overflow: hidden;
-}
-
-.story-card:active {
-    cursor: grabbing;
-}
-
-.story-card.dragging {
-    transition: none;
-    box-shadow: var(--shadow-elevated);
-}
-
-.story-card.swiping-right {
-    box-shadow: var(--shadow-elevated), 0 0 60px var(--accent-glow);
-}
-
-.story-card.exiting {
-    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 400ms cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
-}
-
-.story-card.behind {
-    pointer-events: none;
-}
-
-/* Off-screen card positioning for progressive swipe animation */
-.story-card[data-card-type="prev"] {
-    transform: translateX(-110%);
-    z-index: 1;
-    opacity: 0.7;
-    pointer-events: none;
-}
-
-.story-card[data-card-type="current"] {
-    transform: translateX(0);
-    z-index: 3;
-}
-
-.story-card[data-card-type="next"] {
-    transform: translateX(110%);
-    z-index: 1;
-    opacity: 0.7;
-    pointer-events: none;
-}
-
-/* Card Banner Image - 25% of card height */
-.card-banner {
-    width: 100%;
-    aspect-ratio: 3 / 1;
-    background: linear-gradient(135deg, var(--accent) 0%, #B85A3C 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.card-banner img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-bottom: 3px solid var(--accent);
-}
-
-.card-banner-placeholder {
-    font-size: 48px;
-    opacity: 0.5;
-}
-
-/* Card Content */
-.card-body {
-    position: relative;
-    padding: var(--spacing-lg);
-    /* Extra bottom padding for nav indicators */
-    padding-bottom: calc(var(--spacing-xl) + var(--spacing-xl));
-}
-
-/* Emoji removed from cards - keeping selector for backwards compatibility */
-.card-emoji {
-    display: none;
-}
-
-.card-headline {
-    font-size: var(--font-size-2xl);
-    line-height: var(--line-height-tight);
-    margin-bottom: var(--spacing-sm);
-    color: var(--text-primary);
-    /* Ensure long words wrap properly */
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
-
-.card-teaser {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-relaxed);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-xl);
-    /* Allow 5 lines of text */
-    display: -webkit-box;
-    -webkit-line-clamp: 5;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.card-hint {
-    position: absolute;
-    bottom: var(--spacing-lg);
-    right: var(--spacing-lg);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-family: var(--font-body);
-    font-size: var(--font-size-sm);
-    color: var(--accent);
-    font-weight: 500;
-    opacity: 0.9;
-}
-
-.card-hint-arrow {
-    display: inline-block;
-    font-size: var(--font-size-md);
-}
-
-/* Card Stack Effect */
-.story-card[data-position="0"] {
-    z-index: 3;
-    transform: translateY(0) scale(1);
-}
-
-/* Hide all cards except the current one - no prev/next card visibility */
-.story-card[data-position="-1"],
-.story-card[data-position="1"],
-.story-card[data-position="2"] {
-    display: none;
-    visibility: hidden;
-    opacity: 0;
-}
-
-/* Premium Swipe Visual Feedback - subtle gradient overlays */
-.card-swipe-overlay {
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-xl);
-    opacity: 0;
-    transition: opacity 200ms ease-out;
-    pointer-events: none;
-    z-index: 5;
-}
-
-.card-swipe-overlay.left {
-    background: linear-gradient(90deg, rgba(0,0,0,0.15) 0%, transparent 50%);
-}
-
-.card-swipe-overlay.right {
-    background: linear-gradient(-90deg, rgba(218, 119, 86, 0.2) 0%, transparent 50%);
-}
-
-.story-card.swiping-left .card-swipe-overlay.left {
-    opacity: 1;
-}
-
-.story-card.swiping-right .card-swipe-overlay.right {
-    opacity: 1;
-}
-
-/* ==========================================
-   Card Flip Styles
-   ========================================== */
-
-.story-card {
-    perspective: 1000px;
-}
-
-.card-flipper {
-    position: relative;
-    width: 100%;
-    /* Fixed height - inherits from parent story-card */
-    height: 100%;
-    transform-style: preserve-3d;
-    transition: transform 450ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.story-card.flipped .card-flipper {
-    transform: rotateY(180deg);
-}
-
-.card-face {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    /* Fixed height - fills parent flipper */
-    height: 100%;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    background: var(--bg-card);
-    box-shadow: var(--shadow-card);
-}
-
-/* Front face */
-.card-front {
-    z-index: 2;
-}
-
-/* Back face (summary) - content starts at top, not centered */
-.card-back {
-    transform: rotateY(180deg);
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    /* Content aligned to top, not centered */
-    justify-content: flex-start;
-}
-
-/* Summary tile content - aligned to top, content-based height */
-.card-back-content {
-    /* Padding inside tile - headline starts near top */
-    padding: var(--spacing-md) var(--spacing-lg);
-    /* Space for nav indicators at bottom */
-    padding-bottom: calc(var(--spacing-xl) + 56px);
-    /* No flex:1 - height is content-based */
-}
-
-.card-back-header {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-tight);
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: var(--spacing-md);
-    margin-top: 0;
-    text-align: center;
-}
-
-.card-summary-text {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    line-height: var(--line-height-relaxed);
-    /* Truncate long text with ellipsis */
-    display: -webkit-box;
-    -webkit-line-clamp: 8;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ==========================================
-   Navigation Hints - CSS Grid Layout
-   Left: "← Prev" | Center: "Read ahead ↑" | Right: "Next →"
-   Grid ensures center is always centered even when prev is hidden
-   ========================================== */
-
-.card-nav-hints {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: var(--spacing-md) var(--spacing-lg);
-    min-height: 48px;
-    background: linear-gradient(transparent, var(--bg-card) 50%);
-    z-index: 10;
-    /* pointer-events enabled for clickable hints */
-}
-
-.nav-hint {
-    font-family: var(--font-body);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    transition: opacity var(--transition-fast), transform var(--transition-fast);
-    cursor: pointer;
-}
-
-.nav-hint-prev {
-    justify-self: start;
-    color: var(--text-tertiary);
-}
-
-.nav-hint-center {
-    justify-self: center;
-    color: var(--accent);
-    font-weight: 600;
-}
-
-.nav-hint-next {
-    justify-self: end;
-    color: var(--text-tertiary);
-}
-
-/* DEPRECATED: Use .disabled instead for grid alignment preservation */
-.nav-hint.hidden {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-}
-
-/* Disabled state - keeps element in grid but invisible + non-interactive */
-.nav-hint.disabled {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-}
-
-/* Hover/active states for nav hints */
-.nav-hint:not(.hidden):hover {
-    opacity: 0.8;
-}
-
-.nav-hint:not(.hidden):active {
-    transform: scale(0.95);
-}
-
-/* Summary card: subtle up-arrow hint only */
-.card-nav-hints-summary {
-    justify-content: center;
-}
-
-.nav-hint-center-subtle {
-    color: var(--text-tertiary);
-    font-size: var(--font-size-lg);
-    opacity: 0.5;
-}
-
-/* Swipe visual feedback classes */
-.story-card.swiping-left .card-swipe-overlay.left {
-    opacity: 0.3;
-}
-
-.story-card.swiping-right .card-swipe-overlay.right {
-    opacity: 0.3;
-}
-
-.story-card.swiping-up {
-    /* Add subtle visual feedback for swipe up */
-}
-
-.story-card.swiping-down {
-    /* Add subtle visual feedback for swipe down */
-}
-
-/* LEGACY - keeping for backwards compatibility */
-/* Bottom Navigation Indicators - OLD SYSTEM */
-.card-nav-indicators {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-md) var(--spacing-lg);
-    /* Explicit height for cross-platform consistency */
-    min-height: 56px;
-    background: linear-gradient(transparent, var(--bg-card) 40%);
-    z-index: 10;
-}
-
-/* Nav indicator buttons - clickable (LEGACY) */
-.nav-indicator {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    background: none;
-    border: none;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    cursor: pointer;
-    border-radius: var(--radius-md);
-    transition: background var(--transition-fast), opacity var(--transition-fast);
-}
-
-.nav-indicator:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.nav-indicator:active {
-    opacity: 0.7;
-}
-
-.nav-skip {
-    color: var(--text-tertiary);
-}
-
-/* Flip button text - subdued */
-.nav-flip,
-.nav-flip-back {
-    color: var(--text-tertiary);
-}
-
-.nav-curious {
-    color: var(--accent);
-}
-
-.nav-arrow {
-    flex-shrink: 0;
-}
-
-.nav-indicator.hidden {
-    visibility: hidden;
-}
-
-/* ==========================================
-   Empty States
-   ========================================== */
-
-.empty-state {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-2xl);
-    text-align: center;
-    height: 100%;
-}
-
-.empty-state.visible {
-    display: flex;
-}
-
-.empty-icon {
-    font-size: 64px;
-    margin-bottom: var(--spacing-lg);
-    opacity: 0.6;
-}
-
-.empty-title {
-    font-size: var(--font-size-xl);
-    margin-bottom: var(--spacing-xs);
-}
-
-.empty-text {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-lg);
-}
-
-.refresh-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--accent);
-    color: white;
-    border-radius: var(--radius-full);
-    font-weight: 500;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.refresh-button:hover {
-    background: var(--accent-light);
-}
-
-.refresh-button:active {
-    transform: scale(0.96);
-}
-
-/* ==========================================
-   Swipe Hint
-   ========================================== */
-
-.swipe-hint {
-    position: absolute;
-    bottom: var(--spacing-xl);
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    z-index: var(--z-hint);
-    pointer-events: none;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity var(--transition-slow), transform var(--transition-slow);
-}
-
-.swipe-hint.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.swipe-hint-content {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--bg-elevated);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    box-shadow: var(--shadow-card);
-}
-
-.swipe-arrow {
-    color: var(--text-tertiary);
-    font-size: var(--font-size-lg);
-}
-
-/* ==========================================
-   Completion Screen
-   ========================================== */
-
-.completion-screen {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-xl);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-slow), visibility var(--transition-slow);
-    z-index: var(--z-cards);
-}
-
-.completion-screen.visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-.completion-content {
-    text-align: center;
-    transform: scale(0.95);
-    transition: transform var(--transition-slow);
-}
-
-.completion-screen.visible .completion-content {
-    transform: scale(1);
-}
-
-/* Completion image - width matches title text */
-.completion-image {
-    max-width: 100%;
-    width: auto;
-    height: auto;
-    max-height: 150px;
-    margin-bottom: var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    object-fit: contain;
-}
-
-.completion-title {
-    font-size: var(--font-size-2xl);
-    line-height: var(--line-height-tight);
-    margin-bottom: var(--spacing-sm);
-}
-
-.completion-subtitle {
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-normal);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-xl);
-}
-
-/* Story Thumbnails - removed, simplified completion screen */
-
-.completion-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-    width: 100%;
-    max-width: 280px;
-    margin-top: var(--spacing-lg);
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.completion-buttons .secondary-button {
-    width: 100%;
-}
-
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md) var(--spacing-xl);
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    color: var(--text-primary);
-    transition: background var(--transition-fast), transform var(--transition-fast);
-    flex: 1;
-}
-
-.secondary-button:hover {
-    background: var(--bg-card-hover);
-}
-
-.secondary-button:active {
-    transform: scale(0.96);
-}
-
-/* ==========================================
-   Recap This Week View
-   ========================================== */
-
-.recap-week-view {
-    position: absolute;
-    inset: 0;
-    background: var(--bg-primary);
-    z-index: var(--z-cards);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(20px);
-    transition: opacity var(--transition-normal), visibility var(--transition-normal), transform var(--transition-normal);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.recap-week-view.visible {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-.recap-header {
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-}
-
-.recap-title {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-xl);
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-top: var(--spacing-sm);
-}
-
-.recap-stories-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--spacing-md) var(--spacing-lg);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.recap-date-group {
-    margin-bottom: var(--spacing-md);
-}
-
-.recap-date-header {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: var(--spacing-sm) 0;
-    margin-bottom: var(--spacing-xs);
-}
-
-.recap-story-card {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
-    cursor: pointer;
-    transition: transform var(--transition-fast), background var(--transition-fast);
-    margin-bottom: var(--spacing-sm);
-}
-
-.recap-story-card:hover {
-    background: var(--bg-card-hover);
-}
-
-.recap-story-card:active {
-    transform: scale(0.98);
-}
-
-.recap-story-emoji {
-    font-size: 28px;
-    flex-shrink: 0;
-}
-
-.recap-story-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.recap-story-headline {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    color: var(--text-primary);
-    line-height: var(--line-height-tight);
-    margin: 0;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.recap-arrow {
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    opacity: 0.5;
-}
-
-.recap-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-2xl);
-    gap: var(--spacing-md);
-    color: var(--text-secondary);
-}
-
-.recap-loading p {
-    font-size: var(--font-size-sm);
-    margin: 0;
-}
-
-.recap-empty {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    padding: var(--spacing-2xl);
-    text-align: center;
-}
-
-/* ==========================================
-   History Section
-   ========================================== */
-
-.history-list {
-    padding: 0 var(--spacing-lg) var(--spacing-lg);
-}
-
-.history-item {
-    display: flex;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-sm);
-    cursor: pointer;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.history-item:active {
-    background: var(--bg-card-hover);
-    transform: scale(0.98);
-}
-
-.history-emoji {
-    font-size: 24px;
-    flex-shrink: 0;
-}
-
-.history-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.history-headline {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-sm);
-    font-weight: 400;
-    color: var(--text-primary);
-    margin-bottom: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.history-question {
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    color: var(--text-secondary);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.history-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.history-rating {
-    font-size: var(--font-size-xs);
-    color: var(--warning);
-}
-
-.history-time {
-    font-size: var(--font-size-xs);
-    color: var(--text-tertiary);
-}
-
-/* History Toggle Button */
-.history-toggle {
-    position: fixed;
-    bottom: calc(var(--safe-bottom) + var(--spacing-lg));
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    color: var(--text-secondary);
-    box-shadow: var(--shadow-card);
-    z-index: var(--z-hint);
-    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-}
-
-.history-toggle:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.history-toggle:active {
-    transform: translateX(-50%) scale(0.96);
-}
-
-.history-toggle.hidden {
-    display: none;
-}
-
-/* ==========================================
-   Q&A Card System - REBUILT FROM SCRATCH
-   Q&A card is positioned INSIDE the story-card as a third face
-   Slides up from bottom when card is flipped to summary
-
-   STATE 1: Hidden (translateY 100% - below card)
-   STATE 2: Peeking (only prompt visible at bottom)
-   STATE 3: Active (fully visible, user can tap questions)
-   ========================================== */
-
-/* Q&A Card - positioned INSIDE story card, overlays the back face */
-.qa-card {
-    position: absolute;
-    /* Fill entire container */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    /* Card styling */
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    /* Flexbox for content layout */
-    display: flex;
-    flex-direction: column;
-    /* Padding */
-    padding: var(--spacing-lg);
-    /* Default: Hidden below card */
-    transform: translateY(100%);
-    /* Layer above card faces and flipper */
-    z-index: var(--z-qa-card);
-    /* Hidden by default */
-    pointer-events: none;
-    opacity: 0;
-    /* Smooth slide transition */
-    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease;
-    /* No scroll bars - content will be truncated */
-    overflow: hidden;
-}
-
-/* STATE 2: Peeking - shows prompt at bottom of card with visual gap */
-.qa-card.peeking {
-    /* Slide up so only top ~50px is visible + 16px gap from summary */
-    transform: translateY(calc(100% - 50px));
-    pointer-events: auto;
-    opacity: 1;
-    /* Visual separator - shadow at top edge */
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3), var(--shadow-card);
-}
-
-/* STATE 3: Active - fully visible */
-.qa-card.active {
-    transform: translateY(0);
-    pointer-events: auto;
-    opacity: 1;
-}
-
-/* Q&A Prompt - "Are you curious about:" text */
-.qa-prompt {
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-normal);
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 500;
-    text-align: center;
-    padding: var(--spacing-sm) 0;
-    margin-bottom: var(--spacing-md);
-    flex-shrink: 0;
-}
-
-/* Q&A Questions List - grows to fill space */
-.qa-questions-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    flex: 1;
-    overflow: hidden;
-}
-
-/* Question buttons */
-.qa-question-btn {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--bg-elevated);
-    border-radius: var(--radius-lg);
-    text-align: left;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-}
-
-.qa-question-btn:hover {
-    background: var(--bg-card-hover);
-}
-
-.qa-question-btn:active {
-    transform: scale(0.98);
-}
-
-.qa-question-btn.skip {
-    background: transparent;
-    border: 1px solid var(--border-color);
-}
-
-.qa-question-btn.skip:hover {
-    border-color: var(--text-tertiary);
-    background: var(--bg-card);
-}
-
-.qa-question-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    font-size: 16px;
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.qa-question-text {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-normal);
-    font-weight: 500;
-    color: var(--text-primary);
-    /* Text truncation - max 2 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ==========================================
-   ANSWER CARD - Level 3 in card hierarchy
-   Slides up when user clicks a question
-   ========================================== */
-
-.answer-card {
-    position: absolute;
-    /* Fill entire container */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    padding: var(--spacing-lg);
-    display: flex;
-    flex-direction: column;
-    /* Default: Hidden below card */
-    transform: translateY(100%);
-    /* Layer above Q&A card */
-    z-index: 30;
-    pointer-events: none;
-    opacity: 0;
-    transition: transform 300ms ease-out, opacity 200ms ease;
-    /* No scroll bars - content will be truncated */
-    overflow: hidden;
-}
-
-.answer-card.active {
-    transform: translateY(0);
-    pointer-events: auto;
-    opacity: 1;
-}
-
-/* Answer Card Header */
-.answer-card .answer-header {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-}
-
-.answer-card .answer-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    font-size: 18px;
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.answer-card .answer-question-text {
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-normal);
-    font-weight: 600;
-    color: var(--text-primary);
-    /* Text truncation - max 3 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Answer Card Body - grows to fill available space */
-.answer-card .answer-body {
-    flex: 1;
-    margin-bottom: var(--spacing-lg);
-    overflow: hidden;
-}
-
-.answer-card .answer-text {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-relaxed);
-    color: var(--text-secondary);
-    /* Text truncation - flexible based on available space */
-    display: -webkit-box;
-    -webkit-line-clamp: 12;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Answer Card Rating */
-.answer-card .answer-rating {
-    text-align: center;
-    margin-bottom: var(--spacing-lg);
-}
-
-.answer-card .rating-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.answer-card .rating-stars {
-    display: inline-flex;
-    gap: var(--spacing-xs);
-}
-
-.answer-card .rating-star {
-    font-size: 28px;
-    color: var(--text-tertiary);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    transition: color var(--transition-fast), transform var(--transition-fast);
-}
-
-.answer-card .rating-star:hover {
-    transform: scale(1.15);
-}
-
-.answer-card .rating-star.active {
-    color: var(--warning);
-}
-
-/* Answer Card Footer - stays at bottom */
-.answer-card .answer-footer {
-    display: flex;
-    gap: var(--spacing-sm);
-    flex-shrink: 0;
-}
-
-.answer-card .answer-done-btn,
-.answer-card .answer-dig-deeper-btn {
-    flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.answer-card .answer-done-btn {
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-}
-
-.answer-card .answer-done-btn:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.answer-card .answer-dig-deeper-btn {
-    background: var(--accent);
-    color: white;
-    border: none;
-}
-
-.answer-card .answer-dig-deeper-btn:hover {
-    background: var(--accent-light);
-}
-
-.answer-card .answer-done-btn:active,
-.answer-card .answer-dig-deeper-btn:active {
-    transform: scale(0.96);
-}
-
-/* ==========================================
-   DIG DEEPER Q&A CARD - Level 4 in card hierarchy
-   Slides up when user clicks Dig Deeper
-   ========================================== */
-
-.dig-deeper-qa-card {
-    position: absolute;
-    /* Fill entire container */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    padding: var(--spacing-lg);
-    display: flex;
-    flex-direction: column;
-    /* Default: Hidden below card */
-    transform: translateY(100%);
-    /* Layer above Answer card */
-    z-index: 40;
-    pointer-events: none;
-    opacity: 0;
-    transition: transform 300ms ease-out, opacity 200ms ease;
-    /* No scroll bars - content will be truncated */
-    overflow: hidden;
-    overscroll-behavior: contain;
-}
-
-.dig-deeper-qa-card.active {
-    transform: translateY(0);
-    pointer-events: auto;
-    opacity: 1;
-}
-
-/* Dig Deeper Header - headline and subheading (left-aligned to match answer card) */
-.dig-deeper-header {
-    text-align: left;
-    margin-bottom: var(--spacing-lg);
-    flex-shrink: 0;
-}
-
-.dig-deeper-headline {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-2xl);
-    line-height: var(--line-height-tight);
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 var(--spacing-sm) 0;
-}
-
-.dig-deeper-subheading {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-normal);
-    color: var(--text-tertiary);
-    margin: 0;
-}
-
-/* Dig Deeper Questions List - grows to fill space */
-.dig-deeper-questions-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    flex: 1;
-    overflow: hidden;
-}
-
-/* Dig Deeper questions - same font as main Q&A, truncate to 2 lines for consistency */
-.dig-deeper-questions-list .qa-question-text {
-    -webkit-line-clamp: 2;
-}
-
-/* Dig Deeper Footer - back to headline link */
-.dig-deeper-footer {
-    display: flex;
-    justify-content: center;
-    padding-top: var(--spacing-lg);
-    flex-shrink: 0;
-}
-
-.back-to-headline-link {
-    background: none;
-    border: none;
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: var(--spacing-sm) var(--spacing-md);
-    transition: color var(--transition-fast);
-}
-
-.back-to-headline-link:hover {
-    color: var(--text-secondary);
-}
-
-/* ==========================================
-   DIG DEEPER ANSWER CARD - Level 5 in card hierarchy
-   Slides up when user clicks a dig deeper question
-   ========================================== */
-
-.dig-deeper-answer-card {
-    position: absolute;
-    /* Fill entire container */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    padding: var(--spacing-lg);
-    display: flex;
-    flex-direction: column;
-    /* Default: Hidden below card */
-    transform: translateY(100%);
-    /* Layer above Dig Deeper Q&A card */
-    z-index: 50;
-    pointer-events: none;
-    opacity: 0;
-    transition: transform 300ms ease-out, opacity 200ms ease;
-    /* No scroll bars - content will be truncated */
-    overflow: hidden;
-    overscroll-behavior: contain;
-}
-
-.dig-deeper-answer-card.active {
-    transform: translateY(0);
-    pointer-events: auto;
-    opacity: 1;
-}
-
-/* Dig Deeper Answer Card uses same styling as Answer Card */
-.dig-deeper-answer-card .answer-header {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-}
-
-.dig-deeper-answer-card .answer-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    font-size: 18px;
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.dig-deeper-answer-card .answer-question-text {
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-normal);
-    font-weight: 600;
-    color: var(--text-primary);
-    /* Text truncation - max 3 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.dig-deeper-answer-card .answer-body {
-    flex: 1;
-    margin-bottom: var(--spacing-lg);
-    overflow: hidden;
-}
-
-.dig-deeper-answer-card .answer-text {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-relaxed);
-    color: var(--text-secondary);
-    /* Text truncation - flexible based on available space */
-    display: -webkit-box;
-    -webkit-line-clamp: 12;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.dig-deeper-answer-card .answer-rating {
-    text-align: center;
-    margin-bottom: var(--spacing-lg);
-}
-
-.dig-deeper-answer-card .rating-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.dig-deeper-answer-card .rating-stars {
-    display: inline-flex;
-    gap: var(--spacing-xs);
-}
-
-.dig-deeper-answer-card .rating-star {
-    font-size: 28px;
-    color: var(--text-tertiary);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    transition: color var(--transition-fast), transform var(--transition-fast);
-}
-
-.dig-deeper-answer-card .rating-star:hover {
-    transform: scale(1.15);
-}
-
-.dig-deeper-answer-card .rating-star.active {
-    color: var(--warning);
-}
-
-.dig-deeper-answer-card .answer-footer {
-    display: flex;
-    gap: var(--spacing-sm);
-    flex-shrink: 0;
-}
-
-.dig-deeper-answer-card .answer-done-btn {
-    flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    background: var(--accent);
-    color: white;
-    border: none;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.dig-deeper-answer-card .answer-done-btn:hover {
-    background: var(--accent-light);
-}
-
-.dig-deeper-answer-card .answer-done-btn:active {
-    transform: scale(0.96);
-}
-
-/* ==========================================
-   LEGACY: Old Modal System (keeping for Answer/Dig Deeper views)
-   The modal-backdrop is still used for answer and dig deeper flows
-   ========================================== */
-
-/* Q&A backdrop container - positioned within card area */
-/* NOTE: This is a LEGACY modal system - may be vestigial */
-.modal-backdrop {
-    position: fixed;
-    /* Position in card area, below header/progress */
-    top: calc(var(--safe-top) + var(--header-height) + var(--progress-area-height));
-    left: var(--card-margin-horizontal);
-    right: var(--card-margin-horizontal);
-    bottom: var(--card-margin-bottom);
-    background: transparent;
-    z-index: var(--z-qa-card);
-    pointer-events: none;
-    overflow: hidden;
-    /* Hidden by default - prevents vestigial elements showing on large viewports */
-    visibility: hidden;
-}
-
-/* Q&A Card - matches story card EXACTLY */
-.modal {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    max-width: min(400px, 100%);
-    margin: 0 auto;
-    background: var(--bg-card);
-    border-radius: var(--card-border-radius);
-    box-shadow: var(--shadow-card);
-    padding: var(--spacing-lg);
-    padding-bottom: calc(var(--safe-bottom) + 80px);
-    z-index: var(--z-qa-card);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    display: flex;
-    flex-direction: column;
-    /* STATE 1: Hidden (default) - below viewport */
-    transform: translateY(100%);
-    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1);
-    pointer-events: none;
-}
-
-/* STATE 2: Peeking - shows hint at bottom when Summary is visible */
-.modal-backdrop.peeking {
-    visibility: visible;
-}
-
-.modal-backdrop.peeking .modal {
-    transform: translateY(calc(100% - 80px));
-    pointer-events: auto;
-}
-
-/* STATE 3: Active - fully visible, replaces Summary */
-.modal-backdrop.visible {
-    visibility: visible;
-}
-
-.modal-backdrop.visible .modal {
-    transform: translateY(0);
-    pointer-events: auto;
-}
-
-/* Push transition for swipe-up animation */
-.modal-backdrop.push-transition .modal {
-    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-/* Q&A Card navigation hint - matches story card nav hints */
-.modal-drag-hint {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-md) 0;
-    margin-top: auto;
-}
-
-.drag-bar {
-    width: 40px;
-    height: 4px;
-    background: var(--border-color);
-    border-radius: var(--radius-full);
-}
-
-.drag-text {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    font-weight: 500;
-}
-
-/* Q&A Card nav hint removed - using simple slide transitions */
-
-/* Modal close button - matches modal prev button size (32px) */
-.modal-close {
-    position: absolute;
-    top: var(--spacing-md);
-    right: var(--spacing-md);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    transition: background var(--transition-fast), color var(--transition-fast);
-    z-index: 10;
-}
-
-.modal-close svg {
-    width: 16px;
-    height: 16px;
-}
-
-.modal-close:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.modal-close:active {
-    transform: scale(0.92);
-}
-
-/* Modal Prev Button - 20% smaller */
-.modal-prev {
-    position: absolute;
-    top: var(--spacing-md);
-    left: var(--spacing-md);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    /* Only transition colors, not position - prevents glitching */
-    transition: background var(--transition-fast), color var(--transition-fast);
-    z-index: 10;
-}
-
-.modal-prev svg {
-    width: 16px;
-    height: 16px;
-}
-
-.modal-prev:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.modal-prev:active {
-    opacity: 0.7;
-}
-
-/* Modal Views - Card-internal slide transitions */
-.modal-view {
-    position: relative;
-    padding: 0;
-    overflow-y: auto;
-    background: transparent;
-    transition: transform 350ms cubic-bezier(0.32, 0.72, 0, 1), opacity 350ms ease;
-}
-
-/* Hidden views */
-.modal-view.hidden {
-    display: none;
-    visibility: hidden;
-    opacity: 0;
-}
-
-/* Active view */
-.modal-view:not(.hidden) {
-    display: block;
-    visibility: visible;
-    opacity: 1;
-}
-
-/* Slide out to the left animation */
-.modal-view.slide-out-left {
-    transform: translateX(-100%);
-    opacity: 0;
-}
-
-/* Slide in from right animation (default for views becoming visible) */
-.modal-view.slide-in-right {
-    animation: slideInRight 350ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
-}
-
-@keyframes slideInRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
-/* Legacy fade classes for backwards compatibility */
-.modal-view.fade-out {
-    opacity: 0;
-    transform: translateX(-20px);
-}
-
-.modal-view.fade-in {
-    animation: fadeIn var(--transition-normal) forwards;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-/* Q&A View */
-.modal-header {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-    padding-right: var(--spacing-2xl);
-}
-
-.modal-emoji {
-    font-size: 32px;
-    flex-shrink: 0;
-}
-
-.modal-headline {
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-tight);
-}
-
-.modal-subheading {
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-normal);
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 500;
-    margin-bottom: var(--spacing-md);
-}
-
-/* Question Buttons */
-.questions-container {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
-.question-button {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    text-align: left;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.question-button:hover {
-    background: var(--bg-card-hover);
-}
-
-.question-button:active {
-    transform: scale(0.98);
-}
-
-.question-button.skip {
-    background: transparent;
-    border: 1px solid var(--border-color);
-}
-
-.question-button.skip:hover {
-    border-color: var(--text-tertiary);
-    background: var(--bg-card);
-}
-
-.question-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    font-size: 16px;
-    color: var(--text-primary);
-    flex-shrink: 0;
-    padding-top: 2px;
-}
-
-.question-button.skip .question-label {
-    color: var(--text-tertiary);
-}
-
-.question-text {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-normal);
-    font-weight: 500;
-    color: var(--text-primary);
-    padding-top: 2px;
-}
-
-/* Answer View */
-.answer-header {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-    padding-right: var(--spacing-2xl);
-}
-
-.answer-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    font-size: 18px;
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.answer-question {
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-normal);
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-.answer-content {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    margin-bottom: var(--spacing-xl);
-    transition: background var(--transition-normal);
-}
-
-.answer-text {
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-relaxed);
-    color: var(--text-secondary);
-}
-
-/* Star Rating */
-.rating-section {
-    text-align: center;
-    margin-bottom: var(--spacing-xl);
-}
-
-.rating-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.star-rating {
-    display: inline-flex;
-    gap: var(--spacing-xs);
-}
-
-.star {
-    font-size: 32px;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: color var(--transition-fast), transform var(--transition-fast);
-}
-
-.star:hover {
-    transform: scale(1.15);
-}
-
-.star.active {
-    color: var(--warning);
-}
-
-.star.filling {
-    animation: starFill 200ms ease-out forwards;
-}
-
-@keyframes starFill {
-    0% { transform: scale(1); color: var(--text-tertiary); }
-    50% { transform: scale(1.3); }
-    100% { transform: scale(1); color: var(--warning); }
-}
-
-/* Answer Actions */
-.answer-actions {
-    display: flex;
-    gap: var(--spacing-sm);
-}
-
-.action-button {
-    flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-.action-button.secondary {
-    background: var(--bg-card);
-    color: var(--text-secondary);
-}
-
-.action-button.secondary:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.action-button.primary {
-    background: var(--accent);
-    color: white;
-}
-
-.action-button.primary:hover {
-    background: var(--accent-light);
-}
-
-.action-button:active {
-    transform: scale(0.96);
-}
-
-.action-button.full-width {
-    flex: none;
-    width: 100%;
-}
-
-/* ==========================================
-   Toast
-   ========================================== */
-
-.toast {
-    position: fixed;
-    bottom: calc(var(--safe-bottom) + 80px);
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--bg-elevated);
-    border-radius: var(--radius-full);
-    box-shadow: var(--shadow-elevated);
-    opacity: 0;
-    visibility: hidden;
-    transition: transform var(--transition-normal), opacity var(--transition-normal), visibility var(--transition-normal);
-    z-index: var(--z-toast);
-}
-
-.toast.visible {
-    opacity: 1;
-    visibility: visible;
-    transform: translateX(-50%) translateY(0);
-}
-
-.toast-icon {
-    font-size: var(--font-size-md);
-}
-
-.toast-message {
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-/* ==========================================
-   Responsive Adjustments
-   Mobile-first: Base styles are for smallest screens
-   ========================================== */
-
-/* Small phones (up to 375px) - tighter spacing */
-@media (max-width: 374px) {
-    :root {
-        --spacing-lg: 1rem;
-        --spacing-xl: 1.5rem;
-    }
-
-    .card-container {
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
-    }
-
-    .story-card {
-        width: calc(100% - var(--spacing-md) * 2);
-    }
-
-    .card-body {
-        padding: var(--spacing-md);
-        padding-bottom: calc(var(--spacing-lg) + var(--spacing-xl));
-    }
-
-    .card-headline {
-        font-size: var(--font-size-xl);
-    }
-
-    .modal {
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
+/**
+ * FYI - Premium News PWA
+ * Fetches stories from public Google Sheets (no API key needed)
+ * Filters to show only today's stories
+ */
+
+// ==========================================
+// CONFIGURATION - Edit this!
+// ==========================================
+
+// Paste your Google Sheet ID here (the long string from the URL)
+// Example URL: https://docs.google.com/spreadsheets/d/1ABC123xyz.../edit
+// Sheet ID would be: 1ABC123xyz...
+const SHEET_ID = '1WfcDbDicaZBmTumU4dqG_349UQIRwfP4eMr8NN7TmYs';
+
+// Sheet name (tab name at bottom of spreadsheet)
+const SHEET_NAME = 'Sheet1';
+
+// FAQ Sheet name (separate tab for FAQ content)
+const FAQ_SHEET_NAME = 'FAQs';
+
+// ==========================================
+// PLAUSIBLE ANALYTICS CONFIGURATION
+// ==========================================
+// Add your Plausible domain here after signing up at plausible.io
+// Example: const PLAUSIBLE_DOMAIN = 'fyi.yourdomain.com';
+// Leave as empty string to disable analytics
+const PLAUSIBLE_DOMAIN = 'https://fyi-news.netlify.app/';
+
+// ==========================================
+// Analytics Helper Functions
+// ==========================================
+
+/**
+ * Track an event with Plausible Analytics
+ * Safe wrapper that won't break the app if Plausible fails to load
+ * @param {string} eventName - The name of the event
+ * @param {object} props - Optional properties to track
+ */
+function trackEvent(eventName, props = {}) {
+    try {
+        // Only track if Plausible is loaded and domain is configured
+        if (typeof window.plausible !== 'undefined' && PLAUSIBLE_DOMAIN) {
+            window.plausible(eventName, { props });
+        }
+    } catch (e) {
+        // Silently fail - analytics should never break the app
+        console.debug('Analytics tracking skipped:', e.message);
     }
 }
 
-/* Medium phones (375px - 414px) - standard mobile */
-@media (min-width: 375px) and (max-width: 413px) {
-    .card-headline {
-        font-size: var(--font-size-2xl);
+/**
+ * Track app open event
+ */
+function trackAppOpened() {
+    trackEvent('App Opened');
+}
+
+/**
+ * Track story viewed event
+ * @param {number} storyNumber - Which story (1, 2, or 3)
+ * @param {string} headline - The story headline
+ */
+function trackStoryViewed(storyNumber, headline) {
+    trackEvent('Story Viewed', {
+        story: storyNumber,
+        headline: headline.substring(0, 100) // Limit length
+    });
+}
+
+/**
+ * Track question clicked event
+ * @param {string} storyHeadline - The story headline
+ * @param {string} questionText - The question text
+ */
+function trackQuestionClicked(storyHeadline, questionText) {
+    trackEvent('Question Clicked', {
+        story: storyHeadline.substring(0, 50),
+        question: questionText.substring(0, 100)
+    });
+}
+
+/**
+ * Track rating given event
+ * @param {string} storyHeadline - The story headline
+ * @param {number} rating - Rating value (1-5)
+ */
+function trackRatingGiven(storyHeadline, rating) {
+    trackEvent('Rating Given', {
+        story: storyHeadline.substring(0, 50),
+        rating: rating
+    });
+}
+
+/**
+ * Track answer rated event (new card system)
+ * @param {string} storyHeadline - The story headline
+ * @param {string} questionText - The question that was answered
+ * @param {number} rating - Rating value (1-5)
+ */
+function trackAnswerRated(storyHeadline, questionText, rating) {
+    trackEvent('Answer Rated', {
+        story: storyHeadline ? storyHeadline.substring(0, 50) : 'Unknown',
+        question: questionText ? questionText.substring(0, 50) : 'Unknown',
+        rating: rating
+    });
+}
+
+/**
+ * Track modal opened event
+ * @param {string} modalName - 'What is FYI' or 'Our Philosophy'
+ */
+function trackModalOpened(modalName) {
+    trackEvent('Modal Opened', {
+        modal: modalName
+    });
+}
+
+/**
+ * Track theme changed event
+ * @param {string} theme - 'light' or 'dark'
+ */
+function trackThemeChanged(theme) {
+    trackEvent('Theme Changed', {
+        theme: theme
+    });
+}
+
+/**
+ * Track card swipe event
+ * @param {string} direction - 'skip' (left) or 'curious' (right)
+ * @param {string} headline - The story headline
+ * @param {number} storyNumber - Which story (1, 2, or 3)
+ */
+function trackSwipe(direction, headline, storyNumber) {
+    trackEvent('Card Swiped', {
+        direction: direction,
+        story: storyNumber,
+        headline: headline.substring(0, 50)
+    });
+}
+
+/**
+ * Track card flip event
+ * @param {string} headline - The story headline
+ * @param {string} side - 'to_summary' or 'to_front'
+ */
+function trackCardFlip(headline, side) {
+    trackEvent('Card Flipped', {
+        side: side,
+        headline: headline.substring(0, 50)
+    });
+}
+
+/**
+ * Track completion screen viewed
+ * @param {number} storiesRead - Number of stories completed
+ * @param {number} curiousCount - Number of stories swiped curious
+ */
+function trackCompletionViewed(storiesRead, curiousCount) {
+    trackEvent('Completion Viewed', {
+        stories_read: storiesRead,
+        curious_count: curiousCount
+    });
+}
+
+/**
+ * Track Dig Deeper interaction
+ * @param {string} headline - The story headline
+ * @param {string} deepQuestion - The deep question clicked
+ */
+function trackDigDeeper(headline, deepQuestion) {
+    trackEvent('Dig Deeper Clicked', {
+        headline: headline.substring(0, 50),
+        question: deepQuestion.substring(0, 100)
+    });
+}
+
+/**
+ * Track archive/recap viewed
+ * @param {string} source - 'completion_button' or 'header_recap'
+ */
+function trackRecapViewed(source) {
+    trackEvent('Recap Viewed', {
+        source: source
+    });
+}
+
+/**
+ * Track archive story opened
+ * @param {string} headline - The story headline
+ * @param {string} date - The story date
+ */
+function trackArchiveStoryOpened(headline, date) {
+    trackEvent('Archive Story Opened', {
+        headline: headline.substring(0, 50),
+        date: date
+    });
+}
+
+/**
+ * Track skip question (when user skips all questions)
+ * @param {string} headline - The story headline
+ */
+function trackQuestionsSkipped(headline) {
+    trackEvent('Questions Skipped', {
+        headline: headline.substring(0, 50)
+    });
+}
+
+/**
+ * Track session duration when user leaves
+ * Called on page unload
+ */
+function trackSessionEnd() {
+    const sessionDuration = Math.round((Date.now() - sessionStartTime) / 1000);
+    trackEvent('Session Ended', {
+        duration_seconds: sessionDuration,
+        stories_completed: state.currentIndex
+    });
+}
+
+// Session start time for duration tracking
+const sessionStartTime = Date.now();
+
+// ==========================================
+// FIXED CARD HEIGHT SYSTEM
+// ==========================================
+// Calculate and set explicit card height as CSS custom property
+// This ensures all story cards have identical height regardless of content
+
+/**
+ * Calculate and set the fixed card height based on viewport
+ * Called on init, resize, and orientation change
+ */
+function setCardHeight() {
+    // Safety buffer for browser chrome, Android scaling, and visual breathing room
+    const BUFFER = 100;
+
+    // Use most conservative viewport measurement
+    const viewportHeight = Math.min(
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        window.visualViewport?.height || Infinity
+    );
+
+    // Measure actual elements when possible, with fallbacks
+    const header = document.querySelector('.header');
+    const progressArea = document.querySelector('.progress-area');
+
+    const headerHeight = header ? header.offsetHeight : 60;
+    const progressHeight = progressArea ? progressArea.offsetHeight : 50;
+
+    // Get safe areas with sensible defaults
+    const rootStyles = getComputedStyle(document.documentElement);
+    const safeTop = parseInt(rootStyles.getPropertyValue('--sat')) || 0;
+    const safeBottom = parseInt(rootStyles.getPropertyValue('--sab')) || 20; // Default accounts for gesture areas
+
+    // Bottom margin for visual breathing room
+    const bottomMargin = 24;
+
+    // Calculate available height (conservative)
+    const cardHeight = viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER;
+
+    // Set as CSS custom property
+    document.documentElement.style.setProperty('--card-height', cardHeight + 'px');
+
+    console.log('[setCardHeight] Card height set to:', cardHeight + 'px',
+        '(viewport:', viewportHeight, 'header:', headerHeight, 'progress:', progressHeight, ')');
+}
+
+/**
+ * Initialize card height system with event listeners
+ */
+function initCardHeightSystem() {
+    // Set initial height
+    setCardHeight();
+
+    // Update on resize
+    window.addEventListener('resize', setCardHeight);
+
+    // Update on orientation change (with delay for iOS)
+    window.addEventListener('orientationchange', () => {
+        setTimeout(setCardHeight, 100);
+    });
+
+    // For iOS Safari: use visualViewport API if available
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setCardHeight);
     }
 }
 
-/* Larger phones and small tablets (414px+) */
-@media (min-width: 414px) {
-    .card-headline {
-        font-size: var(--font-size-2xl);
+// ==========================================
+// Fallback Story Data (used when sheet not configured)
+// ==========================================
+
+const fallbackStories = [
+    {
+        id: 1,
+        date: getTodayDate(),
+        emoji: "📉",
+        headline: "Gold Prices Crash After Heavy Liquidation",
+        teaser: "Investors are booking profits after gold hit record highs, triggering algorithmic selling and a sharp correction in global markets. This market behavior reveals the psychology behind profit-taking and the technical levels that matter to institutional traders. Central banks continue accumulating while retail investors panic—creating an interesting divergence in market sentiment.",
+        summary: "Gold prices fell sharply as investors took profits after the precious metal hit record highs near $2,450/oz. The sell-off was accelerated by algorithmic trading and institutional limit orders set at psychological price barriers. Despite the correction, central banks—particularly in Asia—continue accumulating gold reserves, signaling long-term confidence in the asset as a hedge against economic uncertainty.",
+        imageUrl: "",
+        questions: [
+            {
+                label: "✦",
+                text: "Why are investors selling NOW after gold hit records?",
+                answer: "Classic profit-taking psychology. Gold touched $2,450/oz—a psychological barrier that triggered algorithmic selling. Large institutional investors had set limit orders at this level months ago. Additionally, recent Fed signals suggesting delayed rate cuts reduced gold's appeal as a hedge. When momentum traders see others exiting, FOMO works in reverse.",
+                deepQuestions: [
+                    { text: "What makes $2,450 a psychological barrier?", answer: "Round numbers act as mental anchors for traders. Institutions set automatic sell orders at these levels, and when multiple orders trigger simultaneously, it creates a cascade effect. This is why you see sharp movements at price points like $2,000, $2,250, and $2,500." },
+                    { text: "How do algorithmic traders impact gold prices?", answer: "Algorithms now account for 60-70% of trading volume. They detect patterns and execute trades in milliseconds. When algorithms sense selling momentum, they amplify it by front-running expected price drops, creating self-fulfilling prophecies." },
+                    { text: "Why does Fed policy affect gold so much?", answer: "Gold doesn't pay interest or dividends. When the Fed keeps rates high, bonds become more attractive alternatives. Gold's appeal increases when real interest rates (adjusted for inflation) are low or negative, making holding gold less costly compared to interest-bearing assets." }
+                ]
+            },
+            {
+                label: "✦",
+                text: "Does this mean gold isn't safe anymore?",
+                answer: "Not at all—this is normal market behavior, not a fundamental shift. Gold remains the ultimate crisis hedge. What we're seeing is a technical correction after a 15% rally. Long-term holders aren't selling; it's primarily short-term traders and algorithms. Central banks, especially in Asia, continue accumulating.",
+                deepQuestions: [
+                    { text: "What's the difference between a correction and a crash?", answer: "A correction is typically a 10-20% decline from recent highs and is considered healthy market behavior. A crash implies a sudden, severe decline (20%+) often driven by panic. This gold movement is firmly in correction territory—normal after any strong rally." },
+                    { text: "Why are central banks still buying gold?", answer: "Central banks are diversifying away from US dollar reserves due to geopolitical risks and inflation concerns. China, Russia, and Turkey have been major buyers. Gold offers protection against currency devaluation and can't be sanctioned or frozen like foreign currency reserves." }
+                ]
+            },
+            {
+                label: "✦",
+                text: "How is USD recovering with Trump chaos?",
+                answer: "Counterintuitively, political uncertainty often strengthens the dollar short-term. Global investors flee to USD-denominated assets during volatility—it's still the world's reserve currency. Meanwhile, other major economies face their own issues: Europe's stagnation, China's property crisis, Japan's weak yen.",
+                deepQuestions: [
+                    { text: "Why do investors run TO the dollar during US political chaos?", answer: "It's the 'cleanest dirty shirt' phenomenon. Despite domestic turmoil, US markets remain the deepest and most liquid globally. Treasury bonds are still considered the safest assets. When uncertainty hits anywhere, the reflex is to buy dollars first, ask questions later." },
+                    { text: "Could another currency replace the dollar?", answer: "Not soon. The dollar represents 60% of global reserves and 88% of forex trades. No alternative has the liquidity, legal framework, or trust. China's yuan has capital controls, Europe lacks unified fiscal policy, and crypto is too volatile. Change would take decades, not years." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 2,
+        date: getTodayDate(),
+        emoji: "🤝",
+        headline: "India-UAE Sign Nuclear, Defence, Trade Pacts",
+        teaser: "A landmark strategic partnership bundles nuclear cooperation, defense agreements, and trade access into one comprehensive deal. The diplomatic move creates powerful interdependencies between both nations that extend far beyond traditional bilateral relations. This agreement signals a major shift in Middle East power dynamics and energy security frameworks.",
+        summary: "India and the UAE signed a comprehensive strategic partnership covering nuclear energy cooperation, defense technology sharing, and expanded trade access. The deal includes training for UAE nuclear engineers and potential export of Indian defense systems like BrahMos missiles. This bundled approach creates mutual dependencies that strengthen bilateral ties and positions both nations advantageously in the evolving Middle East power structure.",
+        imageUrl: "",
+        questions: [
+            {
+                label: "✦",
+                text: "Why bundle nuclear + defense + trade together?",
+                answer: "It's diplomatic leverage maximization. Bundling creates interdependencies that make either party think twice before souring relations. If UAE wants nuclear cooperation, they commit to defense purchases. If India wants trade access, they share technology. Each component serves as insurance for the others.",
+                deepQuestions: [
+                    { text: "Is this bundling strategy common in international deals?", answer: "Yes, it's called 'package diplomacy.' The US does it with arms sales tied to political alignment. China's Belt and Road bundles infrastructure with resource access. The strategy reduces the risk of one-sided agreements and creates lasting partnerships." },
+                    { text: "What does India gain from this specific bundle?", answer: "India gets a reliable energy partner, a major defense export market, and preferential trade terms. UAE's oil-rich economy provides investment capital India needs. The defense sales boost India's 'Make in India' initiative and establish it as a credible arms exporter." }
+                ]
+            },
+            {
+                label: "✦",
+                text: "Since when does UAE have nuclear capability?",
+                answer: "UAE's Barakah Nuclear Power Plant went operational in 2020—the first in the Arab world. They're not building weapons; this is about clean energy. The country aims for 25% nuclear power by 2030. India's cooperation involves training UAE engineers and potentially supplying components.",
+                deepQuestions: [
+                    { text: "Why would an oil-rich country need nuclear power?", answer: "Forward-thinking energy policy. UAE knows oil is finite and faces climate pressure. Nuclear provides baseload power for industry and desalination. Using oil for export rather than domestic consumption maximizes revenue. It's also about prestige and technological advancement." },
+                    { text: "Is there any weapons proliferation risk here?", answer: "UAE signed the 'gold standard' 123 Agreement with the US, explicitly renouncing enrichment and reprocessing. They import fuel and return spent rods. The IAEA monitors closely. This is genuinely a civilian energy program—among the most transparent globally." }
+                ]
+            },
+            {
+                label: "✦",
+                text: "Why UAE and not Russia for defense?",
+                answer: "Russia's Ukraine situation changed everything. Their weapons are now battle-tested—and found wanting. Export capacity dropped as they prioritize domestic needs. Western sanctions complicate spare parts. India offers a middle path: proven systems like BrahMos missiles, no sanctions risk.",
+                deepQuestions: [
+                    { text: "How has Ukraine changed perceptions of Russian weapons?", answer: "Russian tanks, aircraft, and air defense systems have shown vulnerabilities against Western weapons. The vaunted T-90 tanks proved vulnerable to Javelins. Their inability to achieve air superiority raised questions about their aircraft. Buyers now question if they're getting reliable technology." },
+                    { text: "What makes Indian defense equipment attractive?", answer: "India offers a 'non-aligned' option—no political strings attached. BrahMos missiles are genuinely world-class (fastest cruise missiles). Indian equipment often incorporates both Russian and Western technology, offering a unique hybrid. Pricing is competitive with generous financing." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 3,
+        date: getTodayDate(),
+        emoji: "🤖",
+        headline: "India Sets Up AI Task Force for Vulnerabilities",
+        teaser: "The government has established a dedicated committee to assess AI model risks and develop regulatory frameworks for emerging technologies. This move positions India in the global conversation on AI governance alongside the EU and US, while balancing innovation incentives with safety concerns. The task force includes experts from major tech companies and academic institutions.",
+        summary: "India formed a dedicated AI task force to assess vulnerabilities in AI models and develop appropriate regulatory frameworks. The committee includes experts from Google DeepMind, Microsoft Research India, and leading academic institutions. With a 6-month deadline for initial recommendations, India aims to establish its voice in global AI governance while balancing innovation with safety—particularly focusing on challenges unique to its context like misinformation in local languages.",
+        imageUrl: "",
+        questions: [
+            {
+                label: "✦",
+                text: "Does India even have AI expertise for this?",
+                answer: "More than people assume. India has the world's second-largest AI talent pool after the US. IITs and IISc produce top researchers; many return from Silicon Valley. The task force includes people from Google DeepMind, Microsoft Research India, and TCS Research.",
+                deepQuestions: [
+                    { text: "Why does India have such a large AI talent pool?", answer: "It's the engineering education infrastructure. India produces 1.5 million engineering graduates annually. Top IITs are globally competitive. Plus, the Indian diaspora in Silicon Valley creates a reverse brain drain as senior researchers return to lead labs at Google, Microsoft, and Amazon in India." },
+                    { text: "How does India's AI research compare globally?", answer: "India ranks 5th globally in AI research publications. Indian researchers have contributed to major breakthroughs in NLP (particularly multilingual models), computer vision, and AI for healthcare. The gap is in funding and compute resources rather than talent." }
+                ]
+            },
+            {
+                label: "✦",
+                text: "Will this just be another 3-year report nobody reads?",
+                answer: "Valid skepticism, but timing matters. Unlike past tech committees, AI regulation has global urgency—EU's AI Act, Biden's executive order, China's rules. India can't afford to be left out of standard-setting. The task force has a 6-month deadline for initial recommendations.",
+                deepQuestions: [
+                    { text: "What's different about this task force?", answer: "Three things: tight deadline (6 months vs typical 2-3 years), industry participation (not just bureaucrats), and clear mandate (actionable recommendations, not just observations). The pressure from global AI regulation race adds external accountability." },
+                    { text: "How has India's past tech regulation performed?", answer: "Mixed. IT Act 2000 was forward-thinking. Data Protection Bill took 5 years and multiple drafts. Digital India initiatives moved fast. The pattern suggests urgency and industry involvement correlate with better outcomes—both present here." }
+                ]
+            },
+            {
+                label: "✦",
+                text: "Why not outsource to EU? They're ahead on regulation",
+                answer: "EU's AI Act is designed for European values and market structures—privacy-first, precautionary principle, heavy compliance costs. India's priorities differ: enabling AI adoption for development, protecting against misinformation in local languages, and maintaining tech sovereignty.",
+                deepQuestions: [
+                    { text: "What are India-specific AI challenges?", answer: "Misinformation in 22 official languages (EU deals with ~24 but lower linguistic diversity), deepfakes in elections with 900 million voters, AI for agricultural advisories to 120 million farmers, and bias in systems trained predominantly on Western data. Generic Western frameworks don't address these." },
+                    { text: "What does 'tech sovereignty' mean for AI?", answer: "It means not depending on foreign-controlled AI systems for critical applications. India wants domestic capability in foundational AI models, control over training data, and the ability to audit systems used in governance. It's about strategic autonomy, not isolation." }
+                ]
+            }
+        ]
+    }
+];
+
+// ==========================================
+// Helper Functions
+// ==========================================
+
+function getTodayDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function parseDate(dateStr) {
+    if (!dateStr) return null;
+    // Handle various date formats
+    const str = String(dateStr).trim();
+    // Try ISO format first (YYYY-MM-DD)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str;
+    }
+    // Try MM/DD/YYYY
+    const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match) {
+        return `${match[3]}-${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}`;
+    }
+    // Try DD/MM/YYYY
+    const match2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match2) {
+        return `${match2[3]}-${match2[2].padStart(2, '0')}-${match2[1].padStart(2, '0')}`;
+    }
+    return str;
+}
+
+// ==========================================
+// App State
+// ==========================================
+
+const state = {
+    stories: [],
+    currentIndex: 0,
+    totalStories: 0,
+    currentStory: null,
+    currentQuestion: null, // Track current Q&A question for Dig Deeper
+    currentSection: 'today',
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    currentX: 0,
+    currentY: 0, // Track vertical movement for up/down swipes
+    dragThreshold: 50, // Reduced from 100 for new swipe mechanics
+    swipeVelocityThreshold: 0.3, // px/ms velocity threshold
+    swipeStartTime: 0, // Track swipe start time for velocity calculation
+    hasShownHint: false,
+    rating: 0,
+    history: [],
+    theme: 'dark',
+    isLoading: true,
+    viewedStories: [],
+    longPressTimer: null,
+    isLongPress: false,
+    userName: '',
+    // Archive mode
+    archiveMode: false,
+    archiveStories: [],
+    archiveIndex: 0,
+    originalStories: [], // Store today's stories when entering archive mode
+    // Track if navigated from completion screen
+    cameFromCompletion: false,
+    // Track if in recap view (accessed from completion)
+    inRecapView: false,
+    // FAQ mode
+    faqMode: false,
+    faqStories: [],
+    faqIndex: 0,
+    faqCompleted: false, // Track if user has completed FAQ onboarding
+    // Content mode: 'stories', 'faqs', or 'archives'
+    contentMode: 'stories',
+    // First-time user choice tracking
+    isFirstTimeUser: true,
+    showedWelcomeChoice: false,
+    showFAQsAfterName: false, // Flag to show FAQs after name entry
+    // Track if entered archives from no-stories page
+    enteredArchivesFromNoStories: false,
+    // App mode state machine: 'welcome', 'faqs', 'stories', 'archives', 'no_stories'
+    appMode: 'welcome',
+
+    // NEW: Card layer stack for navigation
+    // Layers: 'headline' (front) -> 'summary' (flipped) -> 'questions' -> 'answer' -> 'deep-questions' -> 'deep-answer'
+    cardLayer: 'headline', // Current visible layer
+    modalStack: [], // Stack of modal states for back navigation
+
+    // NEW: Track if card is flipped (on summary side)
+    isCardFlipped: false,
+
+    // Q&A Card State: 'hidden' | 'peeking' | 'active'
+    qaCardState: 'hidden',
+
+    // Track selected question indices for Answer and Dig Deeper flows
+    currentQuestionIndex: null,          // Index of selected question (0-3)
+    currentDigDeeperQuestionIndex: null  // Index of selected dig deeper question (0-2)
+};
+
+// Q&A Card States - THREE DISTINCT STATES
+const QA_STATES = {
+    HIDDEN: 'hidden',   // Below viewport, not visible
+    PEEKING: 'peeking', // Hint visible at bottom when Summary shows
+    ACTIVE: 'active'    // Fully visible, replaces Summary
+};
+
+/**
+ * Set Q&A card state - manages the three-state system
+ * HIDDEN: Q&A not visible (translateY 100%)
+ * PEEKING: Only "Are you curious about" visible at bottom of card
+ * ACTIVE: Q&A fully visible, user can tap questions
+ *
+ * Q&A card is now INSIDE the story card, not a sibling
+ */
+function setQACardState(newState) {
+    // Find Q&A card inside current story card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const qaCard = currentCard.querySelector('.qa-card');
+    if (!qaCard) return;
+
+    // Remove all state classes
+    qaCard.classList.remove('peeking', 'active');
+
+    // Apply new state
+    switch (newState) {
+        case QA_STATES.PEEKING:
+            qaCard.classList.add('peeking');
+            break;
+        case QA_STATES.ACTIVE:
+            qaCard.classList.add('active');
+            break;
+        case QA_STATES.HIDDEN:
+        default:
+            // No classes = hidden (default CSS: translateY 100%)
+            break;
+    }
+
+    state.qaCardState = newState;
+    console.log('[Q&A State]', newState);
+}
+
+// ==========================================
+// STATE MACHINE - App Mode Management
+// ==========================================
+
+/**
+ * Comprehensive cleanup function that removes ALL UI elements
+ * Must be called before ANY state transition
+ */
+function cleanupCurrentState() {
+    console.log('[STATE] Cleaning up current state:', state.appMode);
+
+    // CRITICAL: Reset Q&A card to hidden state
+    setQACardState(QA_STATES.HIDDEN);
+
+    // Close all modals
+    if (elements.modalBackdrop) {
+        elements.modalBackdrop.classList.remove('visible', 'peeking', 'push-transition');
+        document.body.classList.remove('no-scroll');
+    }
+    if (elements.summaryModalBackdrop) {
+        elements.summaryModalBackdrop.classList.remove('visible');
+    }
+    if (elements.whatIsFYIModal) {
+        elements.whatIsFYIModal.classList.remove('visible');
+    }
+    if (elements.ourPhilosophyModal) {
+        elements.ourPhilosophyModal.classList.remove('visible');
+    }
+
+    // Hide completion screen
+    if (elements.completionScreen) {
+        elements.completionScreen.classList.remove('visible');
+    }
+
+    // Hide no-stories state
+    if (elements.noStoriesState) {
+        elements.noStoriesState.classList.remove('visible');
+        elements.noStoriesState.style.display = 'none';
+    }
+
+    // Hide recap view
+    if (elements.recapWeekView) {
+        elements.recapWeekView.classList.remove('visible');
+    }
+
+    // Clear card container
+    if (elements.cardContainer) {
+        elements.cardContainer.innerHTML = '';
+    }
+
+    // Reset modal views to initial state
+    resetAllModalViews();
+
+    // Clear navigation state
+    state.cameFromCompletion = false;
+    state.inRecapView = false;
+
+    // Remove any stray backdrop overlays
+    document.body.classList.remove('no-scroll');
+
+    console.log('[STATE] Cleanup complete');
+}
+
+/**
+ * Transition to a new app mode with proper cleanup and initialization
+ * @param {string} newMode - 'welcome', 'faqs', 'stories', 'archives', 'no_stories'
+ * @param {object} options - Additional options for the transition
+ */
+async function transitionToMode(newMode, options = {}) {
+    const previousMode = state.appMode;
+    console.log(`[STATE TRANSITION] ${previousMode} → ${newMode}`, options);
+
+    // Skip cleanup for welcome → name input transitions
+    if (!(previousMode === 'welcome' && newMode === 'welcome')) {
+        cleanupCurrentState();
+    }
+
+    // Update state
+    state.appMode = newMode;
+
+    // Reset mode-specific flags
+    state.faqMode = (newMode === 'faqs');
+    state.archiveMode = (newMode === 'archives');
+    state.enteredArchivesFromNoStories = options.fromNoStories || false;
+
+    // Clear connection to previous FAQ state when leaving FAQs
+    if (previousMode === 'faqs' && newMode !== 'faqs') {
+        state.faqStories = [];
+        state.faqIndex = 0;
+        // Mark FAQ as completed if user went through FAQs
+        if (!state.faqCompleted && state.currentIndex > 0) {
+            state.faqCompleted = true;
+            localStorage.setItem('fyi_faq_completed', 'true');
+        }
+    }
+
+    // Initialize the new mode
+    switch (newMode) {
+        case 'faqs':
+            await initFAQMode(options.isNewUserOnboarding || false, options.forceRefresh || false);
+            break;
+        case 'stories':
+            await initStoriesMode(options);
+            break;
+        case 'archives':
+            await initArchivesMode(options);
+            break;
+        case 'no_stories':
+            initNoStoriesMode();
+            break;
+        case 'welcome':
+            // Welcome is handled separately
+            break;
+    }
+
+    // Update Prev button visibility
+    updatePrevButtonVisibility();
+
+    console.log(`[STATE] Transition complete. Now in: ${state.appMode}`);
+
+    // Verify clean state after transition
+    setTimeout(verifyCleanState, 450);
+}
+
+/**
+ * Initialize FAQ mode - load FAQ cards fresh
+ * @param {boolean} isNewUserOnboarding - True when this is part of new user welcome flow
+ * @param {boolean} forceRefresh - True to bypass cache and fetch fresh data
+ */
+async function initFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
+    console.log('[initFAQMode] Loading FAQ content, isNewUserOnboarding:', isNewUserOnboarding, 'forceRefresh:', forceRefresh);
+
+    // Use custom loading text for new user onboarding
+    const loadingText = isNewUserOnboarding ? "Let's show you around" : "Loading FAQs...";
+    showLoading(true, loadingText);
+
+    const faqs = await fetchFAQs(forceRefresh);
+    state.faqStories = faqs;
+    state.stories = faqs;
+    state.totalStories = faqs.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    showLoading(false);
+
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+
+    trackEvent('FAQ Mode Entered');
+}
+
+/**
+ * Initialize Stories mode - load today's stories
+ */
+async function initStoriesMode(options = {}) {
+    console.log('[initStoriesMode] Loading today\'s stories');
+
+    // Clear FAQ state completely
+    state.faqMode = false;
+    state.faqStories = [];
+
+    showLoading(true);
+    await fetchStories();
+    showLoading(false);
+
+    // Check if we have stories
+    if (state.stories.length === 0) {
+        // No stories - transition to no_stories mode
+        state.appMode = 'no_stories';
+        initNoStoriesMode();
+        return;
+    }
+
+    // Reset to first story unless specified otherwise
+    if (!options.preserveIndex) {
+        state.currentIndex = 0;
+        state.viewedStories = [];
+    }
+
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+    updateProgress();
+
+    if (state.currentIndex === 0) {
+        showSwipeHint();
     }
 }
 
-/* Tablets and larger (480px+) */
-@media (min-width: 480px) {
-    .card-body {
-        padding: var(--spacing-xl);
+/**
+ * Initialize Archives mode - load archive stories
+ */
+async function initArchivesMode(options = {}) {
+    console.log('[initArchivesMode] Loading archive stories');
+
+    showLoading(true);
+
+    const archiveStories = await fetchArchiveStories();
+
+    showLoading(false);
+
+    if (archiveStories.length === 0) {
+        showToast('⚠', 'No archive stories available');
+        // Fall back to stories mode
+        await transitionToMode('stories');
+        return;
     }
 
-    .card-headline {
-        font-size: var(--font-size-3xl);
+    state.archiveStories = archiveStories;
+    state.stories = archiveStories;
+    state.totalStories = archiveStories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    // Store original stories if coming from stories mode
+    if (options.originalStories) {
+        state.originalStories = options.originalStories;
     }
 
-    .modal {
-        left: 50%;
-        transform: translateX(-50%) translateY(100%);
-        max-width: 480px;
-        border-radius: var(--radius-xl);
-        bottom: var(--spacing-lg);
+    // Update UI
+    updateDateDisplay();
+    renderProgressDots();
+    renderCards();
+    updateProgress();
+
+    trackEvent('Archive Mode Entered', { source: options.source || 'unknown' });
+}
+
+/**
+ * Initialize No Stories mode - show empty state
+ */
+function initNoStoriesMode() {
+    console.log('[initNoStoriesMode] Showing no stories page');
+
+    if (elements.noStoriesState) {
+        elements.noStoriesState.style.display = 'flex';
+        elements.noStoriesState.classList.add('visible');
     }
 
-    .modal-backdrop.visible .modal {
-        transform: translateX(-50%) translateY(0);
-    }
+    updateDateDisplay();
 }
 
-/* ==========================================
-   Utility Classes
-   ========================================== */
+// ==========================================
+// DOM Elements
+// ==========================================
 
-.hidden {
-    display: none !important;
+const elements = {};
+
+function cacheElements() {
+    elements.hamburgerBtn = document.getElementById('hamburgerBtn');
+    elements.dropdownMenu = document.getElementById('dropdownMenu');
+    elements.whatIsFYIBtn = document.getElementById('whatIsFYIBtn');
+    elements.ourPhilosophyBtn = document.getElementById('ourPhilosophyBtn');
+    elements.whatIsFYIModal = document.getElementById('whatIsFYIModal');
+    elements.ourPhilosophyModal = document.getElementById('ourPhilosophyModal');
+    elements.whatIsFYIClose = document.getElementById('whatIsFYIClose');
+    elements.ourPhilosophyClose = document.getElementById('ourPhilosophyClose');
+    elements.headerLogo = document.getElementById('headerLogo');
+    elements.themeToggle = document.getElementById('themeToggle');
+    elements.progressFill = document.getElementById('progressFill');
+    elements.dateDisplay = document.getElementById('dateDisplay');
+    elements.progressDots = document.getElementById('progressDots');
+    elements.pullIndicator = document.getElementById('pullIndicator');
+    elements.loadingState = document.getElementById('loadingState');
+    elements.loadingText = document.querySelector('.loading-text');
+    elements.mainContent = document.getElementById('mainContent');
+    elements.cardContainer = document.getElementById('cardContainer');
+    elements.noStoriesState = document.getElementById('noStoriesState');
+    elements.completionScreen = document.getElementById('completionScreen');
+    elements.reviewStoriesBtn = document.getElementById('reviewStoriesBtn');
+    elements.yourQuestionsBtn = document.getElementById('yourQuestionsBtn');
+    elements.swipeHint = document.getElementById('swipeHint');
+    elements.emptyRefreshBtn = document.getElementById('emptyRefreshBtn');
+    elements.prevStoryBtn = document.getElementById('prevStoryBtn');
+
+    // Sections
+    elements.sectionToday = document.getElementById('sectionToday');
+    elements.sectionHistory = document.getElementById('sectionHistory');
+
+    // History
+    elements.historyList = document.getElementById('historyList');
+    elements.historyEmpty = document.getElementById('historyEmpty');
+    elements.historyToggle = document.getElementById('historyToggle');
+    elements.historyBackBtn = document.getElementById('historyBackBtn');
+
+    // Q&A Card is now created dynamically inside each story card
+    // No longer a static element - query it from the current story card when needed
+
+    // LEGACY Modal (still used for Answer and Dig Deeper views)
+    elements.modalBackdrop = document.getElementById('modalBackdrop');
+    elements.qaModal = document.getElementById('qaModal');
+    elements.modalClose = document.getElementById('modalClose');
+    elements.qaView = document.getElementById('qaView');
+    elements.answerView = document.getElementById('answerView');
+    elements.modalEmoji = document.getElementById('modalEmoji');
+    elements.modalHeadline = document.getElementById('modalHeadline');
+    elements.questionsContainer = document.getElementById('questionsContainer');
+    elements.answerLabel = document.getElementById('answerLabel');
+    elements.answerQuestion = document.getElementById('answerQuestion');
+    elements.answerText = document.getElementById('answerText');
+    elements.starRating = document.getElementById('starRating');
+    elements.doneBtn = document.getElementById('doneBtn');
+
+    // Toast
+    elements.toast = document.getElementById('toast');
+    elements.toastIcon = document.getElementById('toastIcon');
+    elements.toastMessage = document.getElementById('toastMessage');
+
+    // Summary Modal
+    elements.summaryModalBackdrop = document.getElementById('summaryModalBackdrop');
+    elements.summaryModal = document.getElementById('summaryModal');
+    elements.summaryModalClose = document.getElementById('summaryModalClose');
+    elements.summaryModalHeadline = document.getElementById('summaryModalHeadline');
+
+    // Dig Deeper
+    elements.digDeeperBtn = document.getElementById('digDeeperBtn');
+    elements.digDeeperView = document.getElementById('digDeeperView');
+    elements.deepQuestionsContainer = document.getElementById('deepQuestionsContainer');
+    elements.deepAnswerView = document.getElementById('deepAnswerView');
+    elements.deepAnswerQuestion = document.getElementById('deepAnswerQuestion');
+    elements.deepAnswerText = document.getElementById('deepAnswerText');
+    elements.deepDoneBtn = document.getElementById('deepDoneBtn');
+
+    // Modal Prev Buttons
+    elements.answerViewPrev = document.getElementById('answerViewPrev');
+    elements.digDeeperViewPrev = document.getElementById('digDeeperViewPrev');
+    elements.deepAnswerViewPrev = document.getElementById('deepAnswerViewPrev');
+
+    // Welcome Modal - Choice Screen
+    elements.welcomeChoiceBackdrop = document.getElementById('welcomeChoiceBackdrop');
+    elements.welcomeNewUserBtn = document.getElementById('welcomeNewUserBtn');
+    elements.welcomeReturningBtn = document.getElementById('welcomeReturningBtn');
+
+    // Welcome Modal - Name Input
+    elements.welcomeModalBackdrop = document.getElementById('welcomeModalBackdrop');
+    elements.welcomeNameInput = document.getElementById('welcomeNameInput');
+    elements.welcomeSubmitBtn = document.getElementById('welcomeSubmitBtn');
+    elements.welcomeBackBtn = document.getElementById('welcomeBackBtn');
+
+    // FAQs Menu Button
+    elements.faqsBtn = document.getElementById('faqsBtn');
+
+    // No Stories - Archives Button
+    elements.emptyArchivesBtn = document.getElementById('emptyArchivesBtn');
+
+    // User Name Display
+    elements.fyiUserName = document.getElementById('fyiUserName');
+    elements.fyiComma = document.querySelector('.fyi-comma');
+    elements.fyiSpace = document.querySelector('.fyi-space');
+    elements.logoTextBlock = document.getElementById('logoTextBlock');
+    elements.completionTitle = document.getElementById('completionTitle');
+
+    // Summary Modal Bullets
+    elements.summaryModalBullets = document.getElementById('summaryModalBullets');
+
+    // Recap Week
+    elements.recapWeekBtn = document.getElementById('recapWeekBtn');
+    elements.recapWeekView = document.getElementById('recapWeekView');
+    elements.recapStoriesList = document.getElementById('recapStoriesList');
+    elements.recapEmpty = document.getElementById('recapEmpty');
+    elements.recapBackBtn = document.getElementById('recapBackBtn');
 }
 
-.no-scroll {
-    overflow: hidden;
-}
+// ==========================================
+// Initialization
+// ==========================================
 
-/* ==========================================
-   Info Modal (What is FYI, Our Philosophy)
-   ========================================== */
+async function init() {
+    try {
+        console.log('[init] Starting app initialization...');
 
-.info-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0);
-    z-index: var(--z-modal-backdrop);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-normal), visibility var(--transition-normal), background var(--transition-normal);
-}
+        // Initialize fixed card height system FIRST
+        initCardHeightSystem();
 
-.info-modal-backdrop.visible {
-    opacity: 1;
-    visibility: visible;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
+        cacheElements();
+        console.log('[init] Elements cached');
 
-.info-modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.95);
-    width: calc(100% - var(--spacing-xl) * 2);
-    max-width: 400px;
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-xl);
-    z-index: var(--z-modal);
-    opacity: 0;
-    transition: opacity var(--transition-normal), transform var(--transition-normal);
-}
+        loadFromStorage();
+        applyTheme();
 
-.info-modal-backdrop.visible .info-modal {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-}
+        setupEventListeners();
+        console.log('[init] Event listeners attached');
 
-.info-modal-close {
-    position: absolute;
-    top: var(--spacing-md);
-    right: var(--spacing-md);
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
+        setupSessionTracking();
 
-.info-modal-close:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
+        // Check if user has set their name
+        const savedName = localStorage.getItem('fyi_user_name');
+        const faqCompleted = localStorage.getItem('fyi_faq_completed') === 'true';
 
-.info-modal-title {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-xl);
-    margin-bottom: var(--spacing-md);
-    padding-right: var(--spacing-xl);
-}
+        if (savedName && savedName.trim().length > 0) {
+            state.userName = savedName.trim();
+            state.faqCompleted = faqCompleted;
+            state.isFirstTimeUser = false;
+            updateUserNameDisplay();
+            console.log('[init] Returning user:', savedName);
+        } else {
+            // First-time user - show welcome choice modal
+            state.isFirstTimeUser = true;
+            console.log('[init] First-time user, showing welcome modal');
+            showWelcomeChoice();
+            return; // Don't load content until name is set
+        }
 
-.info-modal-content {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    line-height: var(--line-height-relaxed);
-}
+        // Show loading and fetch stories
+        await loadAppContent();
+        console.log('[init] App content loaded');
 
-/* ==========================================
-   Summary Modal (Tap to view)
-   ========================================== */
-
-.summary-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0);
-    z-index: var(--z-modal-backdrop);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-normal), visibility var(--transition-normal), background var(--transition-normal);
-}
-
-.summary-modal-backdrop.visible {
-    opacity: 1;
-    visibility: visible;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-.summary-modal {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-height: 60vh;
-    max-height: 60dvh;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    padding: var(--spacing-lg) var(--spacing-lg) calc(var(--safe-bottom) + var(--spacing-xl));
-    z-index: var(--z-modal);
-    transform: translateY(100%);
-    transition: transform var(--transition-normal), background var(--transition-normal);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-}
-
-.summary-modal-backdrop.visible .summary-modal {
-    transform: translateY(0);
-}
-
-/* X button in TOP-LEFT corner */
-.summary-modal-close {
-    position: absolute;
-    top: var(--spacing-md);
-    left: var(--spacing-md);
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-    z-index: 1;
-}
-
-.summary-modal-close:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.summary-modal-close:active {
-    transform: scale(0.92);
-}
-
-.summary-modal-content {
-    padding-top: var(--spacing-xl);
-}
-
-.summary-modal-headline {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-xl);
-    font-weight: 700;
-    font-variation-settings: 'wght' 700;
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-md);
-    line-height: var(--line-height-tight);
-}
-
-.summary-modal-text {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    line-height: var(--line-height-relaxed);
-}
-
-@media (min-width: 480px) {
-    .summary-modal {
-        left: 50%;
-        transform: translateX(-50%) translateY(100%);
-        max-width: 480px;
-        border-radius: var(--radius-xl);
-        bottom: var(--spacing-lg);
-    }
-
-    .summary-modal-backdrop.visible .summary-modal {
-        transform: translateX(-50%) translateY(0);
+        // Track app opened
+        trackAppOpened();
+    } catch (error) {
+        console.error('[init] CRITICAL ERROR during initialization:', error);
+        // Try to show some feedback to user
+        document.body.innerHTML += '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff4444;color:white;padding:20px;border-radius:8px;z-index:9999;text-align:center;"><h3>App failed to load</h3><p>Please refresh the page or clear cache.</p><pre style="font-size:10px;text-align:left;margin-top:10px;">' + error.message + '</pre></div>';
     }
 }
 
-/* ==========================================
-   Dig Deeper View Styles
-   ========================================== */
-
-.dig-deeper-header {
-    margin-bottom: var(--spacing-lg);
-    padding-right: var(--spacing-2xl);
-}
-
-.dig-deeper-title {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-xl);
-    font-weight: 700;
-    font-variation-settings: 'wght' 700;
-    color: var(--accent);
-    margin-bottom: var(--spacing-xs);
-}
-
-.dig-deeper-subtitle {
-    font-family: var(--font-body);
-    font-size: var(--font-size-sm);
-    font-weight: 400;
-    color: var(--text-secondary);
-    font-style: normal;
-}
-
-.deep-questions-container {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
-.deep-question-button {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    text-align: left;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.deep-question-button:hover {
-    background: var(--bg-card-hover);
-}
-
-.deep-question-button:active {
-    transform: scale(0.98);
-}
-
-.deep-question-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    font-size: 14px;
-    color: var(--accent);
-    flex-shrink: 0;
-    padding-top: 2px;
-}
-
-.deep-question-text {
-    /* Explicit sizing for cross-platform consistency */
-    font-size: 16px;
-    line-height: 1.5;
-    font-weight: 500;
-    color: var(--text-primary);
-    padding-top: 2px;
-}
-
-/* Back to questions button in deep answer */
-#backToDeepQuestionsBtn {
-    background: var(--bg-card);
-    color: var(--text-secondary);
-}
-
-#backToDeepQuestionsBtn:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-/* ==========================================
-   Welcome Modal (First Time User)
-   ========================================== */
-
-.welcome-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-normal), visibility var(--transition-normal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-lg);
-}
-
-.welcome-modal-backdrop.visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-.welcome-modal {
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-2xl) var(--spacing-xl);
-    width: 100%;
-    max-width: 320px;
-    text-align: center;
-    transform: scale(0.9);
-    opacity: 0;
-    transition: transform var(--transition-normal), opacity var(--transition-normal);
-}
-
-.welcome-modal-backdrop.visible .welcome-modal {
-    transform: scale(1);
-    opacity: 1;
-}
-
-.welcome-title {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-xs);
-}
-
-.welcome-subtitle {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-xl);
-}
-
-.welcome-input {
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--bg-input);
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    font-family: var(--font-body);
-    font-size: var(--font-size-lg);
-    color: var(--text-primary);
-    text-align: center;
-    margin-bottom: var(--spacing-lg);
-    transition: border-color var(--transition-fast);
-    outline: none;
-}
-
-.welcome-input:focus {
-    border-color: var(--accent);
-}
-
-.welcome-input::placeholder {
-    color: var(--text-tertiary);
-}
-
-.welcome-button {
-    width: 100%;
-    padding: var(--spacing-md) var(--spacing-xl);
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: var(--radius-lg);
-    font-family: var(--font-body);
-    font-size: var(--font-size-md);
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.welcome-button:hover {
-    background: var(--accent-light);
-}
-
-.welcome-button:active {
-    transform: scale(0.96);
-}
-
-.welcome-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Welcome Choice Modal - Two Button Style */
-.welcome-choice-modal {
-    max-width: 340px;
-}
-
-.welcome-choice-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.welcome-button.primary {
-    background: var(--accent);
-    color: white;
-}
-
-.welcome-button.secondary {
-    background: transparent;
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-}
-
-.welcome-button.secondary:hover {
-    background: var(--bg-card-hover);
-    border-color: var(--text-tertiary);
-}
-
-/* Welcome Back Button */
-.welcome-back-btn {
-    position: absolute;
-    top: var(--spacing-md);
-    left: var(--spacing-md);
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-full);
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    border: none;
-    cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.welcome-back-btn:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.welcome-modal {
-    position: relative; /* For absolute positioning of back button */
-}
-
-/* ==========================================
-   FAQ Title Styling - Large and Striking
-   ========================================== */
-
-.faq-title-display {
-    font-family: var(--font-body); /* Satoshi */
-    font-size: clamp(1.25rem, 5vw, 1.5rem); /* Responsive, fits on one line */
-    font-weight: 600;
-    color: var(--accent);
-    text-align: center;
-    white-space: nowrap; /* Prevent wrapping */
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ==========================================
-   No Stories State - Redesigned
-   ========================================== */
-
-.no-stories-content {
-    text-align: center;
-    padding: var(--spacing-xl);
-}
-
-.no-stories-image {
-    max-width: 100%;
-    width: auto;
-    height: auto;
-    max-height: 150px;
-    margin-bottom: var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    object-fit: contain;
-}
-
-.no-stories-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-    width: 100%;
-    max-width: 280px;
-    margin: var(--spacing-lg) auto 0;
-}
-
-.no-stories-buttons .secondary-button {
-    width: 100%;
-}
-
-.secondary-button.primary-action {
-    background: var(--accent);
-    color: white;
-    border: none;
-}
-
-.secondary-button.primary-action:hover {
-    background: var(--accent-light);
-}
-
-/* ==========================================
-   Logo with User Name - Inter Font
-   ========================================== */
-
-.logo-text {
-    display: flex;
-    align-items: baseline;
-    white-space: nowrap;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 28px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    transition: font-size var(--transition-fast);
-}
-
-.fyi-text {
-    color: var(--accent);
-}
-
-.fyi-comma {
-    color: var(--accent);
-}
-
-.fyi-space {
-    /* Single space - letter-spacing on .logo-text provides visual separation */
-    display: inline;
-}
-
-.fyi-name {
-    color: #FFFFFF;
-    transition: color var(--transition-normal);
-}
-
-/* Light mode: name text color inverts to dark */
-:root.light-mode .fyi-name {
-    color: #1A1A1A;
-}
-
-/* Hide comma, space, and name when no user name is set */
-.fyi-comma.hidden,
-.fyi-space.hidden,
-.fyi-name.hidden {
-    display: none;
-}
-
-/* ==========================================
-   HTML Text Formatting (from Google Sheets)
-   ========================================== */
-
-/* Color 1: Signature Orange */
-.text-color1 {
-    color: var(--accent);
-}
-
-/* Color 2: Complementary Teal/Blue */
-.text-color2 {
-    color: #4ECDC4;
-}
-
-/* Color 3: Plum/Purple */
-.text-color3 {
-    color: #6B5C8A;
-}
-
-/* Mark: Golden yellow highlight background - vibrant and visible in both themes */
-.text-mark {
-    background: rgba(255, 215, 0, 0.4); /* Golden yellow (#FFD700) with transparency */
-    padding: 1px 4px;
-    border-radius: 3px;
-    color: inherit;
-}
-
-/* Lookup: Orange underlined clickable word */
-.text-lookup {
-    color: var(--accent);
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    text-underline-offset: 2px;
-    cursor: pointer;
-    transition: text-decoration-style var(--transition-fast);
-}
-
-.text-lookup:hover {
-    text-decoration-style: solid;
-}
-
-/* Lookup Tooltip */
-.lookup-tooltip {
-    position: fixed;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
-    box-shadow: var(--shadow-elevated);
-    z-index: var(--z-toast);
-    max-width: 280px;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(10px);
-    transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
-}
-
-.lookup-tooltip.visible {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-.lookup-tooltip-header {
-    font-family: var(--font-headline);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--accent);
-    margin-bottom: var(--spacing-xs);
-}
-
-.lookup-tooltip-content {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    line-height: var(--line-height-relaxed);
-}
-
-/* Light mode adjustments for text formatting */
-:root.light-mode .text-color2 {
-    color: #0D9488;
-}
-
-:root.light-mode .text-mark {
-    background: rgba(255, 193, 7, 0.45); /* Slightly darker gold (#FFC107) for light backgrounds */
-}
-
-/* ==========================================
-   Orange Question Bullets
-   ========================================== */
-
-.question-label {
-    color: var(--accent) !important;
-}
-
-.answer-label {
-    color: var(--accent) !important;
-}
-
-.deep-question-label {
-    color: var(--accent) !important;
-}
-
-/* ==========================================
-   Answer Actions - Dig Deeper Primary, Done Secondary
-   ========================================== */
-
-#digDeeperBtn {
-    background: var(--accent);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#digDeeperBtn:hover {
-    background: var(--accent-light);
-}
-
-#doneBtn {
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-}
-
-#doneBtn:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-/* ==========================================
-   Summary Modal Bullet List
-   ========================================== */
-
-.summary-modal-bullets {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.summary-bullet-item {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-}
-
-.summary-bullet-icon {
-    color: var(--accent);
-    font-size: 14px;
-    flex-shrink: 0;
-    line-height: 1.7;
-}
-
-.summary-bullet-text {
-    /* Explicit sizing for cross-platform consistency */
-    font-size: 16px;
-    line-height: 1.7;
-    color: var(--text-secondary);
-}
-
-/* ==========================================
-   Global Footer
-   ========================================== */
-
-.global-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    text-align: center;
-    padding: var(--spacing-sm) var(--spacing-md);
-    padding-bottom: calc(var(--spacing-sm) + var(--safe-bottom));
-    font-family: 'Satoshi', var(--font-body);
-    /* Explicit font-size for cross-platform consistency */
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text-tertiary);
-    background: linear-gradient(transparent, var(--bg-primary) 50%);
-    pointer-events: none;
-    z-index: 50;
-}
+/**
+ * Show the welcome choice modal (New here? / Been here before?)
+ */
+function showWelcomeChoice() {
+    if (elements.welcomeChoiceBackdrop) {
+        elements.welcomeChoiceBackdrop.classList.add('visible');
+    }
+}
+
+/**
+ * Hide the welcome choice modal
+ */
+function hideWelcomeChoice() {
+    if (elements.welcomeChoiceBackdrop) {
+        elements.welcomeChoiceBackdrop.classList.remove('visible');
+    }
+}
+
+/**
+ * Setup session tracking for when user leaves the app
+ */
+function setupSessionTracking() {
+    // Track session end when page is about to unload
+    window.addEventListener('pagehide', () => {
+        trackSessionEnd();
+    });
+
+    // Also track on visibility change (when user switches tabs/apps on mobile)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            trackSessionEnd();
+        }
+    });
+}
+
+async function loadAppContent() {
+    // Set app mode to stories
+    state.appMode = 'stories';
+    state.faqMode = false;
+    state.archiveMode = false;
+
+    showLoading(true);
+    await fetchStories();
+    showLoading(false);
+
+    // Check if we have stories
+    if (state.stories.length === 0) {
+        state.appMode = 'no_stories';
+    }
+
+    renderCards();
+    updateProgress();
+    updateDateDisplay();
+    renderProgressDots();
+    renderHistory();
+    showSwipeHint();
+    registerServiceWorker();
+}
+
+// Format and display today's date (or appropriate text for FAQ/archive mode)
+function updateDateDisplay() {
+    // Reset any FAQ-specific styling first
+    elements.dateDisplay.classList.remove('faq-title-display');
+
+    if (state.faqMode) {
+        // Show FAQ title with special styling
+        elements.dateDisplay.textContent = 'FAQs: See what we\'re all about';
+        elements.dateDisplay.classList.add('faq-title-display');
+    } else if (state.archiveMode) {
+        // Show "Archives" instead of date
+        elements.dateDisplay.textContent = 'Archives';
+    } else {
+        // Show today's date
+        const today = new Date();
+        const options = { month: 'short', day: 'numeric', year: 'numeric' };
+        const formattedDate = today.toLocaleDateString('en-US', options);
+        elements.dateDisplay.textContent = formattedDate;
+    }
+}
+
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW registration failed:', err));
+    }
+}
+
+// ==========================================
+// Storage
+// ==========================================
+
+function loadFromStorage() {
+    try {
+        // Try new key first, then fall back to old key for migration
+        let saved = localStorage.getItem('fyiNews');
+        if (!saved) {
+            saved = localStorage.getItem('criticalNews');
+            // Migrate to new key
+            if (saved) {
+                localStorage.setItem('fyiNews', saved);
+                localStorage.removeItem('criticalNews');
+            }
+        }
+        if (saved) {
+            const data = JSON.parse(saved);
+            state.history = data.history || [];
+            state.theme = data.theme || 'dark';
+            state.hasShownHint = data.hasShownHint || false;
+            state.viewedStories = data.viewedStories || [];
+
+            // Reset current index if it's a new day
+            const lastDate = data.lastDate;
+            const today = getTodayDate();
+            if (lastDate !== today) {
+                state.currentIndex = 0;
+                state.viewedStories = [];
+            } else {
+                state.currentIndex = data.currentIndex || 0;
+            }
+        }
+    } catch (e) {
+        console.error('Error loading from storage:', e);
+    }
+}
+
+function saveToStorage() {
+    try {
+        const data = {
+            history: state.history,
+            theme: state.theme,
+            currentIndex: state.currentIndex,
+            hasShownHint: state.hasShownHint,
+            viewedStories: state.viewedStories,
+            lastDate: getTodayDate()
+        };
+        localStorage.setItem('fyiNews', JSON.stringify(data));
+    } catch (e) {
+        console.error('Error saving to storage:', e);
+    }
+}
+
+// ==========================================
+// Google Sheets Integration (Public CSV)
+// ==========================================
+
+async function fetchStories() {
+    // Check if sheet ID is configured
+    if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
+        console.log('Sheet ID not configured, using fallback stories');
+        state.stories = fallbackStories;
+        state.totalStories = state.stories.length;
+        return;
+    }
+
+    try {
+        // Fetch public Google Sheet as CSV
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+        const response = await fetch(csvUrl);
+        if (!response.ok) {
+            throw new Error('Failed to fetch sheet');
+        }
+
+        const csvText = await response.text();
+        const stories = parseCSV(csvText);
+
+        // Filter to today's stories only
+        const today = getTodayDate();
+        const todayStories = stories.filter(story => {
+            const storyDate = parseDate(story.date);
+            return storyDate === today;
+        });
+
+        if (todayStories.length > 0) {
+            state.stories = todayStories;
+            state.totalStories = todayStories.length;
+
+            // Cache for offline
+            localStorage.setItem('cachedStories', JSON.stringify({
+                date: today,
+                stories: todayStories
+            }));
+
+            showToast('✓', 'Stories loaded');
+        } else {
+            // Try to load cached stories
+            const cached = localStorage.getItem('cachedStories');
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (data.date === today && data.stories.length > 0) {
+                    state.stories = data.stories;
+                    state.totalStories = data.stories.length;
+                    return;
+                }
+            }
+
+            // No stories for today
+            state.stories = [];
+            state.totalStories = 0;
+        }
+    } catch (error) {
+        console.error('Fetch error:', error);
+
+        // Try cached stories
+        const cached = localStorage.getItem('cachedStories');
+        if (cached) {
+            const data = JSON.parse(cached);
+            state.stories = data.stories || [];
+            state.totalStories = state.stories.length;
+            showToast('⚠', 'Showing cached stories');
+        } else {
+            // Use fallback
+            state.stories = fallbackStories;
+            state.totalStories = state.stories.length;
+            showToast('⚠', 'Using sample stories');
+        }
+    }
+}
+
+// ==========================================
+// Archives Functions
+// ==========================================
+
+async function fetchArchiveStories() {
+    // Check if sheet ID is configured
+    if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
+        return [];
+    }
+
+    try {
+        // Fetch public Google Sheet as CSV
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+        const response = await fetch(csvUrl);
+        if (!response.ok) {
+            throw new Error('Failed to fetch sheet');
+        }
+
+        const csvText = await response.text();
+        const stories = parseCSV(csvText);
+
+        // Get all stories except today
+        const today = getTodayDate();
+
+        // Filter to archive stories only (excluding today)
+        const archiveStories = stories.filter(story => {
+            const storyDate = parseDate(story.date);
+            return storyDate !== today;
+        });
+
+        // Sort by date (most recent first)
+        archiveStories.sort((a, b) => {
+            const dateA = parseDate(a.date);
+            const dateB = parseDate(b.date);
+            return dateB.localeCompare(dateA);
+        });
+
+        // Return last 50 stories
+        return archiveStories.slice(0, 50);
+    } catch (error) {
+        console.error('Error fetching archive stories:', error);
+        return [];
+    }
+}
+
+// ==========================================
+// FAQ Functions
+// ==========================================
+
+/**
+ * Fetch FAQ content from the FAQs sheet with caching
+ * FAQs use the same column structure as stories but:
+ * - No date filtering (FAQs are evergreen)
+ * - Only 3 questions displayed (Question 4 is always "Skip this FAQ")
+ * - No Dig Deeper functionality (deep question columns are empty)
+ *
+ * Caching: FAQ data is cached in localStorage for 24 hours
+ * Cache key: 'fyi_faq_data'
+ * Cache timestamp key: 'fyi_faq_timestamp'
+ */
+async function fetchFAQs(forceRefresh = false) {
+    const CACHE_KEY = 'fyi_faq_data';
+    const CACHE_TIMESTAMP_KEY = 'fyi_faq_timestamp';
+    const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    // Check if sheet ID is configured
+    if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
+        console.log('Sheet ID not configured, using fallback FAQs');
+        return getFallbackFAQs();
+    }
+
+    // Check cache unless force refresh is requested
+    if (!forceRefresh) {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+
+        if (cachedData && cachedTimestamp) {
+            const cacheAge = Date.now() - parseInt(cachedTimestamp, 10);
+            if (cacheAge < CACHE_DURATION_MS) {
+                console.log('[FAQ] Using cached FAQ data (age:', Math.round(cacheAge / 1000 / 60), 'minutes)');
+                try {
+                    return JSON.parse(cachedData);
+                } catch (e) {
+                    console.warn('[FAQ] Cache parse error, fetching fresh data');
+                }
+            } else {
+                console.log('[FAQ] Cache expired, fetching fresh data');
+            }
+        }
+    }
+
+    try {
+        // Fetch FAQ sheet as CSV
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(FAQ_SHEET_NAME)}`;
+
+        const response = await fetch(csvUrl);
+        if (!response.ok) {
+            throw new Error('Failed to fetch FAQ sheet');
+        }
+
+        const csvText = await response.text();
+        const faqs = parseCSV(csvText);
+
+        // FAQs don't need date filtering - return all
+        if (faqs.length > 0) {
+            // Log warning if not exactly 5 FAQs
+            if (faqs.length !== 5) {
+                console.warn(`[FAQ] Expected 5 FAQs, found ${faqs.length}`);
+            }
+
+            // Process FAQs - ensure no deep questions are shown
+            const processedFaqs = faqs.map(faq => ({
+                ...faq,
+                isFAQ: true,
+                // Use image from sheet or fall back to cat image
+                imageUrl: faq.imageUrl || '/images/cat-sleep.jpg',
+                // Strip deep questions from FAQ questions
+                questions: faq.questions.map(q => ({
+                    ...q,
+                    deepQuestions: [] // FAQs don't have dig deeper
+                }))
+            }));
+
+            // Cache the processed FAQs
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(processedFaqs));
+                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                console.log('[FAQ] Cached', processedFaqs.length, 'FAQs from Google Sheets');
+            } catch (e) {
+                console.warn('[FAQ] Failed to cache FAQs:', e.message);
+            }
+
+            return processedFaqs;
+        }
+
+        // Sheet exists but is empty - show updating message
+        console.warn('[FAQ] FAQ sheet is empty');
+        showToast('ℹ️', 'FAQs are being updated. Please check back soon.');
+        return getFallbackFAQs();
+    } catch (error) {
+        console.error('Error fetching FAQs:', error);
+
+        // Try to use cached data even if expired
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+            console.log('[FAQ] Using expired cache due to fetch error');
+            try {
+                return JSON.parse(cachedData);
+            } catch (e) {
+                // Cache corrupted
+            }
+        }
+
+        // Show error message and return fallback
+        showToast('⚠️', "We're having trouble loading FAQs. Please try refreshing.");
+        return getFallbackFAQs();
+    }
+}
+
+/**
+ * Fallback FAQ content when sheet is not configured
+ */
+function getFallbackFAQs() {
+    return [
+        {
+            id: 'faq-1',
+            isFAQ: true,
+            headline: "Why do I need another news app?",
+            teaser: "We know you've been here before—another news service promising \"high-quality\" news that \"cuts the clutter.\" We get the eye roll. But hear us out.",
+            summary: "✦ We're not trying to keep you informed about everything—that's impossible and exhausting<br>✦ We curate 3-5 stories daily that actually matter for conversations you'll have with real people<br>✦ We teach you how to think about news, not just what happened—questions beat headlines every time",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "News apps have just not worked for me, I'm still skeptical",
+                    answer: "We get it. This exact skepticism is what got us to start FYI in the first place. Most news apps either overwhelm you with notifications or simplify things to the point of uselessness. We're not here to replace your news diet—we're here to make you sharper in the 15 minutes you actually have to engage with what's happening.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "What are your qualifications to report on this?",
+                    answer: "Fair question. We're students at IIM Bangalore with 6+ years of competitive debate experience—meaning we're trained to interrogate arguments, spot BS, and explain complex ideas simply. Think of us as your smart friend who reads too much and can't help but share what's actually interesting.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "How is this different from reading headlines on Twitter or Reddit?",
+                    answer: "Twitter gives you hot takes. Reddit gives you crowd consensus. We give you the questions you'd ask if you had time to dig deeper. Plus, our stuff is curated—you're not scrolling through an algorithm designed to keep you angry and engaged. You get in, get smarter, get out.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-2',
+            isFAQ: true,
+            headline: "What kind of stories do you report on?",
+            teaser: "We don't break headlines. We don't give you an endless stream of stories. So why should you pick us?",
+            summary: "✦ We report on stories you'll actually discuss—the ones where people say \"Did you see that thing about...\"<br>✦ Business, geopolitics, tech, culture—anything that reveals how the world actually works<br>✦ If a story won't teach you something or make you sound smarter in conversation, we skip it",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "Do you plan to personalize stories further?",
+                    answer: "Yes, soon! Right now we're keeping it simple—5 stories a day that we think work for most curious people. But we're building features to let you pick topics you care about most. Politics bore you? Skip them. Obsessed with AI? Get more. We want FYI to feel like it's made for you, not for \"users.\"",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "Will you ever cover local news or niche topics?",
+                    answer: "Maybe. We're focused on stories with broad relevance right now—things that matter whether you're in Mumbai, Delhi, or Bangalore. But if there's enough interest in hyperlocal stuff or niche deep-dives, we're open to experimenting. Let us know what you want to see.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "How do you decide what's \"conversation-worthy\"?",
+                    answer: "Simple test: Would this come up at dinner with smart friends? If yes, it's in. We avoid breaking news that'll be outdated in 6 hours, clickbait that sounds important but isn't, and niche wonkery that only policy nerds care about. We're optimizing for \"Oh, I read about this\" moments, not \"I saw a headline\" moments.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-3',
+            isFAQ: true,
+            headline: "Do you store my data?",
+            teaser: "We're a bunch of 20-somethings who forget to store our friends' phone numbers. Relax—we're not tracking you.",
+            summary: "✦ Nope. We use Plausible Analytics—made in the EU, privacy-focused, no cookies, no creepy tracking<br>✦ We only see aggregate data: how many people read a story, which questions get clicked most<br>✦ We can't see who you are, what device you're on, or where you're reading from—and we like it that way",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "But you ask for my name—is that stored on your server?",
+                    answer: "Nope. Your name is stored in localStorage on your device—basically your phone remembers it, not us. That's why the app sometimes glitches and asks you again—if it were on our server, that wouldn't happen. We genuinely have no idea who you are, and that's by design.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "So what kind of data are you actually interested in?",
+                    answer: "We care about what you like. Do you swipe left on all our stories? (Hopefully not.) Which questions do people dig into most? Do people finish all 5 stories or bail after 2? That helps us get better at picking stories and writing questions—but it doesn't tell us anything about you personally.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "All news apps store data. Why not you?",
+                    answer: "We don't run ads. That's the whole game. Most news apps store data because advertisers pay for targeting—show this person shoe ads, that person finance stuff. We're not doing that. We'd rather charge you ₹15/week and keep your reading experience clean than make ₹5/week per user by selling your attention to brands.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-4',
+            isFAQ: true,
+            headline: "What are your political inclinations?",
+            teaser: "Fair question. Are we a propaganda machine in disguise?",
+            summary: "✦ We like capitalism but recognize it has real limitations—markets aren't magic, regulation isn't always bad<br>✦ We're skeptical of ideology in general—left or right—because reality is messy and most loud opinions are performative<br>✦ If we've done our job right, you shouldn't be able to guess our politics from what we write",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "But everyone has biases. What are yours?",
+                    answer: "Sure. We probably lean slightly left on social issues and slightly pro-market on economic ones, but honestly we care more about \"what's actually happening\" than \"what should happen.\" Our bias is toward curiosity over certainty. We'd rather ask good questions than pretend we have all the answers.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "Will you ever take a strong stance on controversial issues?",
+                    answer: "Only when it's intellectually honest. If there's a genuine debate with smart people on both sides, we'll lay it out. But if one side is clearly wrong or acting in bad faith, we're not going to \"both sides\" it for balance. We're not activists, but we're also not stenographers. We call it like we see it.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "How do you handle stories where there's no \"both sides\"?",
+                    answer: "We don't pretend neutrality exists where it doesn't. Some stories genuinely have one defensible interpretation—climate change is real, vaccines work, election fraud claims in 2020 were baseless. In those cases, we explain the facts and move on. Treating every issue as a debate isn't fair—it's lazy.",
+                    deepQuestions: []
+                }
+            ]
+        },
+        {
+            id: 'faq-5',
+            isFAQ: true,
+            headline: "How do you make money?",
+            teaser: "If you're reading this, you're probably one of our earliest users. We hope the answer at the back of this card changes soon.",
+            summary: "✦ Right now? We don't. This is a passion project run by students who should be studying for exams<br>✦ Everyone gets a 30-day free trial to test if FYI actually makes you smarter and more engaged with the world<br>✦ When we do charge, it'll be ₹15/week—less than a cup of coffee, more than a dopamine scroll",
+            imageUrl: "images/cat-sleep.jpg",
+            questions: [
+                {
+                    label: "✦",
+                    text: "That doesn't seem sustainable. Will you even survive?",
+                    answer: "Right now we're just students at IIM Bangalore, so surviving assignments and exams is a bigger worry than surviving as a business. This is an experiment—if people love it, we'll figure out how to make it work. If not, at least we built something we're proud of. Call it freshman idealism.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "Will you ever allow ads?",
+                    answer: "No. Call it naive, but we won't. Ads ruin the reading experience—they optimize for clicks and outrage, not understanding. Our whole model is \"you pay us, we serve you.\" No middlemen, no tracking, no algorithmic manipulation. If we can't make that work, we'd rather shut down than compromise.",
+                    deepQuestions: []
+                },
+                {
+                    label: "✦",
+                    text: "What happens after the free trial?",
+                    answer: "You decide if it's worth ₹15/week. If you've used FYI for 30 days and feel smarter, more engaged, and more confident in conversations—keep going. If not, cancel with zero guilt. We're not locking you into annual plans or guilt-tripping you with notifications. Pay if it's valuable. That's the deal.",
+                    deepQuestions: []
+                }
+            ]
+        }
+    ];
+}
+
+/**
+ * Enter FAQ mode using the state machine
+ * This is the main entry point for FAQ mode from anywhere in the app
+ * @param {boolean} isNewUserOnboarding - True when this is part of new user welcome flow
+ * @param {boolean} forceRefresh - True to bypass cache and fetch fresh FAQ data (used when accessed from menu)
+ */
+async function enterFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
+    console.log('[enterFAQMode] Transitioning to FAQ mode via state machine, isNewUserOnboarding:', isNewUserOnboarding, 'forceRefresh:', forceRefresh);
+    await transitionToMode('faqs', { isNewUserOnboarding, forceRefresh });
+}
+
+/**
+ * Exit FAQ mode and return to stories using state machine
+ */
+async function exitFAQMode() {
+    console.log('[exitFAQMode] Transitioning to stories mode via state machine');
+    await transitionToMode('stories');
+}
+
+function getPastWeekDates() {
+    const dates = [];
+    const today = new Date();
+
+    // Get past 7 days (not including today)
+    for (let i = 1; i <= 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        dates.push(`${year}-${month}-${day}`);
+    }
+
+    return dates;
+}
+
+function formatDateForDisplay(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00');
+    const options = { weekday: 'long', month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+}
+
+async function showRecapView() {
+    triggerHaptic('light');
+
+    // Track that we came from completion screen
+    state.cameFromCompletion = true;
+    state.inRecapView = true;
+
+    // Show loading state
+    showLoading(true);
+
+    // Fetch archive stories
+    const archiveStories = await fetchArchiveStories();
+
+    showLoading(false);
+
+    if (archiveStories.length === 0) {
+        // Show empty state in recap view
+        elements.recapStoriesList.innerHTML = '';
+        elements.recapEmpty.style.display = 'block';
+        elements.completionScreen.classList.remove('visible');
+        elements.recapWeekView.classList.add('visible');
+        // Show prev button for returning to completion
+        updatePrevButtonForCompletionNav();
+        return;
+    }
+
+    // Enter archive mode - show archive stories as swipeable cards
+    state.archiveMode = true;
+    state.originalStories = [...state.stories]; // Save current stories
+    state.archiveStories = archiveStories;
+    state.archiveIndex = 0;
+
+    // Replace current stories with archive stories
+    state.stories = archiveStories;
+    state.totalStories = archiveStories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    // Hide completion screen
+    elements.completionScreen.classList.remove('visible');
+
+    // Render archive cards
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    showToast('📚', `${archiveStories.length} archive stories loaded`);
+}
+
+function hideRecapView() {
+    triggerHaptic('light');
+    elements.recapWeekView.classList.remove('visible');
+    elements.completionScreen.classList.add('visible');
+    // Reset navigation state
+    state.cameFromCompletion = false;
+    state.inRecapView = false;
+    updatePrevButtonVisibility();
+}
+
+function exitArchiveMode() {
+    if (!state.archiveMode) return;
+
+    state.archiveMode = false;
+
+    // Restore today's stories
+    state.stories = state.originalStories;
+    state.totalStories = state.stories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+    state.archiveStories = [];
+    state.originalStories = [];
+
+    // Re-render with today's stories
+    elements.completionScreen.classList.remove('visible');
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    showToast('✓', "Back to today's stories");
+}
+
+// Exit archive mode and return to completion screen (used by Prev button)
+function exitArchiveModeToCompletion() {
+    if (!state.archiveMode) return;
+
+    state.archiveMode = false;
+    state.cameFromCompletion = false;
+    state.inRecapView = false;
+
+    // Restore today's stories
+    state.stories = state.originalStories;
+    state.totalStories = state.stories.length;
+    state.currentIndex = state.totalStories; // Set to end so completion shows
+    state.viewedStories = [];
+    state.archiveStories = [];
+    state.originalStories = [];
+
+    // Clear all cards from DOM
+    elements.cardContainer.innerHTML = '';
+
+    // Show completion screen
+    elements.completionScreen.classList.add('visible');
+    elements.progressFill.style.width = '100%';
+    if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
+
+    // Update completion title
+    if (state.userName && elements.completionTitle) {
+        elements.completionTitle.textContent = `Take a break, ${state.userName}`;
+    }
+
+    updateCompletionButtons();
+    updatePrevButtonVisibility();
+    triggerHaptic('light');
+}
+
+/**
+ * Enter archive mode from the no-stories page
+ * Similar to regular archive mode but tracks source for proper Prev button behavior
+ */
+async function enterArchiveModeFromNoStories() {
+    console.log('[enterArchiveModeFromNoStories] Starting archive mode from no-stories page');
+
+    showLoading(true);
+
+    // Fetch archive stories
+    const archiveStories = await fetchArchiveStories();
+
+    showLoading(false);
+
+    if (archiveStories.length === 0) {
+        showToast('⚠', 'No archive stories available');
+        return;
+    }
+
+    // Enter archive mode
+    state.archiveMode = true;
+    state.contentMode = 'archives';
+    state.enteredArchivesFromNoStories = true;
+    state.originalStories = []; // No today's stories to restore
+    state.archiveStories = archiveStories;
+    state.stories = archiveStories;
+    state.totalStories = archiveStories.length;
+    state.currentIndex = 0;
+    state.viewedStories = [];
+
+    // Hide no-stories state
+    elements.noStoriesState.classList.remove('visible');
+    elements.noStoriesState.style.display = 'none';
+
+    // Render archive cards
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    updatePrevButtonVisibility();
+
+    showToast('✓', 'Browsing archives');
+    trackEvent('Archive Mode Entered', { source: 'no_stories_page' });
+}
+
+/**
+ * Exit archive mode when entered from no-stories page
+ * Returns to no-stories page if today still has no stories, otherwise shows today's stories
+ */
+async function exitArchiveModeFromNoStories() {
+    state.archiveMode = false;
+    state.enteredArchivesFromNoStories = false;
+    state.contentMode = 'stories';
+    state.archiveStories = [];
+
+    // Re-fetch today's stories to check if any have been added
+    showLoading(true);
+    await fetchStories();
+    showLoading(false);
+
+    // Check if we now have stories
+    if (state.stories.length > 0) {
+        // Stories have been added! Show them
+        state.currentIndex = 0;
+        elements.cardContainer.innerHTML = '';
+        renderCards();
+        updateProgress();
+        renderProgressDots();
+        updatePrevButtonVisibility();
+        showToast('✓', 'New stories available!');
+    } else {
+        // Still no stories - show no-stories page again
+        elements.cardContainer.innerHTML = '';
+        elements.noStoriesState.style.display = 'flex';
+        elements.noStoriesState.classList.add('visible');
+        updatePrevButtonVisibility();
+    }
+}
+
+function renderRecapStories(stories) {
+    // Group stories by date
+    const groupedByDate = {};
+    stories.forEach(story => {
+        const date = parseDate(story.date);
+        if (!groupedByDate[date]) {
+            groupedByDate[date] = [];
+        }
+        groupedByDate[date].push(story);
+    });
+
+    // Render grouped stories
+    let html = '';
+    const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+
+    sortedDates.forEach(date => {
+        const displayDate = formatDateForDisplay(date);
+        html += `<div class="recap-date-group">
+            <div class="recap-date-header">${displayDate}</div>`;
+
+        groupedByDate[date].forEach((story, index) => {
+            html += `
+                <div class="recap-story-card" data-recap-date="${date}" data-recap-index="${index}">
+                    <span class="recap-story-emoji">${story.emoji || '📰'}</span>
+                    <div class="recap-story-info">
+                        <h4 class="recap-story-headline">${parseFormattedText(story.headline)}</h4>
+                    </div>
+                    <svg class="recap-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </div>`;
+        });
+
+        html += '</div>';
+    });
+
+    elements.recapStoriesList.innerHTML = html;
+
+    // Add click handlers
+    const recapCards = elements.recapStoriesList.querySelectorAll('.recap-story-card');
+    recapCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const date = card.dataset.recapDate;
+            const index = parseInt(card.dataset.recapIndex);
+            const story = groupedByDate[date][index];
+            if (story) {
+                triggerHaptic('light');
+                openRecapStoryModal(story);
+            }
+        });
+    });
+}
+
+function openRecapStoryModal(story) {
+    // Set the current story for modal interaction
+    state.currentStory = story;
+    state.currentQuestion = null;
+
+    // Track archive story opened
+    trackArchiveStoryOpened(story.headline, story.date);
+
+    // Open the Q&A modal
+    openModal(story);
+}
+
+function parseCSV(csvText) {
+    const lines = csvText.split('\n');
+    if (lines.length < 2) return [];
+
+    // Parse header row
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim().replace(/\s+/g, ' '));
+
+    // Expected column structure (28 columns):
+    // 0: Date, 1: Headline, 2: Teaser, 3: Summary
+    // 4: Question 1, 5: Question 2, 6: Question 3, 7: Question 4
+    // 8: Answer 1, 9: Answer 2, 10: Answer 3
+    // 11-13: Q1-Deep1, Q1-Deep2, Q1-Deep3
+    // 14-16: A1-Deep1, A1-Deep2, A1-Deep3
+    // 17-19: Q2-Deep1, Q2-Deep2, Q2-Deep3
+    // 20-22: A2-Deep1, A2-Deep2, A2-Deep3
+    // 23-25: Q3-Deep1, Q3-Deep2, Q3-Deep3
+    // 26-28: A3-Deep1, A3-Deep2, A3-Deep3
+    // 29: Banner Image URL
+
+    // Map expected headers to indices
+    const headerMap = {};
+
+    headers.forEach((header, index) => {
+        const normalized = header.replace(/[^a-z0-9\s-]/g, '').trim();
+
+        // Core fields
+        if (header === 'date' || normalized === 'date') headerMap['date'] = index;
+        if (header === 'headline' || normalized === 'headline') headerMap['headline'] = index;
+        if (header === 'teaser' || normalized === 'teaser') headerMap['teaser'] = index;
+        if (header === 'summary' || normalized === 'summary') headerMap['summary'] = index;
+
+        // Questions 1-4
+        if (header.includes('question 1') || normalized === 'question 1') headerMap['question 1'] = index;
+        if (header.includes('question 2') || normalized === 'question 2') headerMap['question 2'] = index;
+        if (header.includes('question 3') || normalized === 'question 3') headerMap['question 3'] = index;
+        if (header.includes('question 4') || normalized === 'question 4') headerMap['question 4'] = index;
+
+        // Answers 1-3
+        if (header.includes('answer 1') || normalized === 'answer 1') headerMap['answer 1'] = index;
+        if (header.includes('answer 2') || normalized === 'answer 2') headerMap['answer 2'] = index;
+        if (header.includes('answer 3') || normalized === 'answer 3') headerMap['answer 3'] = index;
+
+        // Deep questions for Q1
+        if (header.includes('q1-deep1') || normalized === 'q1-deep1') headerMap['q1-deep1'] = index;
+        if (header.includes('q1-deep2') || normalized === 'q1-deep2') headerMap['q1-deep2'] = index;
+        if (header.includes('q1-deep3') || normalized === 'q1-deep3') headerMap['q1-deep3'] = index;
+
+        // Deep answers for Q1
+        if (header.includes('a1-deep1') || normalized === 'a1-deep1') headerMap['a1-deep1'] = index;
+        if (header.includes('a1-deep2') || normalized === 'a1-deep2') headerMap['a1-deep2'] = index;
+        if (header.includes('a1-deep3') || normalized === 'a1-deep3') headerMap['a1-deep3'] = index;
+
+        // Deep questions for Q2
+        if (header.includes('q2-deep1') || normalized === 'q2-deep1') headerMap['q2-deep1'] = index;
+        if (header.includes('q2-deep2') || normalized === 'q2-deep2') headerMap['q2-deep2'] = index;
+        if (header.includes('q2-deep3') || normalized === 'q2-deep3') headerMap['q2-deep3'] = index;
+
+        // Deep answers for Q2
+        if (header.includes('a2-deep1') || normalized === 'a2-deep1') headerMap['a2-deep1'] = index;
+        if (header.includes('a2-deep2') || normalized === 'a2-deep2') headerMap['a2-deep2'] = index;
+        if (header.includes('a2-deep3') || normalized === 'a2-deep3') headerMap['a2-deep3'] = index;
+
+        // Deep questions for Q3
+        if (header.includes('q3-deep1') || normalized === 'q3-deep1') headerMap['q3-deep1'] = index;
+        if (header.includes('q3-deep2') || normalized === 'q3-deep2') headerMap['q3-deep2'] = index;
+        if (header.includes('q3-deep3') || normalized === 'q3-deep3') headerMap['q3-deep3'] = index;
+
+        // Deep answers for Q3
+        if (header.includes('a3-deep1') || normalized === 'a3-deep1') headerMap['a3-deep1'] = index;
+        if (header.includes('a3-deep2') || normalized === 'a3-deep2') headerMap['a3-deep2'] = index;
+        if (header.includes('a3-deep3') || normalized === 'a3-deep3') headerMap['a3-deep3'] = index;
+
+        // Banner Image URL
+        if (header.includes('banner') || header.includes('image url')) headerMap['banner image url'] = index;
+    });
+
+    const stories = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = parseCSVLine(line);
+
+        // Get values using header map, with fallback to positional indices
+        const getValue = (key, fallbackIndex) => {
+            const idx = headerMap[key] !== undefined ? headerMap[key] : fallbackIndex;
+            return (values[idx] || '').trim();
+        };
+
+        // Process image URL - handle relative paths from /images/ folder
+        let imageUrl = getValue('banner image url', 27);
+        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+            // Assume it's a filename in the /images/ folder
+            imageUrl = `/images/${imageUrl}`;
+        }
+
+        // Build story object using the 28-column structure
+        const story = {
+            id: i,
+            date: getValue('date', 0),
+            emoji: '📰', // No emoji column - use default
+            headline: getValue('headline', 1),
+            teaser: getValue('teaser', 2),
+            summary: getValue('summary', 3),
+            imageUrl: imageUrl,
+            questions: []
+        };
+
+        // Parse questions 1-3 with their deep dive questions
+        for (let q = 1; q <= 3; q++) {
+            const question = getValue(`question ${q}`, 3 + q);
+            const answer = getValue(`answer ${q}`, 7 + q);
+
+            if (question && question.trim() && answer && answer.trim()) {
+                // Build deep dive questions array
+                const deepQuestions = [];
+                for (let d = 1; d <= 3; d++) {
+                    const deepQ = getValue(`q${q}-deep${d}`, -1);
+                    const deepA = getValue(`a${q}-deep${d}`, -1);
+                    if (deepQ && deepQ.trim() && deepA && deepA.trim()) {
+                        deepQuestions.push({
+                            text: deepQ.trim(),
+                            answer: deepA.trim()
+                        });
+                    }
+                }
+
+                story.questions.push({
+                    label: '✦',
+                    text: question.trim(),
+                    answer: answer.trim(),
+                    deepQuestions: deepQuestions
+                });
+            }
+        }
+
+        // Validate date format (YYYY-MM-DD)
+        const dateStr = story.date;
+        if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            console.warn(`Invalid date format for story ${i}: ${dateStr}. Expected YYYY-MM-DD`);
+        }
+
+        // Only add story if it has headline and at least one question
+        if (story.headline && story.headline.trim() && story.questions.length > 0) {
+            stories.push(story);
+        }
+    }
+
+    return stories;
+}
+
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+
+    result.push(current.trim());
+    return result;
+}
+
+// ==========================================
+// User Name / Welcome Modal
+// ==========================================
+
+function showWelcomeModal() {
+    elements.welcomeModalBackdrop.classList.add('visible');
+    setTimeout(() => {
+        elements.welcomeNameInput.focus();
+    }, 300);
+}
+
+function hideWelcomeModal() {
+    elements.welcomeModalBackdrop.classList.remove('visible');
+}
+
+function formatUserName(name) {
+    // Proper capitalization: first letter uppercase, rest lowercase
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+async function saveUserName(name) {
+    const formatted = formatUserName(name);
+    if (formatted) {
+        localStorage.setItem('fyi_user_name', formatted);
+        state.userName = formatted;
+        state.isFirstTimeUser = false;
+        updateUserNameDisplay();
+        hideWelcomeModal();
+        trackAppOpened();
+
+        // Check if we should show FAQs (new user flow) or stories (returning user flow)
+        if (state.showFAQsAfterName) {
+            // New user: show FAQs first with custom onboarding loading text
+            await enterFAQMode(true);
+        } else {
+            // Returning user: go straight to stories
+            await loadAppContent();
+        }
+    }
+}
+
+function updateUserNameDisplay() {
+    if (state.userName) {
+        elements.fyiUserName.textContent = state.userName;
+        elements.fyiComma.classList.remove('hidden');
+        if (elements.fyiSpace) elements.fyiSpace.classList.remove('hidden');
+        elements.fyiUserName.classList.remove('hidden');
+
+        // Dynamically adjust font size for long names - shrink entire logo block together
+        adjustLogoFontSize();
+    } else {
+        elements.fyiComma.classList.add('hidden');
+        if (elements.fyiSpace) elements.fyiSpace.classList.add('hidden');
+        elements.fyiUserName.classList.add('hidden');
+    }
+}
+
+function adjustLogoFontSize() {
+    // Reset to default size first
+    if (elements.logoTextBlock) {
+        elements.logoTextBlock.style.fontSize = '';
+    }
+
+    // Get available width (header width minus hamburger and theme toggle buttons with padding)
+    const headerWidth = window.innerWidth;
+    const availableWidth = headerWidth - 140; // Reserve 140px for hamburger (44px) + theme toggle (44px) + padding
+
+    // Measure current width of entire logo block
+    const logoBlock = elements.logoTextBlock;
+    if (!logoBlock) return;
+
+    const logoWidth = logoBlock.offsetWidth;
+
+    // If logo block is too wide, reduce font size for the ENTIRE block (both FYI and Name together)
+    if (logoWidth > availableWidth) {
+        const ratio = availableWidth / logoWidth;
+        const currentSize = 28; // Default font size in CSS
+        const newSize = Math.max(16, Math.floor(currentSize * ratio));
+        logoBlock.style.fontSize = `${newSize}px`;
+    }
+}
+
+// ==========================================
+// HTML Text Formatting with Sanitization
+// ==========================================
+
+/**
+ * Sanitize HTML by removing dangerous tags while preserving safe formatting tags
+ * Whitelist approach: only allow specific safe tags
+ */
+function sanitizeHTML(text) {
+    if (!text) return text;
+
+    // First, temporarily preserve allowed tags by replacing them with placeholders
+    const preservedTags = [];
+    const allowedTagPatterns = [
+        /<color1>(.*?)<\/color1>/gi,
+        /<color2>(.*?)<\/color2>/gi,
+        /<color3>(.*?)<\/color3>/gi,
+        /<mark>(.*?)<\/mark>/gi,
+        /<br\s*\/?>/gi,
+        /<strong>(.*?)<\/strong>/gi,
+        /<em>(.*?)<\/em>/gi,
+        /<b>(.*?)<\/b>/gi,
+        /<i>(.*?)<\/i>/gi,
+        /<lookup\s+def="[^"]*">(.*?)<\/lookup>/gi
+    ];
+
+    let sanitized = text;
+
+    // Preserve allowed tags with placeholders
+    allowedTagPatterns.forEach((pattern, index) => {
+        sanitized = sanitized.replace(pattern, (match) => {
+            preservedTags.push(match);
+            return `__PRESERVED_TAG_${preservedTags.length - 1}__`;
+        });
+    });
+
+    // Remove all remaining HTML tags (potentially dangerous ones like <script>, <iframe>, etc.)
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+    // Restore preserved tags
+    preservedTags.forEach((tag, index) => {
+        sanitized = sanitized.replace(`__PRESERVED_TAG_${index}__`, tag);
+    });
+
+    return sanitized;
+}
+
+/**
+ * Parse custom HTML-like tags for text formatting
+ * Converts safe custom tags to styled spans
+ * Includes XSS protection via sanitization
+ */
+function parseFormattedText(text) {
+    if (!text) return text;
+
+    // Sanitize first to remove any dangerous HTML
+    let formatted = sanitizeHTML(text);
+
+    // <color1>text</color1> -> orange accent color
+    formatted = formatted.replace(/<color1>(.*?)<\/color1>/gi, '<span class="text-color1">$1</span>');
+
+    // <color2>text</color2> -> teal/blue secondary color
+    formatted = formatted.replace(/<color2>(.*?)<\/color2>/gi, '<span class="text-color2">$1</span>');
+
+    // <color3>text</color3> -> plum/purple color (#6B5C8A)
+    formatted = formatted.replace(/<color3>(.*?)<\/color3>/gi, '<span class="text-color3">$1</span>');
+
+    // <mark>text</mark> -> golden yellow highlight background
+    formatted = formatted.replace(/<mark>(.*?)<\/mark>/gi, '<span class="text-mark">$1</span>');
+
+    // <strong>text</strong> or <b>text</b> -> bold text
+    formatted = formatted.replace(/<strong>(.*?)<\/strong>/gi, '<strong>$1</strong>');
+    formatted = formatted.replace(/<b>(.*?)<\/b>/gi, '<strong>$1</strong>');
+
+    // <em>text</em> or <i>text</i> -> italic text
+    formatted = formatted.replace(/<em>(.*?)<\/em>/gi, '<em>$1</em>');
+    formatted = formatted.replace(/<i>(.*?)<\/i>/gi, '<em>$1</em>');
+
+    // <lookup def="definition">word</lookup> -> clickable orange underlined word
+    formatted = formatted.replace(
+        /<lookup\s+def="([^"]*)">(.*?)<\/lookup>/gi,
+        '<span class="text-lookup" data-definition="$1" onclick="showLookupTooltip(this, event)">$2</span>'
+    );
+
+    return formatted;
+}
+
+function parseSummaryWithBullets(text) {
+    if (!text) return '';
+
+    // Split by <br> tags
+    const lines = text.split(/<br\s*\/?>/gi);
+
+    // If only one line (no <br> tags), return as single bullet
+    if (lines.length === 1) {
+        return `<div class="summary-bullet-item">
+            <span class="summary-bullet-icon">✦</span>
+            <span class="summary-bullet-text">${parseFormattedText(lines[0].trim())}</span>
+        </div>`;
+    }
+
+    // Multiple lines - create bullet for each non-empty line
+    return lines
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => `<div class="summary-bullet-item">
+            <span class="summary-bullet-icon">✦</span>
+            <span class="summary-bullet-text">${parseFormattedText(line)}</span>
+        </div>`)
+        .join('');
+}
+
+// ==========================================
+// Theme
+// ==========================================
+
+function applyTheme() {
+    if (state.theme === 'light') {
+        document.documentElement.classList.add('light-mode');
+    } else {
+        document.documentElement.classList.remove('light-mode');
+    }
+}
+
+function toggleTheme() {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    applyTheme();
+    saveToStorage();
+    triggerHaptic('light');
+    trackThemeChanged(state.theme);
+}
+
+// ==========================================
+// Loading State
+// ==========================================
+
+function showLoading(show, customText = null) {
+    state.isLoading = show;
+    elements.loadingState.classList.toggle('visible', show);
+
+    // Update loading text if provided, otherwise reset to default
+    if (elements.loadingText) {
+        if (show && customText) {
+            elements.loadingText.textContent = customText;
+        } else if (!show) {
+            // Reset to default when hiding
+            elements.loadingText.textContent = "Loading today's stories...";
+        }
+    }
+}
+
+// ==========================================
+// Card Rendering
+// ==========================================
+
+function renderCards() {
+    elements.cardContainer.innerHTML = '';
+
+    // Check if no stories
+    if (state.stories.length === 0) {
+        elements.noStoriesState.style.display = 'flex';
+        elements.noStoriesState.classList.add('visible');
+        if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
+        return;
+    }
+
+    elements.noStoriesState.style.display = 'none';
+    elements.noStoriesState.classList.remove('visible');
+    if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
+
+    // Check if completed
+    if (state.currentIndex >= state.totalStories) {
+        showCompletion();
+        return;
+    }
+
+    // RENDER PREVIOUS CARD (off-screen left) for progressive animation
+    if (state.currentIndex > 0) {
+        const prevStory = state.stories[state.currentIndex - 1];
+        const prevCard = createCardElement(prevStory, -1);
+        prevCard.dataset.cardType = 'prev';
+        elements.cardContainer.appendChild(prevCard);
+    }
+
+    // RENDER CURRENT CARD
+    const currentStory = state.stories[state.currentIndex];
+    const currentCard = createCardElement(currentStory, 0);
+    currentCard.dataset.cardType = 'current';
+    elements.cardContainer.appendChild(currentCard);
+    setupCardInteractions(currentCard, currentStory);
+
+    // RENDER NEXT CARD (off-screen right) for progressive animation
+    if (state.currentIndex < state.totalStories - 1) {
+        const nextStory = state.stories[state.currentIndex + 1];
+        const nextCard = createCardElement(nextStory, 1);
+        nextCard.dataset.cardType = 'next';
+        elements.cardContainer.appendChild(nextCard);
+    }
+
+    // Update prev button visibility
+    updatePrevButtonVisibility();
+}
+
+function createCardElement(story, position) {
+    const card = document.createElement('div');
+    card.className = 'story-card';
+    card.dataset.id = story.id;
+    card.dataset.position = position;
+    card.dataset.flipped = 'false';
+
+    // Banner image
+    let bannerHTML = '';
+    if (story.imageUrl) {
+        bannerHTML = `
+            <div class="card-banner">
+                <img src="${story.imageUrl}" alt="" onerror="this.parentElement.innerHTML='<span class=card-banner-placeholder>${story.emoji}</span>'">
+            </div>
+        `;
+    } else {
+        bannerHTML = `
+            <div class="card-banner">
+                <span class="card-banner-placeholder">${story.emoji}</span>
+            </div>
+        `;
+    }
+
+    // Use teaser from story, or placeholder if empty
+    const teaserText = story.teaser || "This is placeholder teaser text for the story. It should span approximately five lines to show how the expanded subheading area will look with real content from your Google Sheet.";
+
+    // Parse summary for display on back face
+    const summaryText = story.summary || story.teaser || '';
+    const summaryHTML = parseFormattedText(summaryText);
+
+    // Check if user has flipped before (for "Tap to flip" hint)
+    const hasFlippedBefore = localStorage.getItem('fyi_has_flipped') === 'true';
+    const flipHintClass = hasFlippedBefore ? 'hidden' : '';
+
+    // Determine disabled state for prev/next based on position
+    // CRITICAL: Always show ALL buttons, use 'disabled' class for inactive ones
+    // This preserves CSS Grid spacing and prevents alignment bugs
+    const isFirstStory = state.currentIndex === 0;
+    const isLastStory = state.currentIndex >= state.totalStories - 1;
+
+    card.innerHTML = `
+        <div class="card-flipper">
+            <!-- FRONT FACE (Headline) -->
+            <div class="card-face card-front">
+                <div class="card-swipe-overlay left"></div>
+                <div class="card-swipe-overlay right"></div>
+                ${bannerHTML}
+                <div class="card-body">
+                    <h2 class="card-headline">${parseFormattedText(story.headline)}</h2>
+                    <p class="card-teaser">${parseFormattedText(teaserText)}</p>
+                </div>
+                <!-- Bottom Navigation Hints - ALWAYS show all 3 for grid alignment -->
+                <div class="card-nav-hints">
+                    <span class="nav-hint nav-hint-prev ${isFirstStory ? 'disabled' : ''}" data-action="prev">← Prev</span>
+                    <span class="nav-hint nav-hint-center" data-action="flip">Read ahead ↑</span>
+                    <span class="nav-hint nav-hint-next ${isLastStory ? 'disabled' : ''}" data-action="next">Next →</span>
+                </div>
+            </div>
+
+            <!-- BACK FACE (Summary) -->
+            <div class="card-face card-back">
+                <div class="card-swipe-overlay left"></div>
+                <div class="card-swipe-overlay right"></div>
+                <div class="card-back-content">
+                    <h3 class="card-back-header">Summary</h3>
+                    <div class="card-summary-text">${summaryHTML}</div>
+                </div>
+                <!-- Summary face: subtle hint to swipe up for questions -->
+                <div class="card-nav-hints card-nav-hints-summary">
+                    <span class="nav-hint nav-hint-center-subtle">↑</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Q&A CARD - slides up from bottom of story card -->
+        <div class="qa-card" data-story-id="${story.id}">
+            <p class="qa-prompt">Are you curious about:</p>
+            <div class="qa-questions-list">
+                <!-- Questions injected by populateQACard() -->
+            </div>
+        </div>
+
+        <!-- ANSWER CARD - slides up when question is clicked -->
+        <div class="answer-card" data-story-id="${story.id}">
+            <div class="answer-header">
+                <span class="answer-label">✦</span>
+                <p class="answer-question-text"></p>
+            </div>
+            <div class="answer-body">
+                <p class="answer-text"></p>
+            </div>
+            <div class="answer-rating">
+                <p class="rating-label">Was this helpful?</p>
+                <div class="rating-stars">
+                    <button class="rating-star" data-value="1">★</button>
+                    <button class="rating-star" data-value="2">★</button>
+                    <button class="rating-star" data-value="3">★</button>
+                    <button class="rating-star" data-value="4">★</button>
+                    <button class="rating-star" data-value="5">★</button>
+                </div>
+            </div>
+            <div class="answer-footer">
+                <button class="answer-done-btn">Done</button>
+                <button class="answer-dig-deeper-btn">Dig Deeper</button>
+            </div>
+        </div>
+
+        <!-- DIG DEEPER Q&A CARD - slides up when Dig Deeper is clicked -->
+        <div class="dig-deeper-qa-card" data-story-id="${story.id}">
+            <div class="dig-deeper-header">
+                <h2 class="dig-deeper-headline">Dig deeper</h2>
+                <p class="dig-deeper-subheading">Curiosity never killed the cat</p>
+            </div>
+            <div class="dig-deeper-questions-list">
+                <!-- Dig Deeper questions injected by populateDigDeeperQACard() -->
+            </div>
+            <div class="dig-deeper-footer">
+                <button class="back-to-headline-link">Back to headline</button>
+            </div>
+        </div>
+
+        <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
+        <div class="dig-deeper-answer-card" data-story-id="${story.id}">
+            <div class="answer-header">
+                <span class="answer-label">✦</span>
+                <p class="answer-question-text"></p>
+            </div>
+            <div class="answer-body">
+                <p class="answer-text"></p>
+            </div>
+            <div class="answer-rating">
+                <p class="rating-label">Was this helpful?</p>
+                <div class="rating-stars">
+                    <button class="rating-star" data-value="1">★</button>
+                    <button class="rating-star" data-value="2">★</button>
+                    <button class="rating-star" data-value="3">★</button>
+                    <button class="rating-star" data-value="4">★</button>
+                    <button class="rating-star" data-value="5">★</button>
+                </div>
+            </div>
+            <div class="answer-footer">
+                <button class="answer-done-btn">Done</button>
+            </div>
+        </div>
+    `;
+
+    if (position === 0) {
+        setupCardInteractions(card, story);
+    }
+
+    return card;
+}
+
+// Flip card function - manages headline/summary flip AND Q&A peek state
+function flipCard(card, story) {
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (isFlipped) {
+        // Flip back to front (headline)
+        card.classList.remove('flipped');
+        card.dataset.flipped = 'false';
+        trackCardFlip(story.headline, 'to_front');
+
+        // CRITICAL: Hide Q&A card when returning to headline
+        setQACardState(QA_STATES.HIDDEN);
+    } else {
+        // Flip to back (summary)
+        card.classList.add('flipped');
+        card.dataset.flipped = 'true';
+        trackCardFlip(story.headline, 'to_summary');
+
+        // CRITICAL: Show Q&A card peeking when summary is visible
+        // First populate Q&A content, then show peek
+        populateQACard(story);
+        setQACardState(QA_STATES.PEEKING);
+
+        // Hide the "Tap to flip" hint permanently after first flip
+        if (localStorage.getItem('fyi_has_flipped') !== 'true') {
+            localStorage.setItem('fyi_has_flipped', 'true');
+            document.querySelectorAll('.nav-flip').forEach(hint => {
+                hint.classList.add('hidden');
+            });
+        }
+    }
+}
+
+/**
+ * Populate Q&A card with story questions
+ * Called when flipping to summary to prepare the peek state
+ * Q&A card is now INSIDE the story card element
+ */
+function populateQACard(story) {
+    if (!story || !story.questions) return;
+
+    state.currentStory = story;
+
+    // Find the Q&A card INSIDE the current story card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const qaCard = currentCard.querySelector('.qa-card');
+    const questionsList = currentCard.querySelector('.qa-questions-list');
+    if (!questionsList) return;
+
+    questionsList.innerHTML = '';
+
+    // For FAQs, only show first 3 questions
+    const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
+
+    questionsToShow.forEach((q, index) => {
+        const button = document.createElement('button');
+        button.className = 'qa-question-btn';
+        button.innerHTML = `
+            <span class="qa-question-label">✦</span>
+            <span class="qa-question-text">${parseFormattedText(q.text)}</span>
+        `;
+        button.addEventListener('click', () => {
+            triggerHaptic('light');
+            // Use new Answer Card system instead of legacy modal
+            showAnswerCard(index);
+        });
+        questionsList.appendChild(button);
+    });
+
+    // Add skip button
+    const skipButton = document.createElement('button');
+    skipButton.className = 'qa-question-btn skip';
+    const skipText = story.isFAQ ? 'Skip this FAQ' : 'Skip this story';
+    skipButton.innerHTML = `
+        <span class="qa-question-label">✦</span>
+        <span class="qa-question-text">${skipText}</span>
+    `;
+    skipButton.addEventListener('click', () => {
+        triggerHaptic('light');
+        trackQuestionsSkipped(story.headline);
+        // Return to headline and go to next story
+        setQACardState(QA_STATES.HIDDEN);
+        const card = document.querySelector('.story-card[data-card-type="current"]');
+        if (card) {
+            card.classList.remove('flipped');
+            card.dataset.flipped = 'false';
+        }
+        state.cardLayer = 'headline';
+        state.isCardFlipped = false;
+        setTimeout(() => nextCard(), 300);
+    });
+    questionsList.appendChild(skipButton);
+
+    // Also populate legacy modal for Answer/Dig Deeper views
+    if (elements.modalEmoji) elements.modalEmoji.textContent = story.emoji || '✦';
+    if (elements.modalHeadline) elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
+}
+
+function setupCardInteractions(card, story) {
+    // Touch events for swiping - NEW NAVIGATION SYSTEM
+    card.addEventListener('touchstart', (e) => handleDragStart(e, card, story), { passive: true });
+    card.addEventListener('touchmove', (e) => handleDragMove(e, card), { passive: false });
+    card.addEventListener('touchend', (e) => handleDragEnd(e, card, story));
+
+    // Mouse events for desktop swiping
+    card.addEventListener('mousedown', (e) => handleDragStart(e, card, story));
+    card.addEventListener('mousemove', (e) => handleDragMove(e, card));
+    card.addEventListener('mouseup', (e) => handleDragEnd(e, card, story));
+    card.addEventListener('mouseleave', (e) => {
+        if (state.isDragging) handleDragEnd(e, card, story);
+    });
+
+    // Setup click handlers for nav hints
+    setupNavHintClickHandlers(card, story);
+
+    // Setup Q&A card click handler (tap to expand from peeking state)
+    setupQACardClickHandler(card);
+
+    // Setup Answer card button handlers
+    setupAnswerCardButtons(card);
+
+    // Setup Dig Deeper Answer card button handlers
+    setupDigDeeperAnswerCardButtons(card);
+
+    // Setup Dig Deeper Q&A card button handlers (Back to headline)
+    setupDigDeeperQACardButtons(card);
+
+    // Setup rating star handlers
+    setupRatingStars(card);
+}
+
+/**
+ * Setup click handlers for Dig Deeper Q&A card (Back to headline)
+ */
+function setupDigDeeperQACardButtons(card) {
+    const digDeeperQACard = card.querySelector('.dig-deeper-qa-card');
+    if (!digDeeperQACard) return;
+
+    const backToHeadlineBtn = digDeeperQACard.querySelector('.back-to-headline-link');
+
+    if (backToHeadlineBtn) {
+        backToHeadlineBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            // Reset ALL card states and return to headline
+            backToHeadline();
+        });
+    }
+}
+
+/**
+ * Return all the way back to headline from any depth
+ */
+function backToHeadline() {
+    console.log('[backToHeadline] Returning to headline from deep state');
+
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    // Hide all overlay cards
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    const answerCard = currentCard.querySelector('.answer-card');
+    const qaCard = currentCard.querySelector('.qa-card');
+
+    if (digDeeperAnswerCard) {
+        digDeeperAnswerCard.classList.remove('active');
+        digDeeperAnswerCard.style.transform = '';
+    }
+    if (digDeeperQACard) {
+        digDeeperQACard.classList.remove('active');
+        digDeeperQACard.style.transform = '';
+    }
+    if (answerCard) {
+        answerCard.classList.remove('active');
+        answerCard.style.transform = '';
+    }
+
+    // Hide Q&A card
+    setQACardState(QA_STATES.HIDDEN);
+    if (qaCard) {
+        qaCard.style.transform = '';
+    }
+
+    // Flip card back to headline
+    currentCard.classList.remove('flipped');
+    currentCard.dataset.flipped = 'false';
+
+    // Reset state
+    state.cardLayer = 'headline';
+    state.isCardFlipped = false;
+    state.currentQuestionIndex = null;
+    state.currentDigDeeperQuestionIndex = null;
+}
+
+/**
+ * Setup click handlers for Answer card buttons (Done and Dig Deeper)
+ */
+function setupAnswerCardButtons(card) {
+    const answerCard = card.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    const doneBtn = answerCard.querySelector('.answer-done-btn');
+    const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
+
+    if (doneBtn) {
+        doneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            hideAnswerCard();
+        });
+    }
+
+    if (digDeeperBtn) {
+        digDeeperBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            showDigDeeperQACard();
+        });
+    }
+}
+
+/**
+ * Setup click handlers for Dig Deeper Answer card buttons (Done only)
+ */
+function setupDigDeeperAnswerCardButtons(card) {
+    const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    const doneBtn = digDeeperAnswerCard.querySelector('.answer-done-btn');
+
+    if (doneBtn) {
+        doneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            hideDigDeeperAnswerCard();
+        });
+    }
+}
+
+/**
+ * Setup rating star click handlers for both answer cards
+ */
+function setupRatingStars(card) {
+    // Answer Card stars
+    const answerCard = card.querySelector('.answer-card');
+    if (answerCard) {
+        const stars = answerCard.querySelectorAll('.rating-star');
+        stars.forEach(star => {
+            star.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleStarClick(star, answerCard);
+            });
+        });
+    }
+
+    // Dig Deeper Answer Card stars
+    const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
+    if (digDeeperAnswerCard) {
+        const stars = digDeeperAnswerCard.querySelectorAll('.rating-star');
+        stars.forEach(star => {
+            star.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleStarClick(star, digDeeperAnswerCard);
+            });
+        });
+    }
+}
+
+/**
+ * Handle star click - highlight clicked star and all before it
+ */
+function handleStarClick(clickedStar, cardElement) {
+    const value = parseInt(clickedStar.dataset.value);
+    const stars = cardElement.querySelectorAll('.rating-star');
+
+    stars.forEach(star => {
+        const starValue = parseInt(star.dataset.value);
+        if (starValue <= value) {
+            star.classList.add('active');
+        } else {
+            star.classList.remove('active');
+        }
+    });
+
+    triggerHaptic('light');
+
+    // Track the rating (for analytics)
+    if (state.currentQuestion) {
+        trackAnswerRated(state.currentStory?.headline, state.currentQuestion.text, value);
+    }
+}
+
+/**
+ * Setup click handler for Q&A card inside story card
+ * Tapping the peeking Q&A card activates it to full view
+ */
+function setupQACardClickHandler(card) {
+    const qaCard = card.querySelector('.qa-card');
+    if (!qaCard) return;
+
+    qaCard.addEventListener('click', (e) => {
+        // Only activate from PEEKING state (not when already active)
+        if (state.qaCardState === QA_STATES.PEEKING) {
+            e.stopPropagation();
+            triggerHaptic('light');
+            state.cardLayer = 'questions';
+            setQACardState(QA_STATES.ACTIVE);
+            setupQACardSwipe(); // Setup swipe-down to dismiss
+        }
+        // If already ACTIVE, let normal click propagation happen (question buttons)
+    });
+}
+
+// Click handlers for nav hints
+// CRITICAL: Check for 'disabled' class (not 'hidden') - disabled buttons stay in grid but don't work
+function setupNavHintClickHandlers(card, story) {
+    const prevHint = card.querySelector('.nav-hint-prev');
+    const centerHint = card.querySelector('.nav-hint-center');
+    const nextHint = card.querySelector('.nav-hint-next');
+
+    // Prev button - only active if NOT disabled
+    if (prevHint && !prevHint.classList.contains('disabled')) {
+        prevHint.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            handleSwipeLeft(card, story);
+        });
+    }
+
+    // Center button (flip/read ahead) - always active
+    if (centerHint) {
+        centerHint.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            handleSwipeUp(card, story);
+        });
+    }
+
+    // Next button - only active if NOT disabled
+    if (nextHint && !nextHint.classList.contains('disabled')) {
+        nextHint.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            handleSwipeRight(card, story);
+        });
+    }
+}
+
+// ==========================================
+// NEW SWIPE MECHANICS (Part 1 Implementation)
+// ==========================================
+// Left swipe = Previous story (navigate to prev story headline)
+// Right swipe = Next story (navigate to next story headline)
+// Swipe up = Flip card / Reveal next layer (headline->summary->questions)
+// Swipe down = Return to previous layer (questions->summary->headline)
+// ==========================================
+
+function handleDragStart(e, card, story) {
+    state.isDragging = true;
+    state.isLongPress = false;
+    state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    state.startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    state.currentX = 0;
+    state.currentY = 0;
+    state.swipeStartTime = Date.now();
+    card.classList.add('dragging');
+    hideSwipeHint();
+}
+
+// Legacy function kept for compatibility
+function clearLongPressTimer() {
+    // No-op: long press timer removed
+}
+
+function handleDragMove(e, card) {
+    if (!state.isDragging) return;
+
+    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+    const deltaX = clientX - state.startX;
+    const deltaY = clientY - state.startY;
+
+    state.currentX = deltaX;
+    state.currentY = deltaY;
+
+    // Determine dominant axis
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+
+    if (isHorizontal) {
+        // Horizontal swipe - apply card transform
+        if (e.type === 'touchmove' && Math.abs(deltaX) > 10) {
+            e.preventDefault();
+        }
+
+        const rotation = deltaX * 0.03; // Reduced rotation for subtler effect
+        const scale = Math.max(0.97, 1 - Math.abs(deltaX) * 0.0001);
+
+        card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg) scale(${scale})`;
+
+        // Show visual indicators for swipe direction
+        card.classList.toggle('swiping-left', deltaX < -20);
+        card.classList.toggle('swiping-right', deltaX > 20);
+
+        // PROGRESSIVE REVEAL: Animate adjacent card proportionally during drag
+        const screenWidth = window.innerWidth;
+        const dragProgress = Math.min(Math.abs(deltaX) / (screenWidth * 0.35), 1);
+
+        if (deltaX < 0) {
+            // Swiping LEFT (toward NEXT story)
+            const nextCard = document.querySelector('.story-card[data-card-type="next"]');
+            if (nextCard) {
+                const nextOffset = 110 - (dragProgress * 110);
+                const nextOpacity = 0.7 + (dragProgress * 0.3);
+                nextCard.style.transform = `translateX(${nextOffset}%)`;
+                nextCard.style.opacity = nextOpacity;
+                nextCard.style.transition = 'none';
+            }
+        } else {
+            // Swiping RIGHT (toward PREV story)
+            const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
+            if (prevCard) {
+                const prevOffset = -110 + (dragProgress * 110);
+                const prevOpacity = 0.7 + (dragProgress * 0.3);
+                prevCard.style.transform = `translateX(${prevOffset}%)`;
+                prevCard.style.opacity = prevOpacity;
+                prevCard.style.transition = 'none';
+            }
+        }
+    } else {
+        // Vertical swipe - apply vertical transform
+        if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
+            e.preventDefault();
+        }
+
+        // Limit vertical drag distance
+        const constrainedY = Math.max(-100, Math.min(100, deltaY));
+        const scale = Math.max(0.97, 1 - Math.abs(constrainedY) * 0.0003);
+
+        card.style.transform = `translateY(${constrainedY * 0.5}px) scale(${scale})`;
+
+        card.classList.toggle('swiping-up', deltaY < -20);
+        card.classList.toggle('swiping-down', deltaY > 20);
+    }
+}
+
+function handleDragEnd(e, card, story) {
+    if (!state.isDragging) return;
+
+    state.isDragging = false;
+    card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down');
+
+    const deltaX = state.currentX;
+    const deltaY = state.currentY;
+    const swipeDuration = Date.now() - state.swipeStartTime;
+
+    // NEW: Detect TAP (minimal movement, quick touch) - Instagram style
+    const isTap = Math.abs(deltaX) < 15 && Math.abs(deltaY) < 15 && swipeDuration < 300;
+
+    if (isTap) {
+        handleTapZone(e, card, story);
+        snapCardBack(card);
+        state.currentX = 0;
+        state.currentY = 0;
+        return;
+    }
+
+    // Calculate velocity (px/ms)
+    const velocityX = Math.abs(deltaX) / swipeDuration;
+    const velocityY = Math.abs(deltaY) / swipeDuration;
+
+    // Determine dominant axis
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    const isVertical = Math.abs(deltaY) > Math.abs(deltaX);
+
+    // Check if swipe meets threshold (distance OR velocity)
+    const meetsHorizontalThreshold = Math.abs(deltaX) > state.dragThreshold || velocityX > state.swipeVelocityThreshold;
+    const meetsVerticalThreshold = Math.abs(deltaY) > state.dragThreshold || velocityY > state.swipeVelocityThreshold;
+
+    if (isHorizontal && meetsHorizontalThreshold) {
+        // HORIZONTAL SWIPE: left/right navigation
+        triggerHaptic('light');
+
+        if (deltaX < 0) {
+            // LEFT SWIPE = Next story (swipe toward next)
+            handleSwipeRight(card, story);
+        } else {
+            // RIGHT SWIPE = Previous story (swipe toward prev)
+            handleSwipeLeft(card, story);
+        }
+    } else if (isVertical && meetsVerticalThreshold) {
+        // VERTICAL SWIPE: layer navigation
+        triggerHaptic('light');
+
+        if (deltaY < 0) {
+            // SWIPE UP = Reveal next layer
+            handleSwipeUp(card, story);
+        } else {
+            // SWIPE DOWN = Return to previous layer
+            handleSwipeDown(card, story);
+        }
+    } else {
+        // Small drag or tap: snap back
+        snapCardBack(card);
+    }
+
+    state.currentX = 0;
+    state.currentY = 0;
+}
+
+/**
+ * Handle TAP based on screen position - Instagram style
+ * Left 1/3 = Previous story
+ * Center 1/3 = Flip card / Reveal
+ * Right 1/3 = Next story
+ */
+function handleTapZone(e, card, story) {
+    const tapX = e.type.includes('touch')
+        ? (e.changedTouches ? e.changedTouches[0].clientX : state.startX)
+        : e.clientX;
+
+    const screenWidth = window.innerWidth;
+    const leftThird = screenWidth / 3;
+    const rightThird = screenWidth * 2 / 3;
+
+    if (tapX < leftThird) {
+        // LEFT THIRD = Previous story
+        triggerHaptic('light');
+        handleSwipeLeft(card, story);
+    } else if (tapX > rightThird) {
+        // RIGHT THIRD = Next story
+        triggerHaptic('light');
+        handleSwipeRight(card, story);
+    } else {
+        // CENTER THIRD = Flip card / Reveal (same as swipe up)
+        triggerHaptic('light');
+        handleSwipeUp(card, story);
+    }
+}
+
+/**
+ * Handle LEFT swipe = Navigate to PREVIOUS story
+ * CRITICAL: Only works from headline/summary, NOT from Q&A/answer
+ */
+function handleSwipeLeft(card, story) {
+    // Block story navigation from Q&A or deeper views
+    if (state.cardLayer === 'questions' ||
+        state.cardLayer === 'answer' ||
+        state.cardLayer === 'dig-deeper-qa' ||
+        state.cardLayer === 'dig-deeper-answer') {
+        snapCardBack(card);
+        return;
+    }
+
+    if (state.currentIndex <= 0) {
+        // Already at first story - bounce back
+        showToast('', "You're at the first story");
+        snapCardBack(card);
+        return;
+    }
+
+    // Track the navigation
+    trackEvent('Story Swiped', { direction: 'prev', from: state.currentIndex + 1, to: state.currentIndex });
+
+    // CRITICAL: Reset ALL card states before navigating
+    resetAllCardStates();
+
+    // Navigate to previous story (always to headline, not summary)
+    prevCard();
+}
+
+/**
+ * Handle RIGHT swipe = Navigate to NEXT story
+ * CRITICAL: Only works from headline/summary, NOT from Q&A/answer/dig-deeper
+ */
+function handleSwipeRight(card, story) {
+    // Block story navigation from Q&A or deeper views
+    if (state.cardLayer === 'questions' ||
+        state.cardLayer === 'answer' ||
+        state.cardLayer === 'dig-deeper-qa' ||
+        state.cardLayer === 'dig-deeper-answer') {
+        snapCardBack(card);
+        return;
+    }
+
+    if (state.currentIndex >= state.totalStories - 1) {
+        // At last story - show completion or bounce
+        if (!elements.completionScreen.classList.contains('visible')) {
+            showCompletion();
+        } else {
+            showToast('', "You've seen all stories");
+            snapCardBack(card);
+        }
+        return;
+    }
+
+    // Track the navigation
+    trackEvent('Story Swiped', { direction: 'next', from: state.currentIndex + 1, to: state.currentIndex + 2 });
+
+    // CRITICAL: Reset ALL card states before navigating
+    resetAllCardStates();
+
+    // Navigate to next story (always to headline)
+    nextCard();
+}
+
+/**
+ * Handle SWIPE UP = Reveal next layer
+ * From headline -> flip to summary (Q&A peeks)
+ * From summary -> Q&A becomes active (from peeking to active)
+ */
+function handleSwipeUp(card, story) {
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (!isFlipped) {
+        // Currently on HEADLINE - flip to SUMMARY
+        // flipCard will also set Q&A to PEEKING state
+        flipCard(card, story);
+        state.isCardFlipped = true;
+        state.cardLayer = 'summary';
+    } else {
+        // Currently on SUMMARY with Q&A peeking
+        // Transition Q&A from PEEKING to ACTIVE
+        state.cardLayer = 'questions';
+        setQACardState(QA_STATES.ACTIVE);
+        setupQACardSwipe(); // Setup swipe-down to dismiss
+    }
+}
+
+/**
+ * Handle SWIPE DOWN = Return to previous layer
+ * From Q&A/Answer/etc -> handled by their own swipe handlers, do nothing here
+ * From summary -> flip back to headline
+ * From headline -> do nothing (already at top)
+ */
+function handleSwipeDown(card, story) {
+    // CRITICAL: If we're in Q&A or deeper layers, their own handlers manage swipe down
+    // Do NOT flip the card - just snap back and let the layer handler do its job
+    if (state.cardLayer === 'questions' ||
+        state.cardLayer === 'answer' ||
+        state.cardLayer === 'dig-deeper-qa' ||
+        state.cardLayer === 'dig-deeper-answer') {
+        snapCardBack(card);
+        return;
+    }
+
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (isFlipped && state.cardLayer === 'summary') {
+        // Currently on SUMMARY - flip back to HEADLINE
+        flipCard(card, story);
+        state.isCardFlipped = false;
+        state.cardLayer = 'headline';
+        // Also hide Q&A card completely when going back to headline
+        setQACardState(QA_STATES.HIDDEN);
+    } else {
+        // Already on HEADLINE - bounce back, nothing to do
+        snapCardBack(card);
+    }
+}
+
+/**
+ * Snap card back to original position with spring animation
+ */
+function snapCardBack(card) {
+    card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+    card.style.transform = 'translateX(0) translateY(0) rotate(0) scale(1)';
+
+    // Reset adjacent cards to their off-screen positions
+    const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
+    const nextCard = document.querySelector('.story-card[data-card-type="next"]');
+
+    if (prevCard) {
+        prevCard.style.transition = 'transform 300ms ease, opacity 300ms ease';
+        prevCard.style.transform = 'translateX(-110%)';
+        prevCard.style.opacity = '0.7';
+    }
+
+    if (nextCard) {
+        nextCard.style.transition = 'transform 300ms ease, opacity 300ms ease';
+        nextCard.style.transform = 'translateX(110%)';
+        nextCard.style.opacity = '0.7';
+    }
+
+    setTimeout(() => {
+        card.style.transition = '';
+        if (prevCard) prevCard.style.transition = '';
+        if (nextCard) nextCard.style.transition = '';
+    }, 300);
+}
+
+/**
+ * Open Questions card with push-from-bottom transition
+ * This is called when user swipes up from Summary card
+ * Q&A card pushes up to replace Summary (like PowerPoint slide)
+ */
+function openQuestionsWithPushTransition(story) {
+    // Push current state to modal stack
+    state.modalStack.push({ type: 'summary', storyId: story.id });
+
+    // Update state
+    state.currentStory = story;
+    state.cardLayer = 'questions';
+
+    // Set initial position for Q&A card (below viewport)
+    elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
+
+    // Open the Q&A card with push transition
+    elements.modalBackdrop.classList.add('push-transition');
+    openModal(story);
+
+    // Remove transition class after animation
+    setTimeout(() => {
+        elements.modalBackdrop.classList.remove('push-transition');
+    }, 400);
+}
+
+function animateCardExit(card, direction, callback) {
+    const swipeDuration = Date.now() - state.swipeStartTime;
+    const velocity = Math.abs(state.currentX) / swipeDuration;
+
+    // Faster swipe = faster animation (150-350ms range)
+    const exitDuration = Math.max(150, Math.min(350, 250 / (velocity + 0.3)));
+
+    const exitX = direction === 'left' ? '-110%' : '110%';
+
+    card.classList.add('exiting');
+    card.style.transition = `transform ${exitDuration}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${exitDuration}ms ease-out`;
+    card.style.transform = `translateX(${exitX})`;
+    card.style.opacity = '0';
+
+    // Animate incoming card to center position
+    const incomingCard = direction === 'left'
+        ? document.querySelector('.story-card[data-card-type="next"]')
+        : document.querySelector('.story-card[data-card-type="prev"]');
+
+    if (incomingCard) {
+        incomingCard.style.transition = `transform ${exitDuration}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${exitDuration}ms ease-out`;
+        incomingCard.style.transform = 'translateX(0)';
+        incomingCard.style.opacity = '1';
+    }
+
+    setTimeout(() => {
+        card.style.transition = '';
+        if (callback) callback();
+    }, exitDuration);
+}
+
+// Legacy function - kept for compatibility but now simplified
+function animateCardExitWithModal(card, direction, callback, story) {
+    // For new swipe mechanics, modal is opened via swipe up
+    // This function now just opens the modal directly
+    openModal(story);
+    if (callback) callback();
+}
+
+// ==========================================
+// Card Navigation
+// ==========================================
+
+function nextCard() {
+    // Reset card layer state for new navigation
+    state.isCardFlipped = false;
+    state.cardLayer = 'headline';
+
+    // Mark current story as viewed
+    if (state.stories[state.currentIndex]) {
+        state.viewedStories.push(state.stories[state.currentIndex].id);
+    }
+
+    state.currentIndex++;
+    saveToStorage();
+
+    if (state.currentIndex >= state.totalStories) {
+        showCompletion();
+    } else {
+        updateProgress();
+        renderProgressDots();
+        renderCards();
+        updatePrevButtonVisibility();
+    }
+}
+
+function prevCard() {
+    // Reset card layer state for new navigation
+    state.isCardFlipped = false;
+    state.cardLayer = 'headline';
+
+    // If on completion screen, clear it first and show last story
+    if (elements.completionScreen.classList.contains('visible')) {
+        elements.completionScreen.classList.remove('visible');
+        // Restore history toggle if present
+        if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
+        // Decrement to show last story
+        if (state.currentIndex > 0) {
+            state.currentIndex--;
+        } else {
+            // If at index 0, we need to go to last story (totalStories - 1)
+            state.currentIndex = Math.max(0, state.totalStories - 1);
+        }
+        saveToStorage();
+        updateProgress();
+        renderProgressDots();
+        renderCards();
+        updatePrevButtonVisibility();
+        triggerHaptic('light');
+        return;
+    }
+
+    // Normal prev card navigation
+    if (state.currentIndex > 0) {
+        state.currentIndex--;
+        saveToStorage();
+        updateProgress();
+        renderProgressDots();
+        renderCards();
+        updatePrevButtonVisibility();
+        triggerHaptic('light');
+    }
+}
+
+function updatePrevButtonVisibility() {
+    if (elements.prevStoryBtn) {
+        // Hide prev button on first story, unless we came from completion screen
+        const shouldHide = state.currentIndex === 0 && !state.cameFromCompletion && !state.inRecapView;
+        elements.prevStoryBtn.classList.toggle('hidden', shouldHide);
+    }
+}
+
+// Show prev button when navigating from completion screen to history/recap
+function updatePrevButtonForCompletionNav() {
+    if (elements.prevStoryBtn && state.cameFromCompletion) {
+        elements.prevStoryBtn.classList.remove('hidden');
+    }
+}
+
+function updateProgress() {
+    if (state.totalStories === 0) {
+        elements.progressFill.style.width = '0%';
+        return;
+    }
+    const progress = ((state.currentIndex + 1) / state.totalStories) * 100;
+    elements.progressFill.style.width = `${Math.min(progress, 100)}%`;
+}
+
+function renderProgressDots() {
+    if (state.totalStories === 0) {
+        elements.progressDots.innerHTML = '';
+        return;
+    }
+
+    let dotsHTML = '';
+    for (let i = 0; i < state.totalStories; i++) {
+        let className = 'progress-dot';
+        if (i === state.currentIndex) {
+            className += ' active';
+        } else if (i < state.currentIndex) {
+            className += ' viewed';
+        }
+        dotsHTML += `<div class="${className}"></div>`;
+    }
+    elements.progressDots.innerHTML = dotsHTML;
+}
+
+function showCompletion() {
+    elements.cardContainer.innerHTML = '';
+    elements.completionScreen.classList.add('visible');
+    elements.progressFill.style.width = '100%';
+    if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
+
+    // Update completion title and subtitle based on mode
+    const subtitle = elements.completionScreen.querySelector('.completion-subtitle');
+
+    if (state.userName && elements.completionTitle) {
+        if (state.faqMode) {
+            // FAQ completion - welcoming and action-oriented
+            elements.completionTitle.textContent = `Ready to jump in, ${state.userName}?`;
+            if (subtitle) {
+                subtitle.textContent = "We will make it worth your time.";
+            }
+        } else if (state.archiveMode) {
+            // Archive completion
+            elements.completionTitle.textContent = `All caught up, ${state.userName}`;
+            if (subtitle) {
+                subtitle.textContent = "You've reviewed the archives.";
+            }
+        } else {
+            // Regular stories completion
+            elements.completionTitle.textContent = `Take a break, ${state.userName}`;
+            if (subtitle) {
+                subtitle.textContent = "That's your daily dose of critical thinking.";
+            }
+        }
+    }
+
+    // Track completion - count curious swipes from the state
+    const curiousCount = state.viewedStories.length;
+    trackCompletionViewed(state.totalStories, curiousCount);
+
+    // Update button labels based on mode
+    updateCompletionButtons();
+}
+
+function updateCompletionButtons() {
+    const reviewBtn = elements.reviewStoriesBtn;
+    const questionsBtn = elements.yourQuestionsBtn;
+    const archiveBtn = elements.recapWeekBtn;
+
+    if (state.faqMode) {
+        // FAQ completion buttons: "Review FAQs", "Go to stories", "Go to archives"
+        if (reviewBtn) {
+            reviewBtn.querySelector('span').textContent = 'Review FAQs';
+        }
+        if (questionsBtn) {
+            questionsBtn.querySelector('span').textContent = 'Go to stories';
+            // Change functionality for FAQ mode
+            questionsBtn.dataset.faqAction = 'go-to-stories';
+        }
+        if (archiveBtn) {
+            archiveBtn.querySelector('span').textContent = 'Go to archives';
+        }
+    } else if (state.archiveMode) {
+        // Archives completion buttons: "Review stories", "Your questions", "Back to today"
+        if (reviewBtn) {
+            reviewBtn.querySelector('span').textContent = 'Review stories';
+        }
+        if (questionsBtn) {
+            questionsBtn.querySelector('span').textContent = 'Your questions';
+            questionsBtn.dataset.faqAction = '';
+        }
+        if (archiveBtn) {
+            archiveBtn.querySelector('span').textContent = 'Back to today';
+        }
+    } else {
+        // Stories completion buttons: "Review stories", "Your questions", "Go to archives"
+        if (reviewBtn) {
+            reviewBtn.querySelector('span').textContent = 'Review stories';
+        }
+        if (questionsBtn) {
+            questionsBtn.querySelector('span').textContent = 'Your questions';
+            questionsBtn.dataset.faqAction = '';
+        }
+        if (archiveBtn) {
+            archiveBtn.querySelector('span').textContent = 'Go to archives';
+        }
+    }
+}
+
+function resetApp() {
+    state.currentIndex = 0;
+    state.viewedStories = [];
+    saveToStorage();
+    elements.completionScreen.classList.remove('visible');
+    if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
+    updateProgress();
+    renderProgressDots();
+    renderCards();
+    showSwipeHint();
+    updatePrevButtonVisibility();
+    triggerHaptic('light');
+}
+
+// ==========================================
+// Modal Handling
+// ==========================================
+
+function openModal(story) {
+    state.currentStory = story;
+    state.rating = 0;
+
+    // Track story viewed
+    const storyIndex = state.stories.findIndex(s => s.id === story.id);
+    trackStoryViewed(storyIndex + 1, story.headline);
+
+    elements.modalEmoji.textContent = story.emoji || '✦';
+    elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
+
+    elements.questionsContainer.innerHTML = '';
+
+    // For FAQs, only show first 3 questions (Question 4 is "Skip this FAQ")
+    const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
+
+    questionsToShow.forEach((q) => {
+        const button = document.createElement('button');
+        button.className = 'question-button';
+        button.innerHTML = `
+            <span class="question-label">✦</span>
+            <span class="question-text">${parseFormattedText(q.text)}</span>
+        `;
+        button.addEventListener('click', () => {
+            triggerHaptic('light');
+            showAnswer(q);
+        });
+        elements.questionsContainer.appendChild(button);
+    });
+
+    // Add skip button - text differs for FAQs vs stories
+    const skipButton = document.createElement('button');
+    skipButton.className = 'question-button skip';
+    const skipText = story.isFAQ ? 'Skip this FAQ' : 'Skip this story';
+    skipButton.innerHTML = `
+        <span class="question-label">✦</span>
+        <span class="question-text">${skipText}</span>
+    `;
+    skipButton.addEventListener('click', () => {
+        triggerHaptic('light');
+        trackQuestionsSkipped(story.headline);
+        closeModal();
+        // Animate current card out and move to next
+        setTimeout(() => {
+            const card = document.querySelector('.story-card[data-position="0"]');
+            if (card) {
+                animateCardExit(card, 'left', () => nextCard());
+            } else {
+                nextCard();
+            }
+        }, 300);
+    });
+    elements.questionsContainer.appendChild(skipButton);
+
+    elements.qaView.classList.remove('hidden', 'fade-out');
+    elements.answerView.classList.add('hidden');
+
+    elements.modalBackdrop.classList.add('visible');
+    document.body.classList.add('no-scroll');
+
+    // Setup modal swipe to dismiss
+    setupModalSwipe();
+}
+
+function setupModalSwipe() {
+    let startY = 0;
+    let currentY = 0;
+
+    const modal = elements.qaModal;
+
+    // CRITICAL: Remove old listeners first to prevent duplicates
+    if (modal._touchStartHandler) {
+        modal.removeEventListener('touchstart', modal._touchStartHandler);
+        modal.removeEventListener('touchmove', modal._touchMoveHandler);
+        modal.removeEventListener('touchend', modal._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && modal.scrollTop === 0) {
+            e.preventDefault();
+            // Q&A card positioned absolutely, apply translateY offset
+            modal.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            // Swipe down threshold met - return to Summary (Q&A becomes peeking)
+            triggerHaptic('light');
+            closeModal();
+        } else {
+            // Reset position to active state
+            modal.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    // Store handlers for removal later
+    modal._touchStartHandler = handleTouchStart;
+    modal._touchMoveHandler = handleTouchMove;
+    modal._touchEndHandler = handleTouchEnd;
+
+    modal.addEventListener('touchstart', handleTouchStart, { passive: true });
+    modal.addEventListener('touchmove', handleTouchMove, { passive: false });
+    modal.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Setup swipe-to-dismiss for Q&A card (inside story card)
+ * Swipe down from Q&A returns to Summary (Q&A becomes peeking)
+ */
+function setupQACardSwipe() {
+    // Find Q&A card inside current story card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const qaCard = currentCard.querySelector('.qa-card');
+    if (!qaCard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners first to prevent duplicates
+    if (qaCard._touchStartHandler) {
+        qaCard.removeEventListener('touchstart', qaCard._touchStartHandler);
+        qaCard.removeEventListener('touchmove', qaCard._touchMoveHandler);
+        qaCard.removeEventListener('touchend', qaCard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        // Only allow dragging down when at top of scroll
+        if (deltaY > 0 && qaCard.scrollTop === 0) {
+            e.preventDefault();
+            // Apply visual feedback during drag - NO translateX since it's inside card
+            qaCard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            // Swipe down threshold met - return to Summary (Q&A becomes peeking)
+            triggerHaptic('light');
+            closeQACard();
+        } else {
+            // Reset position to active state (translateY 0)
+            qaCard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    // Store handlers for removal later
+    qaCard._touchStartHandler = handleTouchStart;
+    qaCard._touchMoveHandler = handleTouchMove;
+    qaCard._touchEndHandler = handleTouchEnd;
+
+    qaCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    qaCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    qaCard.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Close Q&A card - return from ACTIVE to PEEKING state
+ * Called when swiping down from Q&A
+ */
+function closeQACard() {
+    // Transition Q&A from ACTIVE back to PEEKING
+    setQACardState(QA_STATES.PEEKING);
+
+    // Update layer state - return to SUMMARY
+    state.cardLayer = 'summary';
+
+    // Reset Q&A card inline transform
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (currentCard) {
+        const qaCard = currentCard.querySelector('.qa-card');
+        if (qaCard) {
+            qaCard.style.transform = '';
+        }
+    }
+
+    console.log('[closeQACard] Returned to Summary with Q&A peeking');
+}
+
+// ==========================================
+// ANSWER CARD STATE MANAGEMENT
+// ==========================================
+
+/**
+ * Show Answer Card - slide up from bottom
+ * @param {number} questionIndex - Index of the selected question (0-3)
+ */
+function showAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    // Store the question index
+    state.currentQuestionIndex = questionIndex;
+
+    // Populate the answer card with content
+    populateAnswerCard(questionIndex);
+
+    // Show the card
+    answerCard.classList.add('active');
+
+    // Update state
+    state.cardLayer = 'answer';
+
+    // Setup swipe handler for this card
+    setupAnswerCardSwipe();
+
+    console.log('[showAnswerCard] Showing answer for question', questionIndex);
+}
+
+/**
+ * Hide Answer Card - slide down, return to Q&A
+ */
+function hideAnswerCard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (answerCard) {
+        answerCard.classList.remove('active');
+        answerCard.style.transform = '';
+    }
+
+    // Update state - return to Q&A
+    state.cardLayer = 'questions';
+    state.currentQuestionIndex = null;
+
+    console.log('[hideAnswerCard] Returned to Q&A');
+}
+
+/**
+ * Populate Answer Card with question and answer content
+ * @param {number} questionIndex - Index of the question
+ */
+function populateAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard || !state.currentStory) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    const question = state.currentStory.questions[questionIndex];
+    if (!question) return;
+
+    // Store for later use (dig deeper, history, etc.)
+    state.currentQuestion = question;
+
+    // Populate content
+    const questionText = answerCard.querySelector('.answer-question-text');
+    const answerText = answerCard.querySelector('.answer-text');
+    const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
+
+    if (questionText) questionText.innerHTML = parseFormattedText(question.text);
+    if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
+
+    // Show/hide Dig Deeper button based on availability
+    const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
+    if (digDeeperBtn) {
+        digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
+    }
+
+    // Reset rating stars
+    resetAnswerCardStars(answerCard);
+
+    // Add to history
+    addToHistory(state.currentStory, question);
+
+    // Track analytics
+    trackQuestionClicked(state.currentStory.headline, question.text);
+}
+
+/**
+ * Reset rating stars in answer card
+ */
+function resetAnswerCardStars(answerCard) {
+    const stars = answerCard.querySelectorAll('.rating-star');
+    stars.forEach(star => star.classList.remove('active'));
+}
+
+// ==========================================
+// DIG DEEPER Q&A CARD STATE MANAGEMENT
+// ==========================================
+
+/**
+ * Show Dig Deeper Q&A Card - slide up from bottom
+ */
+function showDigDeeperQACard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    if (!digDeeperQACard) return;
+
+    // Populate with dig deeper questions
+    populateDigDeeperQACard();
+
+    // Show the card
+    digDeeperQACard.classList.add('active');
+
+    // Update state
+    state.cardLayer = 'dig-deeper-qa';
+
+    // Setup swipe handler
+    setupDigDeeperQACardSwipe();
+
+    console.log('[showDigDeeperQACard] Showing dig deeper questions');
+}
+
+/**
+ * Hide Dig Deeper Q&A Card - slide down, return to Answer
+ */
+function hideDigDeeperQACard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    if (digDeeperQACard) {
+        digDeeperQACard.classList.remove('active');
+        digDeeperQACard.style.transform = '';
+    }
+
+    // Update state - return to Answer
+    state.cardLayer = 'answer';
+
+    console.log('[hideDigDeeperQACard] Returned to Answer');
+}
+
+/**
+ * Populate Dig Deeper Q&A Card with follow-up questions
+ */
+function populateDigDeeperQACard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard || !state.currentQuestion) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    const questionsList = digDeeperQACard?.querySelector('.dig-deeper-questions-list');
+    if (!questionsList) return;
+
+    // Clear existing questions
+    questionsList.innerHTML = '';
+
+    const deepQuestions = state.currentQuestion.deepQuestions || [];
+
+    // Create button for each dig deeper question
+    deepQuestions.forEach((q, index) => {
+        const button = document.createElement('button');
+        button.className = 'qa-question-btn';
+        button.innerHTML = `
+            <span class="qa-question-label">✦</span>
+            <span class="qa-question-text">${parseFormattedText(q.text)}</span>
+        `;
+        button.addEventListener('click', () => {
+            triggerHaptic('light');
+            showDigDeeperAnswerCard(index);
+        });
+        questionsList.appendChild(button);
+    });
+}
+
+// ==========================================
+// DIG DEEPER ANSWER CARD STATE MANAGEMENT
+// ==========================================
+
+/**
+ * Show Dig Deeper Answer Card - slide up from bottom
+ * @param {number} questionIndex - Index of the dig deeper question (0-2)
+ */
+function showDigDeeperAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    // Store the question index
+    state.currentDigDeeperQuestionIndex = questionIndex;
+
+    // Populate the card with content
+    populateDigDeeperAnswerCard(questionIndex);
+
+    // Show the card
+    digDeeperAnswerCard.classList.add('active');
+
+    // Update state
+    state.cardLayer = 'dig-deeper-answer';
+
+    // Setup swipe handler
+    setupDigDeeperAnswerCardSwipe();
+
+    console.log('[showDigDeeperAnswerCard] Showing dig deeper answer', questionIndex);
+}
+
+/**
+ * Hide Dig Deeper Answer Card - slide down, return to Dig Deeper Q&A
+ */
+function hideDigDeeperAnswerCard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (digDeeperAnswerCard) {
+        digDeeperAnswerCard.classList.remove('active');
+        digDeeperAnswerCard.style.transform = '';
+    }
+
+    // Update state - return to Dig Deeper Q&A
+    state.cardLayer = 'dig-deeper-qa';
+    state.currentDigDeeperQuestionIndex = null;
+
+    console.log('[hideDigDeeperAnswerCard] Returned to Dig Deeper Q&A');
+}
+
+/**
+ * Populate Dig Deeper Answer Card with content
+ * @param {number} questionIndex - Index of the dig deeper question
+ */
+function populateDigDeeperAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard || !state.currentQuestion) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    const deepQuestions = state.currentQuestion.deepQuestions || [];
+    const question = deepQuestions[questionIndex];
+    if (!question) return;
+
+    // Populate content
+    const questionText = digDeeperAnswerCard.querySelector('.answer-question-text');
+    const answerText = digDeeperAnswerCard.querySelector('.answer-text');
+
+    if (questionText) questionText.innerHTML = parseFormattedText(question.text);
+    if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
+
+    // Reset rating stars
+    resetAnswerCardStars(digDeeperAnswerCard);
+
+    // Track analytics
+    trackQuestionClicked(state.currentStory.headline, question.text);
+}
+
+// ==========================================
+// SWIPE HANDLERS FOR NEW CARDS
+// ==========================================
+
+/**
+ * Setup swipe-to-dismiss for Answer Card
+ * Swipe down returns to Q&A card
+ */
+function setupAnswerCardSwipe() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners
+    if (answerCard._touchStartHandler) {
+        answerCard.removeEventListener('touchstart', answerCard._touchStartHandler);
+        answerCard.removeEventListener('touchmove', answerCard._touchMoveHandler);
+        answerCard.removeEventListener('touchend', answerCard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && answerCard.scrollTop === 0) {
+            e.preventDefault();
+            answerCard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            triggerHaptic('light');
+            hideAnswerCard();
+        } else {
+            answerCard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    answerCard._touchStartHandler = handleTouchStart;
+    answerCard._touchMoveHandler = handleTouchMove;
+    answerCard._touchEndHandler = handleTouchEnd;
+
+    answerCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    answerCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    answerCard.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Setup swipe-to-dismiss for Dig Deeper Q&A Card
+ * Swipe down returns to Answer card
+ */
+function setupDigDeeperQACardSwipe() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    if (!digDeeperQACard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners
+    if (digDeeperQACard._touchStartHandler) {
+        digDeeperQACard.removeEventListener('touchstart', digDeeperQACard._touchStartHandler);
+        digDeeperQACard.removeEventListener('touchmove', digDeeperQACard._touchMoveHandler);
+        digDeeperQACard.removeEventListener('touchend', digDeeperQACard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && digDeeperQACard.scrollTop === 0) {
+            e.preventDefault();
+            digDeeperQACard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            triggerHaptic('light');
+            hideDigDeeperQACard();
+        } else {
+            digDeeperQACard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    digDeeperQACard._touchStartHandler = handleTouchStart;
+    digDeeperQACard._touchMoveHandler = handleTouchMove;
+    digDeeperQACard._touchEndHandler = handleTouchEnd;
+
+    digDeeperQACard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    digDeeperQACard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    digDeeperQACard.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Setup swipe-to-dismiss for Dig Deeper Answer Card
+ * Swipe down returns to Dig Deeper Q&A card
+ */
+function setupDigDeeperAnswerCardSwipe() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners
+    if (digDeeperAnswerCard._touchStartHandler) {
+        digDeeperAnswerCard.removeEventListener('touchstart', digDeeperAnswerCard._touchStartHandler);
+        digDeeperAnswerCard.removeEventListener('touchmove', digDeeperAnswerCard._touchMoveHandler);
+        digDeeperAnswerCard.removeEventListener('touchend', digDeeperAnswerCard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && digDeeperAnswerCard.scrollTop === 0) {
+            e.preventDefault();
+            digDeeperAnswerCard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            triggerHaptic('light');
+            hideDigDeeperAnswerCard();
+        } else {
+            digDeeperAnswerCard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    digDeeperAnswerCard._touchStartHandler = handleTouchStart;
+    digDeeperAnswerCard._touchMoveHandler = handleTouchMove;
+    digDeeperAnswerCard._touchEndHandler = handleTouchEnd;
+
+    digDeeperAnswerCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    digDeeperAnswerCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    digDeeperAnswerCard.addEventListener('touchend', handleTouchEnd);
+}
+
+// ==========================================
+// LEGACY ANSWER SYSTEM (keeping for backwards compatibility)
+// ==========================================
+
+function showAnswer(question) {
+    addToHistory(state.currentStory, question);
+
+    // Store current question for Dig Deeper feature
+    state.currentQuestion = question;
+
+    // Track question clicked
+    trackQuestionClicked(state.currentStory.headline, question.text);
+
+    console.log('[showAnswer] Transitioning from Q&A to answer view');
+
+    // Prepare answer view content in LEGACY modal
+    elements.answerLabel.textContent = '✦';
+    elements.answerQuestion.innerHTML = parseFormattedText(question.text);
+    elements.answerText.innerHTML = parseFormattedText(question.answer);
+
+    // Show/hide Dig Deeper button based on availability
+    const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
+    if (elements.digDeeperBtn) {
+        elements.digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
+    }
+
+    resetStars();
+
+    // Hide NEW Q&A card (it was active)
+    setQACardState(QA_STATES.HIDDEN);
+
+    // Show LEGACY modal with Answer view
+    elements.qaView.classList.add('hidden');
+    elements.answerView.classList.remove('hidden');
+    elements.modalBackdrop.classList.add('visible');
+    document.body.classList.add('no-scroll');
+
+    // Update state
+    state.cardLayer = 'answer';
+
+    // Setup swipe on legacy modal
+    setupModalSwipe();
+}
+
+function showQAView() {
+    console.log('[showQAView] Starting transition to Q&A view');
+
+    // Find which view is currently visible
+    const currentView = [elements.answerView, elements.digDeeperView, elements.deepAnswerView]
+        .find(v => v && !v.classList.contains('hidden'));
+
+    if (currentView) {
+        // SLIDE TRANSITION: Current view slides out right, Q&A slides in from left
+        elements.qaView.style.transform = 'translateX(-100%)';
+        elements.qaView.classList.remove('hidden');
+
+        // Force reflow
+        void elements.qaView.offsetHeight;
+
+        elements.qaView.style.transform = '';
+        currentView.classList.add('slide-out-left');
+
+        setTimeout(() => {
+            currentView.classList.add('hidden');
+            currentView.classList.remove('slide-out-left');
+            // Reset inline styles
+            currentView.style.cssText = '';
+        }, 350);
+    } else {
+        // Just show Q&A view directly
+        elements.qaView.classList.remove('hidden');
+    }
+
+    // Verify modal backdrop is still correctly visible
+    if (!elements.modalBackdrop.classList.contains('visible')) {
+        elements.modalBackdrop.classList.add('visible');
+    }
+
+    console.log('[showQAView] Q&A view should now be visible');
+}
+
+function verifyModalState() {
+    // Check Q&A view is visible
+    const qaViewStyle = getComputedStyle(elements.qaView);
+    const qaViewVisible = qaViewStyle.display !== 'none' && qaViewStyle.visibility !== 'hidden';
+
+    // Check other views are hidden
+    const answerHidden = elements.answerView.classList.contains('hidden');
+    const digDeeperHidden = elements.digDeeperView ? elements.digDeeperView.classList.contains('hidden') : true;
+    const deepAnswerHidden = elements.deepAnswerView ? elements.deepAnswerView.classList.contains('hidden') : true;
+
+    console.log('[verifyModalState] Q&A visible:', qaViewVisible);
+    console.log('[verifyModalState] Answer hidden:', answerHidden);
+    console.log('[verifyModalState] DigDeeper hidden:', digDeeperHidden);
+    console.log('[verifyModalState] DeepAnswer hidden:', deepAnswerHidden);
+
+    // Check for any stray overlay elements
+    const overlays = document.querySelectorAll('[class*="overlay"], [class*="backdrop"]');
+    overlays.forEach(el => {
+        const style = getComputedStyle(el);
+        if (style.position === 'fixed' || style.position === 'absolute') {
+            console.log('[verifyModalState] Found overlay element:', el.className, 'zIndex:', style.zIndex);
+        }
+    });
+}
+
+function closeModal() {
+    // Close LEGACY modal and return to NEW Q&A card (ACTIVE state)
+    // This is called when dismissing Answer/Dig Deeper views
+
+    // Hide legacy modal
+    elements.modalBackdrop.classList.remove('visible');
+    document.body.classList.remove('no-scroll');
+
+    // Show NEW Q&A card in ACTIVE state (return to questions)
+    setQACardState(QA_STATES.ACTIVE);
+
+    // Update layer state - return to Q&A questions
+    state.cardLayer = 'questions';
+    if (state.modalStack.length > 0) {
+        state.modalStack.pop();
+    }
+
+    // Reset modal views after animation completes
+    setTimeout(() => {
+        elements.qaView.classList.remove('hidden', 'fade-out', 'fade-in', 'slide-out-left');
+        elements.answerView.classList.add('hidden');
+        elements.answerView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
+        elements.digDeeperView.classList.add('hidden');
+        elements.digDeeperView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
+        elements.deepAnswerView.classList.add('hidden');
+        elements.deepAnswerView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
+
+        state.currentQuestion = null;
+        state.currentHistoryEntry = null;
+    }, 300);
+
+    // Setup swipe on new Q&A card
+    setupQACardSwipe();
+}
+
+// ==========================================
+// Summary Modal
+// ==========================================
+
+function openSummaryModal(story) {
+    state.currentStory = story;
+
+    // Track story viewed
+    const storyIndex = state.stories.findIndex(s => s.id === story.id);
+    trackStoryViewed(storyIndex + 1, story.headline);
+
+    elements.summaryModalHeadline.innerHTML = parseFormattedText(story.headline);
+
+    // Parse summary with bullets and HTML formatting
+    const summaryText = story.summary || story.teaser;
+    elements.summaryModalBullets.innerHTML = parseSummaryWithBullets(summaryText);
+
+    elements.summaryModalBackdrop.classList.add('visible');
+    document.body.classList.add('no-scroll');
+
+    // Setup swipe to dismiss
+    setupSummaryModalSwipe();
+}
+
+function closeSummaryModal() {
+    elements.summaryModalBackdrop.classList.remove('visible');
+    document.body.classList.remove('no-scroll');
+    elements.summaryModal.style.transform = '';
+}
+
+function setupSummaryModalSwipe() {
+    let startY = 0;
+    let currentY = 0;
+
+    const modal = elements.summaryModal;
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && modal.scrollTop === 0) {
+            e.preventDefault();
+            modal.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            closeSummaryModal();
+        } else {
+            modal.style.transform = '';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    // Remove old listeners first to avoid duplicates
+    modal.removeEventListener('touchstart', modal._touchStartHandler);
+    modal.removeEventListener('touchmove', modal._touchMoveHandler);
+    modal.removeEventListener('touchend', modal._touchEndHandler);
+
+    // Store handlers for removal later
+    modal._touchStartHandler = handleTouchStart;
+    modal._touchMoveHandler = handleTouchMove;
+    modal._touchEndHandler = handleTouchEnd;
+
+    modal.addEventListener('touchstart', handleTouchStart, { passive: true });
+    modal.addEventListener('touchmove', handleTouchMove, { passive: false });
+    modal.addEventListener('touchend', handleTouchEnd);
+}
+
+// ==========================================
+// Dig Deeper Feature
+// ==========================================
+
+function showDigDeeper() {
+    console.log('[showDigDeeper] Transitioning to dig deeper view');
+
+    const question = state.currentQuestion;
+    if (!question || !question.deepQuestions || question.deepQuestions.length === 0) {
+        showToast('ℹ', 'No follow-up questions available');
+        showQAView();
+        return;
+    }
+
+    // Reset all views first
+    resetAllModalViews();
+
+    // Populate deep questions
+    elements.deepQuestionsContainer.innerHTML = '';
+    question.deepQuestions.forEach((dq, index) => {
+        const button = document.createElement('button');
+        button.className = 'deep-question-button';
+        button.innerHTML = `
+            <span class="deep-question-label">✦</span>
+            <span class="deep-question-text">${parseFormattedText(dq.text)}</span>
+        `;
+        button.addEventListener('click', () => {
+            triggerHaptic('light');
+            trackDigDeeper(state.currentStory.headline, dq.text);
+            showDeepAnswer(dq);
+        });
+        elements.deepQuestionsContainer.appendChild(button);
+    });
+
+    // Add "Back to main questions" option
+    const backButton = document.createElement('button');
+    backButton.className = 'deep-question-button';
+    backButton.style.background = 'transparent';
+    backButton.style.border = '1px solid var(--border-color)';
+    backButton.innerHTML = `
+        <span class="deep-question-label">←</span>
+        <span class="deep-question-text">Back to main questions</span>
+    `;
+    backButton.addEventListener('click', () => {
+        triggerHaptic('light');
+        hideDigDeeper();
+    });
+    elements.deepQuestionsContainer.appendChild(backButton);
+
+    // Show dig deeper view
+    elements.digDeeperView.classList.remove('hidden');
+    elements.digDeeperView.style.display = 'block';
+    elements.digDeeperView.style.visibility = 'visible';
+    elements.digDeeperView.style.opacity = '1';
+
+    // Force reflow
+    void elements.digDeeperView.offsetHeight;
+}
+
+function hideDigDeeper() {
+    console.log('[hideDigDeeper] Returning to Q&A view');
+    showQAView();
+}
+
+function showDeepAnswer(deepQuestion) {
+    console.log('[showDeepAnswer] Transitioning to deep answer view');
+
+    // Reset all views first
+    resetAllModalViews();
+
+    // Prepare deep answer content
+    elements.deepAnswerQuestion.innerHTML = parseFormattedText(deepQuestion.text);
+    elements.deepAnswerText.innerHTML = parseFormattedText(deepQuestion.answer);
+
+    // Show deep answer view
+    elements.deepAnswerView.classList.remove('hidden');
+    elements.deepAnswerView.style.display = 'block';
+    elements.deepAnswerView.style.visibility = 'visible';
+    elements.deepAnswerView.style.opacity = '1';
+
+    // Force reflow
+    void elements.deepAnswerView.offsetHeight;
+}
+
+function backToDeepQuestions() {
+    console.log('[backToDeepQuestions] Transitioning from deep answer to deep questions');
+
+    // Immediately reset all views
+    resetAllModalViews();
+
+    // Show only dig deeper view
+    elements.digDeeperView.classList.remove('hidden');
+    elements.digDeeperView.style.display = 'block';
+    elements.digDeeperView.style.visibility = 'visible';
+    elements.digDeeperView.style.opacity = '1';
+
+    // Force reflow
+    void elements.digDeeperView.offsetHeight;
+}
+
+function hideDigDeeperToAnswer() {
+    console.log('[hideDigDeeperToAnswer] Transitioning from dig deeper to answer');
+
+    // Immediately reset all views
+    resetAllModalViews();
+
+    // Show only answer view
+    elements.answerView.classList.remove('hidden');
+    elements.answerView.style.display = 'block';
+    elements.answerView.style.visibility = 'visible';
+    elements.answerView.style.opacity = '1';
+
+    // Force reflow
+    void elements.answerView.offsetHeight;
+}
+
+function deepDone() {
+    console.log('[deepDone] Returning to Q&A view from deep answer');
+
+    // Use the comprehensive showQAView function
+    showQAView();
+}
+
+// Helper function to reset all modal views to hidden state
+function resetAllModalViews() {
+    const allViews = [elements.qaView, elements.answerView, elements.digDeeperView, elements.deepAnswerView].filter(v => v);
+
+    allViews.forEach(v => {
+        v.classList.add('hidden');
+        v.classList.remove('fade-out', 'fade-in', 'slide-out-left');
+        v.style.cssText = '';
+    });
+
+    // Force reflow
+    void document.body.offsetHeight;
+}
+
+/**
+ * Verify clean navigation state - call after every major transition
+ * Ensures no invisible overlays or broken states
+ */
+function verifyCleanState() {
+    // Check that Q&A modal is either fully visible or fully hidden
+    const modalVisible = elements.modalBackdrop.classList.contains('visible');
+
+    if (!modalVisible) {
+        // Modal should be completely hidden
+        const modalRect = elements.qaModal.getBoundingClientRect();
+        if (modalRect.top < window.innerHeight && modalRect.bottom > 0) {
+            console.warn('[verifyCleanState] Q&A card visible when modal backdrop hidden - forcing cleanup');
+            elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
+        }
+    }
+
+    // Verify no stray backdrop overlays
+    const backdrops = document.querySelectorAll('.modal-backdrop, .summary-modal-backdrop, .info-modal-backdrop');
+    backdrops.forEach(backdrop => {
+        if (!backdrop.classList.contains('visible')) {
+            // Ensure truly hidden
+            backdrop.style.pointerEvents = 'none';
+        }
+    });
+
+    // Log current state for debugging
+    console.log('[verifyCleanState] cardLayer:', state.cardLayer,
+                'modalStack:', state.modalStack.length,
+                'modalVisible:', modalVisible);
+}
+
+/**
+ * Reset ALL card states - called on EVERY story navigation
+ * CRITICAL: This prevents cards persisting across stories
+ */
+function resetAllCardStates() {
+    console.log('[resetAllCardStates] Resetting all card states');
+
+    const storyCard = document.querySelector('.story-card[data-card-type="current"]');
+
+    // 1. Reset Q&A card to HIDDEN state
+    setQACardState(QA_STATES.HIDDEN);
+
+    // 2. Reset ALL card transforms and states inside current story card
+    if (storyCard) {
+        // Reset Q&A card
+        const qaCard = storyCard.querySelector('.qa-card');
+        if (qaCard) {
+            qaCard.style.transform = '';
+        }
+
+        // Reset Answer card
+        const answerCard = storyCard.querySelector('.answer-card');
+        if (answerCard) {
+            answerCard.classList.remove('active');
+            answerCard.style.transform = '';
+        }
+
+        // Reset Dig Deeper Q&A card
+        const digDeeperQACard = storyCard.querySelector('.dig-deeper-qa-card');
+        if (digDeeperQACard) {
+            digDeeperQACard.classList.remove('active');
+            digDeeperQACard.style.transform = '';
+        }
+
+        // Reset Dig Deeper Answer card
+        const digDeeperAnswerCard = storyCard.querySelector('.dig-deeper-answer-card');
+        if (digDeeperAnswerCard) {
+            digDeeperAnswerCard.classList.remove('active');
+            digDeeperAnswerCard.style.transform = '';
+        }
+    }
+
+    // 3. Hide LEGACY modal
+    if (elements.modalBackdrop) {
+        elements.modalBackdrop.classList.remove('visible', 'peeking', 'push-transition');
+    }
+
+    // 4. Reset flip card to front (headline)
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (currentCard) {
+        currentCard.classList.remove('flipped');
+        currentCard.dataset.flipped = 'false';
+    }
+
+    // 5. Reset modal views
+    resetAllModalViews();
+
+    // 6. Reset card layer state
+    state.cardLayer = 'headline';
+    state.isCardFlipped = false;
+    state.modalStack = [];
+
+    // 7. Reset question indices
+    state.currentQuestionIndex = null;
+    state.currentDigDeeperQuestionIndex = null;
+
+    // 8. Remove no-scroll from body
+    document.body.classList.remove('no-scroll');
+}
+
+/**
+ * Full state reset - returns to Story 1 headline from any state
+ * Used by logo click and other "go home" actions
+ */
+function fullStateReset() {
+    console.log('[fullStateReset] Performing complete navigation reset');
+
+    // Reset all card states
+    resetAllCardStates();
+
+    // Reset story to first
+    state.currentIndex = 0;
+    state.currentStory = null;
+    state.currentQuestion = null;
+
+    // Re-render cards
+    renderCards();
+    updateProgress();
+    renderProgressDots();
+
+    // Verify clean state
+    setTimeout(verifyCleanState, 450);
+}
+
+// ==========================================
+// History
+// ==========================================
+
+function addToHistory(story, question) {
+    const entry = {
+        id: Date.now(),
+        storyId: story.id,
+        emoji: story.emoji,
+        headline: story.headline,
+        question: question.text,
+        answer: question.answer,
+        label: question.label,
+        rating: 0,
+        timestamp: Date.now()
+    };
+
+    state.history.unshift(entry);
+
+    if (state.history.length > 50) {
+        state.history = state.history.slice(0, 50);
+    }
+
+    saveToStorage();
+    renderHistory();
+}
+
+function updateHistoryRating(entryId, rating) {
+    const entry = state.history.find(h => h.id === entryId);
+    if (entry) {
+        entry.rating = rating;
+        saveToStorage();
+        renderHistory();
+    }
+}
+
+function renderHistory() {
+    if (state.history.length === 0) {
+        elements.historyList.innerHTML = '';
+        elements.historyEmpty.classList.add('visible');
+        return;
+    }
+
+    elements.historyEmpty.classList.remove('visible');
+    elements.historyList.innerHTML = state.history.map(entry => `
+        <div class="history-item" data-id="${entry.id}">
+            <span class="history-emoji">${entry.emoji}</span>
+            <div class="history-content">
+                <h4 class="history-headline">${entry.headline}</h4>
+                <p class="history-question">${entry.label}: ${entry.question}</p>
+            </div>
+            <div class="history-meta">
+                ${entry.rating > 0 ? `<span class="history-rating">${'★'.repeat(entry.rating)}</span>` : ''}
+                <span class="history-time">${formatTimeAgo(entry.timestamp)}</span>
+            </div>
+        </div>
+    `).join('');
+
+    elements.historyList.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const id = parseInt(item.dataset.id);
+            const entry = state.history.find(h => h.id === id);
+            if (entry) {
+                triggerHaptic('light');
+                showHistoryAnswer(entry);
+            }
+        });
+    });
+}
+
+function showHistoryAnswer(entry) {
+    const story = {
+        id: entry.storyId,
+        emoji: entry.emoji,
+        headline: entry.headline,
+        teaser: '',
+        questions: [{
+            label: entry.label,
+            text: entry.question,
+            answer: entry.answer
+        }]
+    };
+
+    state.currentStory = story;
+    state.currentHistoryEntry = entry;
+
+    elements.modalEmoji.textContent = story.emoji;
+    elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
+
+    elements.qaView.classList.add('hidden');
+    elements.answerView.classList.remove('hidden');
+
+    elements.answerLabel.textContent = '✦';
+    elements.answerQuestion.innerHTML = parseFormattedText(entry.question);
+    // Apply HTML formatting to history answer
+    elements.answerText.innerHTML = parseFormattedText(entry.answer);
+
+    // Hide Dig Deeper button for history items (no deep questions stored)
+    if (elements.digDeeperBtn) {
+        elements.digDeeperBtn.style.display = 'none';
+    }
+
+    setRating(entry.rating, true);
+
+    elements.modalBackdrop.classList.add('visible');
+    document.body.classList.add('no-scroll');
+}
+
+function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+
+    return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// ==========================================
+// Navigation
+// ==========================================
+
+function switchSection(sectionName) {
+    state.currentSection = sectionName;
+    triggerHaptic('light');
+
+    document.querySelectorAll('.section').forEach(section => {
+        section.classList.remove('active');
+    });
+
+    if (sectionName === 'today') {
+        elements.sectionToday.classList.add('active');
+        if (elements.historyToggle) elements.historyToggle.classList.remove('hidden');
+        // Reset navigation state when returning to today
+        state.cameFromCompletion = false;
+        updatePrevButtonVisibility();
+    } else {
+        elements.sectionHistory.classList.add('active');
+        if (elements.historyToggle) elements.historyToggle.classList.add('hidden');
+        // Show prev button if came from completion
+        updatePrevButtonForCompletionNav();
+    }
+}
+
+// ==========================================
+// Star Rating
+// ==========================================
+
+function setupStarRating() {
+    const stars = elements.starRating.querySelectorAll('.star');
+
+    stars.forEach(star => {
+        star.addEventListener('click', () => {
+            const rating = parseInt(star.dataset.rating);
+            setRating(rating);
+            triggerHaptic('light');
+
+            if (state.currentHistoryEntry) {
+                updateHistoryRating(state.currentHistoryEntry.id, rating);
+            }
+        });
+    });
+}
+
+function setRating(rating, skipAnimation = false) {
+    state.rating = rating;
+    const stars = elements.starRating.querySelectorAll('.star');
+
+    // Track rating if not skipping animation (i.e., user clicked)
+    if (!skipAnimation && state.currentStory) {
+        trackRatingGiven(state.currentStory.headline, rating);
+    }
+
+    stars.forEach((star, index) => {
+        const starRating = index + 1;
+
+        if (starRating <= rating) {
+            if (skipAnimation) {
+                star.classList.add('active');
+                star.classList.remove('filling');
+            } else if (!star.classList.contains('active')) {
+                star.classList.add('filling');
+                setTimeout(() => {
+                    star.classList.remove('filling');
+                    star.classList.add('active');
+                }, 200);
+            }
+        } else {
+            star.classList.remove('active', 'filling');
+        }
+    });
+}
+
+function resetStars() {
+    state.rating = 0;
+    state.currentHistoryEntry = null;
+    const stars = elements.starRating.querySelectorAll('.star');
+    stars.forEach(star => star.classList.remove('active', 'filling'));
+}
+
+// ==========================================
+// Word Lookup Tooltip
+// ==========================================
+
+function createLookupTooltip() {
+    // Create tooltip if it doesn't exist
+    if (document.getElementById('lookupTooltip')) return;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'lookup-tooltip';
+    tooltip.id = 'lookupTooltip';
+    tooltip.innerHTML = `
+        <div class="lookup-tooltip-header">FYI explains</div>
+        <div class="lookup-tooltip-content" id="lookupTooltipContent"></div>
+    `;
+    document.body.appendChild(tooltip);
+}
+
+function showLookupTooltip(element, event) {
+    event.stopPropagation(); // Prevent card flip
+
+    createLookupTooltip();
+
+    const tooltip = document.getElementById('lookupTooltip');
+    const content = document.getElementById('lookupTooltipContent');
+    const definition = element.dataset.definition;
+
+    if (!definition) return;
+
+    content.textContent = definition;
+
+    // Position tooltip near the word
+    const rect = element.getBoundingClientRect();
+    const tooltipWidth = 280;
+
+    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+    left = Math.max(16, Math.min(left, window.innerWidth - tooltipWidth - 16));
+
+    let top = rect.bottom + 8;
+    // If not enough space below, show above
+    if (top + 150 > window.innerHeight) {
+        top = rect.top - 120;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.classList.add('visible');
+
+    triggerHaptic('light');
+
+    // Close on click outside (after a small delay)
+    setTimeout(() => {
+        document.addEventListener('click', closeLookupTooltip, { once: true });
+        document.addEventListener('touchstart', closeLookupTooltip, { once: true });
+    }, 10);
+}
+
+function closeLookupTooltip() {
+    const tooltip = document.getElementById('lookupTooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+// ==========================================
+// Pull to Refresh
+// ==========================================
+
+// Pull-to-refresh requires deliberate action:
+// - Must pull down 150px+ (much more than swipe navigation 50-80px)
+// - Must hold for 300ms after reaching threshold
+// This prevents accidental refresh during normal swipe-down navigation
+
+const PULL_REFRESH_THRESHOLD = 150;  // px - must pull this far
+const PULL_REFRESH_HOLD_TIME = 300;  // ms - must hold after threshold
+
+function setupPullToRefresh() {
+    let pullStartY = 0;
+    let isPulling = false;
+    let pullHoldTimer = null;
+    let refreshReady = false;
+
+    elements.sectionToday.addEventListener('touchstart', (e) => {
+        // Only enable pull-to-refresh when at top of content
+        if (elements.sectionToday.scrollTop === 0) {
+            pullStartY = e.touches[0].clientY;
+            isPulling = true;
+            refreshReady = false;
+            clearTimeout(pullHoldTimer);
+            pullHoldTimer = null;
+        }
+    }, { passive: true });
+
+    elements.sectionToday.addEventListener('touchmove', (e) => {
+        if (!isPulling) return;
+
+        const pullDistance = e.touches[0].clientY - pullStartY;
+
+        // Only show indicator when past the high threshold
+        if (pullDistance > PULL_REFRESH_THRESHOLD) {
+            elements.pullIndicator.classList.add('visible');
+
+            if (refreshReady) {
+                elements.pullIndicator.querySelector('.pull-text').textContent = 'Release to refresh';
+            } else {
+                elements.pullIndicator.querySelector('.pull-text').textContent = 'Keep pulling...';
+
+                // Start hold timer if not already started
+                if (!pullHoldTimer) {
+                    pullHoldTimer = setTimeout(() => {
+                        refreshReady = true;
+                        // Haptic feedback when refresh is ready
+                        triggerHaptic('medium');
+                        elements.pullIndicator.querySelector('.pull-text').textContent = 'Release to refresh';
+                    }, PULL_REFRESH_HOLD_TIME);
+                }
+            }
+        } else {
+            // Below threshold - hide indicator and reset timer
+            elements.pullIndicator.classList.remove('visible');
+            clearTimeout(pullHoldTimer);
+            pullHoldTimer = null;
+            refreshReady = false;
+        }
+    }, { passive: true });
+
+    elements.sectionToday.addEventListener('touchend', (e) => {
+        if (!isPulling) return;
+
+        const pullDistance = e.changedTouches[0].clientY - pullStartY;
+
+        // Only trigger refresh if threshold was met AND hold time completed
+        if (pullDistance > PULL_REFRESH_THRESHOLD && refreshReady) {
+            triggerHaptic('heavy');
+            elements.pullIndicator.classList.add('refreshing');
+            elements.pullIndicator.querySelector('.pull-text').textContent = 'Refreshing...';
+            refreshStories();
+        } else {
+            // Not a refresh - just hide indicator
+            elements.pullIndicator.classList.remove('visible');
+        }
+
+        // Reset state
+        isPulling = false;
+        refreshReady = false;
+        clearTimeout(pullHoldTimer);
+        pullHoldTimer = null;
+    });
+}
+
+async function refreshStories() {
+    await fetchStories();
+    renderCards();
+    updateProgress();
+    renderProgressDots();
+
+    elements.pullIndicator.classList.remove('visible', 'refreshing');
+}
+
+// ==========================================
+// Haptic Feedback
+// ==========================================
+
+function triggerHaptic(intensity = 'light') {
+    if ('vibrate' in navigator) {
+        switch (intensity) {
+            case 'light': navigator.vibrate(10); break;
+            case 'medium': navigator.vibrate(20); break;
+            case 'heavy': navigator.vibrate([30, 10, 30]); break;
+        }
+    }
+}
+
+// ==========================================
+// Toast
+// ==========================================
+
+function showToast(icon, message) {
+    elements.toastIcon.textContent = icon;
+    elements.toastMessage.textContent = message;
+    elements.toast.classList.add('visible');
+
+    setTimeout(() => {
+        elements.toast.classList.remove('visible');
+    }, 2500);
+}
+
+// ==========================================
+// Swipe Hint
+// ==========================================
+
+function showSwipeHint() {
+    if (state.hasShownHint || state.stories.length === 0) return;
+
+    setTimeout(() => {
+        elements.swipeHint.classList.add('visible');
+        state.hasShownHint = true;
+        saveToStorage();
+
+        setTimeout(hideSwipeHint, 3000);
+    }, 1000);
+}
+
+function hideSwipeHint() {
+    elements.swipeHint.classList.remove('visible');
+}
+
+// ==========================================
+// Event Listeners
+// ==========================================
+
+function setupEventListeners() {
+    // Helper to safely add event listeners with null check
+    const safeAddListener = (element, event, handler) => {
+        if (element) {
+            element.addEventListener(event, handler);
+        } else {
+            console.warn('[setupEventListeners] Missing element for', event, 'listener');
+        }
+    };
+
+    // Theme toggle
+    safeAddListener(elements.themeToggle, 'click', toggleTheme);
+
+    // Hamburger menu toggle
+    safeAddListener(elements.hamburgerBtn, 'click', (e) => {
+        e.stopPropagation();
+        triggerHaptic('light');
+        if (elements.dropdownMenu) elements.dropdownMenu.classList.toggle('visible');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (elements.dropdownMenu && elements.hamburgerBtn) {
+            if (!elements.dropdownMenu.contains(e.target) && e.target !== elements.hamburgerBtn) {
+                elements.dropdownMenu.classList.remove('visible');
+            }
+        }
+    });
+
+    // What is FYI modal
+    safeAddListener(elements.whatIsFYIBtn, 'click', () => {
+        triggerHaptic('light');
+        if (elements.dropdownMenu) elements.dropdownMenu.classList.remove('visible');
+        if (elements.whatIsFYIModal) elements.whatIsFYIModal.classList.add('visible');
+        document.body.classList.add('no-scroll');
+        trackModalOpened('What is FYI');
+    });
+
+    safeAddListener(elements.whatIsFYIClose, 'click', () => {
+        triggerHaptic('light');
+        if (elements.whatIsFYIModal) elements.whatIsFYIModal.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+    });
+
+    safeAddListener(elements.whatIsFYIModal, 'click', (e) => {
+        if (e.target === elements.whatIsFYIModal) {
+            triggerHaptic('light');
+            elements.whatIsFYIModal.classList.remove('visible');
+            document.body.classList.remove('no-scroll');
+        }
+    });
+
+    // FAQs menu button - force refresh to get latest FAQ content
+    safeAddListener(elements.faqsBtn, 'click', async () => {
+        triggerHaptic('light');
+        if (elements.dropdownMenu) elements.dropdownMenu.classList.remove('visible');
+        trackEvent('FAQs Menu Clicked');
+        // Force refresh when explicitly accessing FAQs from menu
+        await enterFAQMode(false, true);
+    });
+
+    // Our Philosophy modal
+    safeAddListener(elements.ourPhilosophyBtn, 'click', () => {
+        triggerHaptic('light');
+        if (elements.dropdownMenu) elements.dropdownMenu.classList.remove('visible');
+        if (elements.ourPhilosophyModal) elements.ourPhilosophyModal.classList.add('visible');
+        document.body.classList.add('no-scroll');
+        trackModalOpened('Our Philosophy');
+    });
+
+    safeAddListener(elements.ourPhilosophyClose, 'click', () => {
+        triggerHaptic('light');
+        if (elements.ourPhilosophyModal) elements.ourPhilosophyModal.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+    });
+
+    safeAddListener(elements.ourPhilosophyModal, 'click', (e) => {
+        if (e.target === elements.ourPhilosophyModal) {
+            triggerHaptic('light');
+            elements.ourPhilosophyModal.classList.remove('visible');
+            document.body.classList.remove('no-scroll');
+        }
+    });
+
+    // Logo click - ALWAYS returns to today's Story 1, from ANY state
+    safeAddListener(elements.headerLogo, 'click', async () => {
+        console.log('[LOGO CLICKED] Forcing transition to Story 1');
+        triggerHaptic('light');
+
+        // Always transition to stories mode with fresh state
+        await transitionToMode('stories');
+        showToast('✓', "Back to today's stories");
+    });
+
+    // Empty state refresh
+    safeAddListener(elements.emptyRefreshBtn, 'click', () => {
+        triggerHaptic('light');
+        refreshStories();
+    });
+
+    // Modal controls
+    safeAddListener(elements.modalClose, 'click', () => {
+        triggerHaptic('light');
+        closeModal();
+    });
+
+    safeAddListener(elements.modalBackdrop, 'click', (e) => {
+        if (e.target === elements.modalBackdrop) {
+            triggerHaptic('light');
+            closeModal();
+        }
+    });
+
+    // Q&A card click handler is now set up dynamically in setupQACardClickHandler()
+    // Called by setupCardInteractions() when card is created
+
+    // LEGACY: Keep old qaModal click handler for Answer/Dig Deeper views
+    if (elements.qaModal) {
+        elements.qaModal.addEventListener('click', (e) => {
+            // Clicking inside the modal shouldn't close it
+            e.stopPropagation();
+        });
+    }
+
+    // Done button - returns to question set (Q&A view), NOT to card deck
+    safeAddListener(elements.doneBtn, 'click', () => {
+        triggerHaptic('light');
+        showQAView();
+    });
+
+    // Dig Deeper button
+    if (elements.digDeeperBtn) {
+        elements.digDeeperBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            showDigDeeper();
+        });
+    }
+
+    // Deep done button
+    if (elements.deepDoneBtn) {
+        elements.deepDoneBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            deepDone();
+        });
+    }
+
+    // Modal Prev buttons
+    if (elements.answerViewPrev) {
+        elements.answerViewPrev.addEventListener('click', () => {
+            triggerHaptic('light');
+            showQAView();
+        });
+    }
+
+    if (elements.digDeeperViewPrev) {
+        elements.digDeeperViewPrev.addEventListener('click', () => {
+            triggerHaptic('light');
+            hideDigDeeperToAnswer();
+        });
+    }
+
+    if (elements.deepAnswerViewPrev) {
+        elements.deepAnswerViewPrev.addEventListener('click', () => {
+            triggerHaptic('light');
+            backToDeepQuestions();
+        });
+    }
+
+    // Summary Modal close button
+    if (elements.summaryModalClose) {
+        elements.summaryModalClose.addEventListener('click', () => {
+            triggerHaptic('light');
+            closeSummaryModal();
+        });
+    }
+
+    // Summary Modal backdrop click
+    if (elements.summaryModalBackdrop) {
+        elements.summaryModalBackdrop.addEventListener('click', (e) => {
+            if (e.target === elements.summaryModalBackdrop) {
+                triggerHaptic('light');
+                closeSummaryModal();
+            }
+        });
+    }
+
+    // Review stories button
+    safeAddListener(elements.reviewStoriesBtn, 'click', () => {
+        triggerHaptic('light');
+        resetApp();
+    });
+
+    // Your Questions button (on completion screen) - behavior changes in FAQ mode
+    if (elements.yourQuestionsBtn) {
+        elements.yourQuestionsBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+
+            // In FAQ mode, this button becomes "Go to stories"
+            if (elements.yourQuestionsBtn.dataset.faqAction === 'go-to-stories') {
+                console.log('[Go to stories] Transitioning from FAQ completion to Story 1');
+                // Use state machine to properly transition to stories
+                await transitionToMode('stories');
+                return;
+            }
+
+            // Default behavior: show question history
+            state.cameFromCompletion = true; // Track that we came from completion
+            switchSection('history');
+        });
+    }
+
+    // Prev Story button - handles card navigation with mode-aware behavior
+    if (elements.prevStoryBtn) {
+        elements.prevStoryBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+
+            // If we're in history section (came from completion's "Your Questions")
+            if (state.currentSection === 'history' && state.cameFromCompletion) {
+                // Return to completion screen
+                state.cameFromCompletion = false;
+                switchSection('today');
+                elements.completionScreen.classList.add('visible');
+                return;
+            }
+
+            // If we're in recap view (came from completion's "Go to archives")
+            if (state.inRecapView && state.cameFromCompletion) {
+                hideRecapView();
+                return;
+            }
+
+            // If in FAQ mode on first card, exit to stories
+            if (state.faqMode && state.currentIndex === 0) {
+                console.log('[Prev] Exiting FAQ mode on first card');
+                await transitionToMode('stories');
+                return;
+            }
+
+            // If in archive mode on first card from no-stories page
+            if (state.archiveMode && state.currentIndex === 0 && state.enteredArchivesFromNoStories) {
+                console.log('[Prev] Returning to no-stories from archives');
+                await transitionToMode('stories'); // Will show no-stories if still empty
+                return;
+            }
+
+            // If in archive mode on first card, return to stories completion
+            if (state.archiveMode && state.currentIndex === 0) {
+                console.log('[Prev] Exiting archive mode on first card');
+                // Go back to stories and show completion
+                cleanupCurrentState();
+                state.archiveMode = false;
+                state.appMode = 'stories';
+                state.stories = state.originalStories || [];
+                state.totalStories = state.stories.length;
+                state.currentIndex = state.totalStories; // At end = completion
+                state.originalStories = [];
+
+                // Show completion
+                elements.completionScreen.classList.add('visible');
+                elements.progressFill.style.width = '100%';
+                updateCompletionButtons();
+                updateDateDisplay();
+                updatePrevButtonVisibility();
+                return;
+            }
+
+            // Default: go to previous card
+            prevCard();
+        });
+    }
+
+    // Recap This Week / Back to Today / Go to Archives button - behavior depends on mode
+    if (elements.recapWeekBtn) {
+        elements.recapWeekBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+
+            if (state.faqMode) {
+                // In FAQ mode: "Go to archives" - use state machine
+                console.log('[Go to archives] Transitioning from FAQ to archives');
+                trackRecapViewed('faq_completion');
+                await transitionToMode('archives', { source: 'faq_completion' });
+            } else if (state.archiveMode) {
+                // In archive mode: go back to today's stories
+                console.log('[Back to today] Transitioning from archives to stories');
+                await transitionToMode('stories');
+            } else {
+                // In today mode: go to archives
+                console.log('[Go to archives] Transitioning from stories to archives');
+                trackRecapViewed('completion_button');
+                await transitionToMode('archives', {
+                    source: 'completion_button',
+                    originalStories: [...state.stories]
+                });
+            }
+        });
+    }
+
+    // Star rating
+    setupStarRating();
+
+    // History toggle (legacy floating button, may be removed)
+    if (elements.historyToggle) {
+        elements.historyToggle.addEventListener('click', () => {
+            switchSection('history');
+        });
+    }
+
+    // History back button - REMOVED from HTML, functionality moved to global Prev button
+
+    // Welcome Choice - New User button
+    if (elements.welcomeNewUserBtn) {
+        elements.welcomeNewUserBtn.addEventListener('click', () => {
+            triggerHaptic('medium');
+            state.showFAQsAfterName = true; // Flag to show FAQs after name entry
+            hideWelcomeChoice();
+            showWelcomeModal();
+        });
+    }
+
+    // Welcome Choice - Returning User button
+    if (elements.welcomeReturningBtn) {
+        elements.welcomeReturningBtn.addEventListener('click', () => {
+            triggerHaptic('medium');
+            state.showFAQsAfterName = false; // Skip FAQs, go to stories
+            hideWelcomeChoice();
+            showWelcomeModal();
+        });
+    }
+
+    // Welcome Back button - returns to welcome choice
+    if (elements.welcomeBackBtn) {
+        elements.welcomeBackBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            hideWelcomeModal();
+            showWelcomeChoice();
+        });
+    }
+
+    // Welcome modal submit
+    if (elements.welcomeSubmitBtn) {
+        elements.welcomeSubmitBtn.addEventListener('click', () => {
+            const name = elements.welcomeNameInput.value.trim();
+            if (name) {
+                triggerHaptic('medium');
+                saveUserName(name);
+            }
+        });
+    }
+
+    // Welcome modal input - submit on Enter key
+    if (elements.welcomeNameInput) {
+        elements.welcomeNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const name = elements.welcomeNameInput.value.trim();
+                if (name) {
+                    triggerHaptic('medium');
+                    saveUserName(name);
+                }
+            }
+        });
+    }
+
+    // No Stories - Go to Archives button
+    if (elements.emptyArchivesBtn) {
+        elements.emptyArchivesBtn.addEventListener('click', async () => {
+            triggerHaptic('light');
+            trackRecapViewed('no_stories_page');
+            await enterArchiveModeFromNoStories();
+        });
+    }
+
+    // Resize handler to adjust logo font size
+    window.addEventListener('resize', () => {
+        if (state.userName) {
+            adjustLogoFontSize();
+        }
+    });
+
+    // Pull to refresh
+    setupPullToRefresh();
+
+    // Keyboard shortcuts - NEW NAVIGATION SYSTEM
+    document.addEventListener('keydown', (e) => {
+        // Escape closes modals (returns to previous layer)
+        if (e.key === 'Escape') {
+            handleKeyboardBack();
+            return;
+        }
+
+        // Check legacy modal states
+        const qaModalOpen = elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible');
+        const summaryModalOpen = elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible');
+
+        // When in legacy Q&A modal - only down arrow works (to go back)
+        if (qaModalOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                closeModal();
+            }
+            return;
+        }
+
+        // When in summary modal - only down arrow works (to go back)
+        if (summaryModalOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                closeSummaryModal();
+            }
+            return;
+        }
+
+        // Card navigation (when no modal is open)
+        if (state.currentSection === 'today') {
+            const card = document.querySelector('.story-card[data-card-type="current"]');
+            const story = state.stories[state.currentIndex];
+
+            // Handle ArrowDown based on current layer state
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                handleKeyboardDown(card, story);
+                return;
+            }
+
+            // Handle ArrowUp based on current layer state
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (card && story) handleSwipeUp(card, story);
+                return;
+            }
+
+            // Left/Right only work on headline/summary
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (card && story) handleSwipeLeft(card, story);
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                if (card && story) handleSwipeRight(card, story);
+            }
+        }
+    });
+}
+
+/**
+ * Handle ArrowDown key navigation for all card layers
+ */
+function handleKeyboardDown(card, story) {
+    // Handle based on current card layer
+    switch (state.cardLayer) {
+        case 'dig-deeper-answer':
+            // From Dig Deeper Answer -> return to Dig Deeper Q&A
+            hideDigDeeperAnswerCard();
+            break;
+
+        case 'dig-deeper-qa':
+            // From Dig Deeper Q&A -> return to Answer
+            hideDigDeeperQACard();
+            break;
+
+        case 'answer':
+            // From Answer -> return to Q&A
+            hideAnswerCard();
+            break;
+
+        case 'questions':
+            // From Q&A -> return to Summary
+            closeQACard();
+            break;
+
+        case 'summary':
+            // From Summary -> flip back to Headline
+            if (card && story) {
+                flipCard(card, story);
+                state.isCardFlipped = false;
+                state.cardLayer = 'headline';
+                setQACardState(QA_STATES.HIDDEN);
+            }
+            break;
+
+        case 'headline':
+        default:
+            // Already at headline, do nothing
+            break;
+    }
+}
+
+/**
+ * Handle keyboard back navigation (Escape key)
+ * Returns to previous layer based on current state
+ */
+function handleKeyboardBack() {
+    // Check legacy modals first
+    if (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible')) {
+        closeSummaryModal();
+        return;
+    }
+    if (elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible')) {
+        closeModal();
+        return;
+    }
+
+    // Handle new card system layers
+    const card = document.querySelector('.story-card[data-card-type="current"]');
+    const story = state.stories[state.currentIndex];
+
+    switch (state.cardLayer) {
+        case 'dig-deeper-answer':
+            hideDigDeeperAnswerCard();
+            break;
+
+        case 'dig-deeper-qa':
+            hideDigDeeperQACard();
+            break;
+
+        case 'answer':
+            hideAnswerCard();
+            break;
+
+        case 'questions':
+            closeQACard();
+            break;
+
+        case 'summary':
+            // From Summary -> flip back to Headline
+            if (card && story) {
+                flipCard(card, story);
+                state.isCardFlipped = false;
+                state.cardLayer = 'headline';
+                setQACardState(QA_STATES.HIDDEN);
+            }
+            break;
+
+        default:
+            // At headline or unknown state, do nothing
+            break;
+    }
+}
+
+// ==========================================
+// Start App
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', init);
