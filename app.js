@@ -438,28 +438,28 @@ const QA_STATES = {
 
 /**
  * Set Q&A card state - manages the three-state system
- * HIDDEN: Q&A not visible
- * PEEKING: Q&A hint visible at bottom (when Summary is shown)
- * ACTIVE: Q&A fully visible (when user swipes up from Summary)
+ * HIDDEN: Q&A not visible (translateY 100%)
+ * PEEKING: Only "Are you curious about" visible at bottom of container
+ * ACTIVE: Q&A fully visible, replacing Summary visually
  */
 function setQACardState(newState) {
-    const qaBackdrop = elements.modalBackdrop;
-    if (!qaBackdrop) return;
+    const qaCard = elements.qaCard;
+    if (!qaCard) return;
 
     // Remove all state classes
-    qaBackdrop.classList.remove('peeking', 'visible');
+    qaCard.classList.remove('peeking', 'active');
 
     // Apply new state
     switch (newState) {
         case QA_STATES.PEEKING:
-            qaBackdrop.classList.add('peeking');
+            qaCard.classList.add('peeking');
             break;
         case QA_STATES.ACTIVE:
-            qaBackdrop.classList.add('visible');
+            qaCard.classList.add('active');
             break;
         case QA_STATES.HIDDEN:
         default:
-            // No classes = hidden (default CSS applies)
+            // No classes = hidden (default CSS: translateY 100%)
             break;
     }
 
@@ -755,7 +755,11 @@ function cacheElements() {
     elements.historyToggle = document.getElementById('historyToggle');
     elements.historyBackBtn = document.getElementById('historyBackBtn');
 
-    // Modal
+    // NEW Q&A Card (inside card-container)
+    elements.qaCard = document.getElementById('qaCard');
+    elements.qaQuestionsList = document.getElementById('qaQuestionsList');
+
+    // LEGACY Modal (still used for Answer and Dig Deeper views)
     elements.modalBackdrop = document.getElementById('modalBackdrop');
     elements.qaModal = document.getElementById('qaModal');
     elements.modalClose = document.getElementById('modalClose');
@@ -2195,7 +2199,9 @@ function createCardElement(story, position) {
     const hasFlippedBefore = localStorage.getItem('fyi_has_flipped') === 'true';
     const flipHintClass = hasFlippedBefore ? 'hidden' : '';
 
-    // Determine visibility of prev/next based on position
+    // Determine disabled state for prev/next based on position
+    // CRITICAL: Always show ALL buttons, use 'disabled' class for inactive ones
+    // This preserves CSS Grid spacing and prevents alignment bugs
     const isFirstStory = state.currentIndex === 0;
     const isLastStory = state.currentIndex >= state.totalStories - 1;
 
@@ -2210,11 +2216,11 @@ function createCardElement(story, position) {
                     <h2 class="card-headline">${parseFormattedText(story.headline)}</h2>
                     <p class="card-teaser">${parseFormattedText(teaserText)}</p>
                 </div>
-                <!-- Bottom Navigation Hints (visual only, not clickable) -->
+                <!-- Bottom Navigation Hints - ALWAYS show all 3 for grid alignment -->
                 <div class="card-nav-hints">
-                    <span class="nav-hint nav-hint-prev ${isFirstStory ? 'hidden' : ''}">← Prev</span>
-                    <span class="nav-hint nav-hint-center">Read ahead ↑</span>
-                    <span class="nav-hint nav-hint-next ${isLastStory ? 'hidden' : ''}">Next →</span>
+                    <span class="nav-hint nav-hint-prev ${isFirstStory ? 'disabled' : ''}" data-action="prev">← Prev</span>
+                    <span class="nav-hint nav-hint-center" data-action="flip">Read ahead ↑</span>
+                    <span class="nav-hint nav-hint-next ${isLastStory ? 'disabled' : ''}" data-action="next">Next →</span>
                 </div>
             </div>
 
@@ -2277,41 +2283,41 @@ function flipCard(card, story) {
 /**
  * Populate Q&A card with story questions
  * Called when flipping to summary to prepare the peek state
+ * Uses the NEW Q&A card structure (inside card-container)
  */
 function populateQACard(story) {
     if (!story || !story.questions) return;
 
     state.currentStory = story;
 
-    elements.modalEmoji.textContent = story.emoji || '✦';
-    elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
-
-    elements.questionsContainer.innerHTML = '';
+    // Clear the NEW Q&A questions list
+    if (!elements.qaQuestionsList) return;
+    elements.qaQuestionsList.innerHTML = '';
 
     // For FAQs, only show first 3 questions
     const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
 
     questionsToShow.forEach((q) => {
         const button = document.createElement('button');
-        button.className = 'question-button';
+        button.className = 'qa-question-btn';
         button.innerHTML = `
-            <span class="question-label">✦</span>
-            <span class="question-text">${parseFormattedText(q.text)}</span>
+            <span class="qa-question-label">✦</span>
+            <span class="qa-question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
             showAnswer(q);
         });
-        elements.questionsContainer.appendChild(button);
+        elements.qaQuestionsList.appendChild(button);
     });
 
     // Add skip button
     const skipButton = document.createElement('button');
-    skipButton.className = 'question-button skip';
+    skipButton.className = 'qa-question-btn skip';
     const skipText = story.isFAQ ? 'Skip this FAQ' : 'Skip this story';
     skipButton.innerHTML = `
-        <span class="question-label">✦</span>
-        <span class="question-text">${skipText}</span>
+        <span class="qa-question-label">✦</span>
+        <span class="qa-question-text">${skipText}</span>
     `;
     skipButton.addEventListener('click', () => {
         triggerHaptic('light');
@@ -2327,7 +2333,11 @@ function populateQACard(story) {
         state.isCardFlipped = false;
         setTimeout(() => nextCard(), 300);
     });
-    elements.questionsContainer.appendChild(skipButton);
+    elements.qaQuestionsList.appendChild(skipButton);
+
+    // Also populate legacy modal for Answer/Dig Deeper views
+    if (elements.modalEmoji) elements.modalEmoji.textContent = story.emoji || '✦';
+    if (elements.modalHeadline) elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
 }
 
 function setupCardInteractions(card, story) {
@@ -2349,12 +2359,14 @@ function setupCardInteractions(card, story) {
 }
 
 // Click handlers for nav hints
+// CRITICAL: Check for 'disabled' class (not 'hidden') - disabled buttons stay in grid but don't work
 function setupNavHintClickHandlers(card, story) {
     const prevHint = card.querySelector('.nav-hint-prev');
     const centerHint = card.querySelector('.nav-hint-center');
     const nextHint = card.querySelector('.nav-hint-next');
 
-    if (prevHint && !prevHint.classList.contains('hidden')) {
+    // Prev button - only active if NOT disabled
+    if (prevHint && !prevHint.classList.contains('disabled')) {
         prevHint.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
@@ -2362,6 +2374,7 @@ function setupNavHintClickHandlers(card, story) {
         });
     }
 
+    // Center button (flip/read ahead) - always active
     if (centerHint) {
         centerHint.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -2370,7 +2383,8 @@ function setupNavHintClickHandlers(card, story) {
         });
     }
 
-    if (nextHint && !nextHint.classList.contains('hidden')) {
+    // Next button - only active if NOT disabled
+    if (nextHint && !nextHint.classList.contains('disabled')) {
         nextHint.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
@@ -2650,7 +2664,7 @@ function handleSwipeUp(card, story) {
         // Transition Q&A from PEEKING to ACTIVE
         state.cardLayer = 'questions';
         setQACardState(QA_STATES.ACTIVE);
-        setupModalSwipe(); // Setup swipe-down to dismiss
+        setupQACardSwipe(); // Setup swipe-down to dismiss
     }
 }
 
@@ -3048,6 +3062,13 @@ function setupModalSwipe() {
 
     const modal = elements.qaModal;
 
+    // CRITICAL: Remove old listeners first to prevent duplicates
+    if (modal._touchStartHandler) {
+        modal.removeEventListener('touchstart', modal._touchStartHandler);
+        modal.removeEventListener('touchmove', modal._touchMoveHandler);
+        modal.removeEventListener('touchend', modal._touchEndHandler);
+    }
+
     const handleTouchStart = (e) => {
         startY = e.touches[0].clientY;
     };
@@ -3079,9 +3100,93 @@ function setupModalSwipe() {
         currentY = 0;
     };
 
+    // Store handlers for removal later
+    modal._touchStartHandler = handleTouchStart;
+    modal._touchMoveHandler = handleTouchMove;
+    modal._touchEndHandler = handleTouchEnd;
+
     modal.addEventListener('touchstart', handleTouchStart, { passive: true });
     modal.addEventListener('touchmove', handleTouchMove, { passive: false });
     modal.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Setup swipe-to-dismiss for NEW Q&A card (inside card-container)
+ * Swipe down from Q&A returns to Summary (Q&A becomes peeking)
+ */
+function setupQACardSwipe() {
+    const qaCard = elements.qaCard;
+    if (!qaCard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners first to prevent duplicates
+    if (qaCard._touchStartHandler) {
+        qaCard.removeEventListener('touchstart', qaCard._touchStartHandler);
+        qaCard.removeEventListener('touchmove', qaCard._touchMoveHandler);
+        qaCard.removeEventListener('touchend', qaCard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        // Only allow dragging down when at top of scroll
+        if (deltaY > 0 && qaCard.scrollTop === 0) {
+            e.preventDefault();
+            // Apply visual feedback during drag
+            qaCard.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            // Swipe down threshold met - return to Summary (Q&A becomes peeking)
+            triggerHaptic('light');
+            closeQACard();
+        } else {
+            // Reset position to active state
+            qaCard.style.transform = 'translateX(-50%) translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    // Store handlers for removal later
+    qaCard._touchStartHandler = handleTouchStart;
+    qaCard._touchMoveHandler = handleTouchMove;
+    qaCard._touchEndHandler = handleTouchEnd;
+
+    qaCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    qaCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    qaCard.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Close Q&A card - return from ACTIVE to PEEKING state
+ * Called when swiping down from Q&A
+ */
+function closeQACard() {
+    // Transition Q&A from ACTIVE back to PEEKING
+    setQACardState(QA_STATES.PEEKING);
+
+    // Update layer state - return to SUMMARY
+    state.cardLayer = 'summary';
+
+    // Reset Q&A card inline transform
+    if (elements.qaCard) {
+        elements.qaCard.style.transform = '';
+    }
+
+    console.log('[closeQACard] Returned to Summary with Q&A peeking');
 }
 
 function showAnswer(question) {
@@ -3095,7 +3200,7 @@ function showAnswer(question) {
 
     console.log('[showAnswer] Transitioning from Q&A to answer view');
 
-    // Prepare answer view content before showing
+    // Prepare answer view content in LEGACY modal
     elements.answerLabel.textContent = '✦';
     elements.answerQuestion.innerHTML = parseFormattedText(question.text);
     elements.answerText.innerHTML = parseFormattedText(question.answer);
@@ -3108,14 +3213,20 @@ function showAnswer(question) {
 
     resetStars();
 
-    // SLIDE TRANSITION: Q&A slides left, Answer slides in from right
-    elements.qaView.classList.add('slide-out-left');
-    elements.answerView.classList.remove('hidden');
+    // Hide NEW Q&A card (it was active)
+    setQACardState(QA_STATES.HIDDEN);
 
-    setTimeout(() => {
-        elements.qaView.classList.add('hidden');
-        elements.qaView.classList.remove('slide-out-left');
-    }, 350);
+    // Show LEGACY modal with Answer view
+    elements.qaView.classList.add('hidden');
+    elements.answerView.classList.remove('hidden');
+    elements.modalBackdrop.classList.add('visible');
+    document.body.classList.add('no-scroll');
+
+    // Update state
+    state.cardLayer = 'answer';
+
+    // Setup swipe on legacy modal
+    setupModalSwipe();
 }
 
 function showQAView() {
@@ -3181,13 +3292,18 @@ function verifyModalState() {
 }
 
 function closeModal() {
-    // CRITICAL: Transition Q&A from ACTIVE back to PEEKING (not hidden!)
-    // This is the swipe-down from Q&A which returns to Summary
-    setQACardState(QA_STATES.PEEKING);
+    // Close LEGACY modal and return to NEW Q&A card (ACTIVE state)
+    // This is called when dismissing Answer/Dig Deeper views
+
+    // Hide legacy modal
+    elements.modalBackdrop.classList.remove('visible');
     document.body.classList.remove('no-scroll');
 
-    // Update layer state - return to SUMMARY
-    state.cardLayer = 'summary';
+    // Show NEW Q&A card in ACTIVE state (return to questions)
+    setQACardState(QA_STATES.ACTIVE);
+
+    // Update layer state - return to Q&A questions
+    state.cardLayer = 'questions';
     if (state.modalStack.length > 0) {
         state.modalStack.pop();
     }
@@ -3205,6 +3321,9 @@ function closeModal() {
         state.currentQuestion = null;
         state.currentHistoryEntry = null;
     }, 300);
+
+    // Setup swipe on new Q&A card
+    setupQACardSwipe();
 }
 
 // ==========================================
@@ -3461,25 +3580,35 @@ function verifyCleanState() {
 function resetAllCardStates() {
     console.log('[resetAllCardStates] Resetting all card states');
 
-    // 1. Reset Q&A card to HIDDEN state
+    // 1. Reset NEW Q&A card to HIDDEN state
     setQACardState(QA_STATES.HIDDEN);
 
-    // 2. Reset flip card to front (headline)
+    // 2. Reset inline transform on new Q&A card
+    if (elements.qaCard) {
+        elements.qaCard.style.transform = '';
+    }
+
+    // 3. Hide LEGACY modal
+    if (elements.modalBackdrop) {
+        elements.modalBackdrop.classList.remove('visible', 'peeking', 'push-transition');
+    }
+
+    // 4. Reset flip card to front (headline)
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (currentCard) {
         currentCard.classList.remove('flipped');
         currentCard.dataset.flipped = 'false';
     }
 
-    // 3. Reset modal views
+    // 5. Reset modal views
     resetAllModalViews();
 
-    // 4. Reset card layer state
+    // 6. Reset card layer state
     state.cardLayer = 'headline';
     state.isCardFlipped = false;
     state.modalStack = [];
 
-    // 5. Remove no-scroll from body
+    // 7. Remove no-scroll from body
     document.body.classList.remove('no-scroll');
 }
 
@@ -4022,6 +4151,37 @@ function setupEventListeners() {
             closeModal();
         }
     });
+
+    // Click on Q&A modal when PEEKING = activate it
+    // This allows users to tap on the peeking hint to open full Q&A
+    // Click on NEW Q&A card when PEEKING = activate it
+    if (elements.qaCard) {
+        elements.qaCard.addEventListener('click', (e) => {
+            // Only activate from PEEKING state (not when already active)
+            if (state.qaCardState === QA_STATES.PEEKING) {
+                e.stopPropagation();
+                triggerHaptic('light');
+                state.cardLayer = 'questions';
+                setQACardState(QA_STATES.ACTIVE);
+                setupQACardSwipe(); // Setup swipe-down to dismiss
+            }
+            // If already ACTIVE, let normal click propagation happen
+        });
+    }
+
+    // LEGACY: Keep old qaModal click handler for Answer/Dig Deeper
+    if (elements.qaModal) {
+        elements.qaModal.addEventListener('click', (e) => {
+            // Only activate from PEEKING state (not when already active)
+            if (state.qaCardState === QA_STATES.PEEKING) {
+                e.stopPropagation();
+                triggerHaptic('light');
+                state.cardLayer = 'questions';
+                setQACardState(QA_STATES.ACTIVE);
+                setupQACardSwipe();
+            }
+        });
+    }
 
     // Done button - returns to question set (Q&A view), NOT to card deck
     elements.doneBtn.addEventListener('click', () => {
