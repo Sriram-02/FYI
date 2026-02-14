@@ -423,8 +423,49 @@ const state = {
     modalStack: [], // Stack of modal states for back navigation
 
     // NEW: Track if card is flipped (on summary side)
-    isCardFlipped: false
+    isCardFlipped: false,
+
+    // Q&A Card State: 'hidden' | 'peeking' | 'active'
+    qaCardState: 'hidden'
 };
+
+// Q&A Card States - THREE DISTINCT STATES
+const QA_STATES = {
+    HIDDEN: 'hidden',   // Below viewport, not visible
+    PEEKING: 'peeking', // Hint visible at bottom when Summary shows
+    ACTIVE: 'active'    // Fully visible, replaces Summary
+};
+
+/**
+ * Set Q&A card state - manages the three-state system
+ * HIDDEN: Q&A not visible
+ * PEEKING: Q&A hint visible at bottom (when Summary is shown)
+ * ACTIVE: Q&A fully visible (when user swipes up from Summary)
+ */
+function setQACardState(newState) {
+    const qaBackdrop = elements.modalBackdrop;
+    if (!qaBackdrop) return;
+
+    // Remove all state classes
+    qaBackdrop.classList.remove('peeking', 'visible');
+
+    // Apply new state
+    switch (newState) {
+        case QA_STATES.PEEKING:
+            qaBackdrop.classList.add('peeking');
+            break;
+        case QA_STATES.ACTIVE:
+            qaBackdrop.classList.add('visible');
+            break;
+        case QA_STATES.HIDDEN:
+        default:
+            // No classes = hidden (default CSS applies)
+            break;
+    }
+
+    state.qaCardState = newState;
+    console.log('[Q&A State]', newState);
+}
 
 // ==========================================
 // STATE MACHINE - App Mode Management
@@ -437,9 +478,12 @@ const state = {
 function cleanupCurrentState() {
     console.log('[STATE] Cleaning up current state:', state.appMode);
 
+    // CRITICAL: Reset Q&A card to hidden state
+    setQACardState(QA_STATES.HIDDEN);
+
     // Close all modals
     if (elements.modalBackdrop) {
-        elements.modalBackdrop.classList.remove('visible');
+        elements.modalBackdrop.classList.remove('visible', 'peeking', 'push-transition');
         document.body.classList.remove('no-scroll');
     }
     if (elements.summaryModalBackdrop) {
@@ -2197,30 +2241,93 @@ function createCardElement(story, position) {
     return card;
 }
 
-// Flip card function
+// Flip card function - manages headline/summary flip AND Q&A peek state
 function flipCard(card, story) {
     const isFlipped = card.dataset.flipped === 'true';
 
     if (isFlipped) {
-        // Flip back to front
+        // Flip back to front (headline)
         card.classList.remove('flipped');
         card.dataset.flipped = 'false';
         trackCardFlip(story.headline, 'to_front');
+
+        // CRITICAL: Hide Q&A card when returning to headline
+        setQACardState(QA_STATES.HIDDEN);
     } else {
         // Flip to back (summary)
         card.classList.add('flipped');
         card.dataset.flipped = 'true';
         trackCardFlip(story.headline, 'to_summary');
 
+        // CRITICAL: Show Q&A card peeking when summary is visible
+        // First populate Q&A content, then show peek
+        populateQACard(story);
+        setQACardState(QA_STATES.PEEKING);
+
         // Hide the "Tap to flip" hint permanently after first flip
         if (localStorage.getItem('fyi_has_flipped') !== 'true') {
             localStorage.setItem('fyi_has_flipped', 'true');
-            // Hide all flip hints on all cards
             document.querySelectorAll('.nav-flip').forEach(hint => {
                 hint.classList.add('hidden');
             });
         }
     }
+}
+
+/**
+ * Populate Q&A card with story questions
+ * Called when flipping to summary to prepare the peek state
+ */
+function populateQACard(story) {
+    if (!story || !story.questions) return;
+
+    state.currentStory = story;
+
+    elements.modalEmoji.textContent = story.emoji || '✦';
+    elements.modalHeadline.innerHTML = parseFormattedText(story.headline);
+
+    elements.questionsContainer.innerHTML = '';
+
+    // For FAQs, only show first 3 questions
+    const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
+
+    questionsToShow.forEach((q) => {
+        const button = document.createElement('button');
+        button.className = 'question-button';
+        button.innerHTML = `
+            <span class="question-label">✦</span>
+            <span class="question-text">${parseFormattedText(q.text)}</span>
+        `;
+        button.addEventListener('click', () => {
+            triggerHaptic('light');
+            showAnswer(q);
+        });
+        elements.questionsContainer.appendChild(button);
+    });
+
+    // Add skip button
+    const skipButton = document.createElement('button');
+    skipButton.className = 'question-button skip';
+    const skipText = story.isFAQ ? 'Skip this FAQ' : 'Skip this story';
+    skipButton.innerHTML = `
+        <span class="question-label">✦</span>
+        <span class="question-text">${skipText}</span>
+    `;
+    skipButton.addEventListener('click', () => {
+        triggerHaptic('light');
+        trackQuestionsSkipped(story.headline);
+        // Return to headline and go to next story
+        setQACardState(QA_STATES.HIDDEN);
+        const card = document.querySelector('.story-card[data-card-type="current"]');
+        if (card) {
+            card.classList.remove('flipped');
+            card.dataset.flipped = 'false';
+        }
+        state.cardLayer = 'headline';
+        state.isCardFlipped = false;
+        setTimeout(() => nextCard(), 300);
+    });
+    elements.questionsContainer.appendChild(skipButton);
 }
 
 function setupCardInteractions(card, story) {
@@ -2466,8 +2573,15 @@ function handleTapZone(e, card, story) {
 
 /**
  * Handle LEFT swipe = Navigate to PREVIOUS story
+ * CRITICAL: Only works from headline/summary, NOT from Q&A/answer
  */
 function handleSwipeLeft(card, story) {
+    // Block story navigation from Q&A or Answer views
+    if (state.cardLayer === 'questions' || state.cardLayer === 'answer') {
+        snapCardBack(card);
+        return;
+    }
+
     if (state.currentIndex <= 0) {
         // Already at first story - bounce back
         showToast('', "You're at the first story");
@@ -2478,16 +2592,24 @@ function handleSwipeLeft(card, story) {
     // Track the navigation
     trackEvent('Story Swiped', { direction: 'prev', from: state.currentIndex + 1, to: state.currentIndex });
 
+    // CRITICAL: Reset ALL card states before navigating
+    resetAllCardStates();
+
     // Navigate to previous story (always to headline, not summary)
-    state.isCardFlipped = false;
-    state.cardLayer = 'headline';
     prevCard();
 }
 
 /**
  * Handle RIGHT swipe = Navigate to NEXT story
+ * CRITICAL: Only works from headline/summary, NOT from Q&A/answer
  */
 function handleSwipeRight(card, story) {
+    // Block story navigation from Q&A or Answer views
+    if (state.cardLayer === 'questions' || state.cardLayer === 'answer') {
+        snapCardBack(card);
+        return;
+    }
+
     if (state.currentIndex >= state.totalStories - 1) {
         // At last story - show completion or bounce
         if (!elements.completionScreen.classList.contains('visible')) {
@@ -2502,29 +2624,33 @@ function handleSwipeRight(card, story) {
     // Track the navigation
     trackEvent('Story Swiped', { direction: 'next', from: state.currentIndex + 1, to: state.currentIndex + 2 });
 
+    // CRITICAL: Reset ALL card states before navigating
+    resetAllCardStates();
+
     // Navigate to next story (always to headline)
-    state.isCardFlipped = false;
-    state.cardLayer = 'headline';
     nextCard();
 }
 
 /**
  * Handle SWIPE UP = Reveal next layer
- * From headline -> flip to summary
- * From summary -> open questions modal
+ * From headline -> flip to summary (Q&A peeks)
+ * From summary -> Q&A becomes active (from peeking to active)
  */
 function handleSwipeUp(card, story) {
     const isFlipped = card.dataset.flipped === 'true';
 
     if (!isFlipped) {
         // Currently on HEADLINE - flip to SUMMARY
+        // flipCard will also set Q&A to PEEKING state
         flipCard(card, story);
         state.isCardFlipped = true;
         state.cardLayer = 'summary';
     } else {
-        // Currently on SUMMARY - reveal QUESTIONS modal
+        // Currently on SUMMARY with Q&A peeking
+        // Transition Q&A from PEEKING to ACTIVE
         state.cardLayer = 'questions';
-        openQuestionsWithPushTransition(story);
+        setQACardState(QA_STATES.ACTIVE);
+        setupModalSwipe(); // Setup swipe-down to dismiss
     }
 }
 
@@ -2932,8 +3058,8 @@ function setupModalSwipe() {
 
         if (deltaY > 0 && modal.scrollTop === 0) {
             e.preventDefault();
-            // Q&A card uses centered positioning, so preserve translateX(-50%)
-            modal.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
+            // Q&A card positioned absolutely, apply translateY offset
+            modal.style.transform = `translateY(${deltaY}px)`;
         }
     };
 
@@ -2941,12 +3067,12 @@ function setupModalSwipe() {
         const deltaY = currentY - startY;
 
         if (deltaY > 100) {
-            // Swipe down threshold met - return to Summary
+            // Swipe down threshold met - return to Summary (Q&A becomes peeking)
             triggerHaptic('light');
             closeModal();
         } else {
-            // Reset position
-            modal.style.transform = 'translateX(-50%) translateY(0)';
+            // Reset position to active state
+            modal.style.transform = 'translateY(0)';
         }
 
         startY = 0;
@@ -3055,20 +3181,18 @@ function verifyModalState() {
 }
 
 function closeModal() {
-    // Animate Q&A card sliding down/out
-    elements.modalBackdrop.classList.remove('visible', 'push-transition');
+    // CRITICAL: Transition Q&A from ACTIVE back to PEEKING (not hidden!)
+    // This is the swipe-down from Q&A which returns to Summary
+    setQACardState(QA_STATES.PEEKING);
     document.body.classList.remove('no-scroll');
-    // Reset transform with centered positioning
-    elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
 
-    // CRITICAL: Update layer state - return to SUMMARY (not Headline!)
-    // Q&A swipe down always goes to Summary, which is one layer back
+    // Update layer state - return to SUMMARY
     state.cardLayer = 'summary';
     if (state.modalStack.length > 0) {
-        state.modalStack.pop(); // Remove questions from stack
+        state.modalStack.pop();
     }
 
-    // Reset modal state after animation completes
+    // Reset modal views after animation completes
     setTimeout(() => {
         elements.qaView.classList.remove('hidden', 'fade-out', 'fade-in', 'slide-out-left');
         elements.answerView.classList.add('hidden');
@@ -3078,11 +3202,8 @@ function closeModal() {
         elements.deepAnswerView.classList.add('hidden');
         elements.deepAnswerView.classList.remove('fade-out', 'fade-in', 'slide-out-left');
 
-        // Note: Do NOT clear state.currentStory - we're still on the same story
         state.currentQuestion = null;
         state.currentHistoryEntry = null;
-
-        // Note: Do NOT re-render cards - the story card (showing Summary) is still there
     }, 300);
 }
 
@@ -3334,26 +3455,43 @@ function verifyCleanState() {
 }
 
 /**
+ * Reset ALL card states - called on EVERY story navigation
+ * CRITICAL: This prevents Q&A card persisting across stories
+ */
+function resetAllCardStates() {
+    console.log('[resetAllCardStates] Resetting all card states');
+
+    // 1. Reset Q&A card to HIDDEN state
+    setQACardState(QA_STATES.HIDDEN);
+
+    // 2. Reset flip card to front (headline)
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (currentCard) {
+        currentCard.classList.remove('flipped');
+        currentCard.dataset.flipped = 'false';
+    }
+
+    // 3. Reset modal views
+    resetAllModalViews();
+
+    // 4. Reset card layer state
+    state.cardLayer = 'headline';
+    state.isCardFlipped = false;
+    state.modalStack = [];
+
+    // 5. Remove no-scroll from body
+    document.body.classList.remove('no-scroll');
+}
+
+/**
  * Full state reset - returns to Story 1 headline from any state
  * Used by logo click and other "go home" actions
  */
 function fullStateReset() {
     console.log('[fullStateReset] Performing complete navigation reset');
 
-    // Close all modals
-    if (elements.modalBackdrop.classList.contains('visible')) {
-        elements.modalBackdrop.classList.remove('visible', 'push-transition');
-        elements.qaModal.style.transform = 'translateX(-50%) translateY(100%)';
-    }
-    document.body.classList.remove('no-scroll');
-
-    // Reset all modal views
-    resetAllModalViews();
-
-    // Clear card layer state
-    state.cardLayer = 'headline';
-    state.modalStack = [];
-    state.isCardFlipped = false;
+    // Reset all card states
+    resetAllCardStates();
 
     // Reset story to first
     state.currentIndex = 0;
