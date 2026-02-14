@@ -680,8 +680,8 @@ button {
     /* Fluid width - uses calc with vw for consistent sizing across devices */
     width: calc(100% - var(--spacing-lg) * 2);
     max-width: min(400px, 90vw);
-    /* Height determined by content */
-    height: auto;
+    /* FIXED HEIGHT - set by JS, fallback to 70vh */
+    height: var(--card-height, 70vh);
     background: transparent;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card);
@@ -691,7 +691,8 @@ button {
     transform-origin: center center;
     transition: box-shadow var(--transition-normal);
     will-change: transform;
-    overflow: visible;
+    /* Hide overflow to prevent content from extending beyond card */
+    overflow: hidden;
 }
 
 .story-card:active {
@@ -820,7 +821,8 @@ button {
     transform: translateY(0) scale(1);
 }
 
-/* Hide all cards except the top one - no stacked card visibility */
+/* Hide all cards except the current one - no prev/next card visibility */
+.story-card[data-position="-1"],
 .story-card[data-position="1"],
 .story-card[data-position="2"] {
     display: none;
@@ -866,8 +868,8 @@ button {
 .card-flipper {
     position: relative;
     width: 100%;
-    /* Responsive min-height: smaller on small phones, larger on big phones */
-    min-height: clamp(320px, 55vh, 420px);
+    /* Fixed height - inherits from parent story-card */
+    height: 100%;
     transform-style: preserve-3d;
     transition: transform 450ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -881,8 +883,8 @@ button {
     top: 0;
     left: 0;
     width: 100%;
-    /* Match flipper min-height for consistent flip */
-    min-height: clamp(320px, 55vh, 420px);
+    /* Fixed height - fills parent flipper */
+    height: 100%;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     border-radius: var(--radius-xl);
@@ -930,6 +932,12 @@ button {
     font-size: var(--font-size-md);
     color: var(--text-secondary);
     line-height: var(--line-height-relaxed);
+    /* Truncate long text with ellipsis */
+    display: -webkit-box;
+    -webkit-line-clamp: 8;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ==========================================
@@ -1526,66 +1534,63 @@ button {
 }
 
 /* ==========================================
-   Q&A Card System - NEW ARCHITECTURE
-   Q&A card is now INSIDE card-container as sibling of story cards
-   This ensures identical positioning and sizing
+   Q&A Card System - REBUILT FROM SCRATCH
+   Q&A card is positioned INSIDE the story-card as a third face
+   Slides up from bottom when card is flipped to summary
 
-   STATE 1: Hidden (below container, translateY 100%)
-   STATE 2: Peeking (only "Are you curious about" visible)
-   STATE 3: Active (fully visible, replaces Summary)
+   STATE 1: Hidden (translateY 100% - below card)
+   STATE 2: Peeking (only prompt visible at bottom)
+   STATE 3: Active (fully visible, user can tap questions)
    ========================================== */
 
-/* Q&A Card - IDENTICAL positioning to story cards */
+/* Q&A Card - positioned INSIDE story card, overlays the back face */
 .qa-card {
     position: absolute;
-    /* Same width/max-width as story cards */
-    width: calc(100% - var(--spacing-lg) * 2);
-    max-width: min(400px, 90vw);
-    /* Same min-height as card flipper */
-    min-height: clamp(320px, 55vh, 420px);
-    /* Center horizontally like story cards */
-    left: 50%;
-    transform: translateX(-50%) translateY(100%);
-    /* Layer above story cards */
-    z-index: var(--z-qa-card);
-    /* Card styling - matches story card */
+    /* Fill entire container */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Card styling */
     background: var(--bg-card);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card);
-    /* Padding */
-    padding: var(--spacing-lg);
-    padding-bottom: calc(var(--spacing-xl) + 56px); /* Space for bottom nav hint */
-    /* Default: Hidden below viewport */
-    pointer-events: none;
-    opacity: 0;
-    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-}
-
-/* STATE 2: Peeking - only "Are you curious about" visible at bottom */
-.qa-card.peeking {
-    /* Show only top ~60px (the prompt text) */
-    transform: translateX(-50%) translateY(calc(100% - 60px));
-    pointer-events: auto;
-    opacity: 1;
-}
-
-/* STATE 3: Active - fully visible, replaces Summary */
-.qa-card.active {
-    transform: translateX(-50%) translateY(0);
-    pointer-events: auto;
-    opacity: 1;
-}
-
-/* Q&A Card Content */
-.qa-card-content {
+    /* Flexbox for content layout */
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    /* Padding */
+    padding: var(--spacing-lg);
+    /* Default: Hidden below card */
+    transform: translateY(100%);
+    /* Layer above card faces and flipper */
+    z-index: var(--z-qa-card);
+    /* Hidden by default */
+    pointer-events: none;
+    opacity: 0;
+    /* Smooth slide transition */
+    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease;
+    /* No scroll bars - content will be truncated */
+    overflow: hidden;
 }
 
-/* Q&A Prompt - the "Are you curious about:" text */
+/* STATE 2: Peeking - shows prompt at bottom of card with visual gap */
+.qa-card.peeking {
+    /* Slide up so only top ~50px is visible + 16px gap from summary */
+    transform: translateY(calc(100% - 50px));
+    pointer-events: auto;
+    opacity: 1;
+    /* Visual separator - shadow at top edge */
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3), var(--shadow-card);
+}
+
+/* STATE 3: Active - fully visible */
+.qa-card.active {
+    transform: translateY(0);
+    pointer-events: auto;
+    opacity: 1;
+}
+
+/* Q&A Prompt - "Are you curious about:" text */
 .qa-prompt {
     font-size: var(--font-size-sm);
     line-height: var(--line-height-normal);
@@ -1595,16 +1600,20 @@ button {
     font-weight: 500;
     text-align: center;
     padding: var(--spacing-sm) 0;
+    margin-bottom: var(--spacing-md);
+    flex-shrink: 0;
 }
 
-/* Q&A Questions List */
+/* Q&A Questions List - grows to fill space */
 .qa-questions-list {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
+    flex: 1;
+    overflow: hidden;
 }
 
-/* Q&A Question Button - reuse existing question-button styles */
+/* Question buttons */
 .qa-question-btn {
     display: flex;
     align-items: flex-start;
@@ -1617,6 +1626,7 @@ button {
     transition: background var(--transition-fast), transform var(--transition-fast);
     border: none;
     cursor: pointer;
+    font-family: inherit;
 }
 
 .qa-question-btn:hover {
@@ -1646,7 +1656,6 @@ button {
     font-size: 16px;
     color: var(--accent);
     flex-shrink: 0;
-    padding-top: 2px;
 }
 
 .qa-question-text {
@@ -1654,16 +1663,426 @@ button {
     line-height: var(--line-height-normal);
     font-weight: 500;
     color: var(--text-primary);
-    padding-top: 2px;
+    /* Text truncation - max 2 lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Small phones - tighter Q&A card */
-@media (max-width: 374px) {
-    .qa-card {
-        width: calc(100% - var(--spacing-md) * 2);
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
-    }
+/* ==========================================
+   ANSWER CARD - Level 3 in card hierarchy
+   Slides up when user clicks a question
+   ========================================== */
+
+.answer-card {
+    position: absolute;
+    /* Fill entire container */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    /* Default: Hidden below card */
+    transform: translateY(100%);
+    /* Layer above Q&A card */
+    z-index: 30;
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 300ms ease-out, opacity 200ms ease;
+    /* No scroll bars - content will be truncated */
+    overflow: hidden;
+}
+
+.answer-card.active {
+    transform: translateY(0);
+    pointer-events: auto;
+    opacity: 1;
+}
+
+/* Answer Card Header */
+.answer-card .answer-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.answer-card .answer-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.answer-card .answer-question-text {
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-normal);
+    font-weight: 600;
+    color: var(--text-primary);
+    /* Text truncation - max 3 lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Answer Card Body - grows to fill available space */
+.answer-card .answer-body {
+    flex: 1;
+    margin-bottom: var(--spacing-lg);
+    overflow: hidden;
+}
+
+.answer-card .answer-text {
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-relaxed);
+    color: var(--text-secondary);
+    /* Text truncation - flexible based on available space */
+    display: -webkit-box;
+    -webkit-line-clamp: 12;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Answer Card Rating */
+.answer-card .answer-rating {
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.answer-card .rating-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.answer-card .rating-stars {
+    display: inline-flex;
+    gap: var(--spacing-xs);
+}
+
+.answer-card .rating-star {
+    font-size: 28px;
+    color: var(--text-tertiary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.answer-card .rating-star:hover {
+    transform: scale(1.15);
+}
+
+.answer-card .rating-star.active {
+    color: var(--warning);
+}
+
+/* Answer Card Footer - stays at bottom */
+.answer-card .answer-footer {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.answer-card .answer-done-btn,
+.answer-card .answer-dig-deeper-btn {
+    flex: 1;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.answer-card .answer-done-btn {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.answer-card .answer-done-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.answer-card .answer-dig-deeper-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+
+.answer-card .answer-dig-deeper-btn:hover {
+    background: var(--accent-light);
+}
+
+.answer-card .answer-done-btn:active,
+.answer-card .answer-dig-deeper-btn:active {
+    transform: scale(0.96);
+}
+
+/* ==========================================
+   DIG DEEPER Q&A CARD - Level 4 in card hierarchy
+   Slides up when user clicks Dig Deeper
+   ========================================== */
+
+.dig-deeper-qa-card {
+    position: absolute;
+    /* Fill entire container */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    /* Default: Hidden below card */
+    transform: translateY(100%);
+    /* Layer above Answer card */
+    z-index: 40;
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 300ms ease-out, opacity 200ms ease;
+    /* No scroll bars - content will be truncated */
+    overflow: hidden;
+    overscroll-behavior: contain;
+}
+
+.dig-deeper-qa-card.active {
+    transform: translateY(0);
+    pointer-events: auto;
+    opacity: 1;
+}
+
+/* Dig Deeper Header - headline and subheading (left-aligned to match answer card) */
+.dig-deeper-header {
+    text-align: left;
+    margin-bottom: var(--spacing-lg);
+    flex-shrink: 0;
+}
+
+.dig-deeper-headline {
+    font-family: var(--font-headline);
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-tight);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.dig-deeper-subheading {
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-normal);
+    color: var(--text-tertiary);
+    margin: 0;
+}
+
+/* Dig Deeper Questions List - grows to fill space */
+.dig-deeper-questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Dig Deeper questions - same font as main Q&A, truncate to 2 lines for consistency */
+.dig-deeper-questions-list .qa-question-text {
+    -webkit-line-clamp: 2;
+}
+
+/* Dig Deeper Footer - back to headline link */
+.dig-deeper-footer {
+    display: flex;
+    justify-content: center;
+    padding-top: var(--spacing-lg);
+    flex-shrink: 0;
+}
+
+.back-to-headline-link {
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: var(--spacing-sm) var(--spacing-md);
+    transition: color var(--transition-fast);
+}
+
+.back-to-headline-link:hover {
+    color: var(--text-secondary);
+}
+
+/* ==========================================
+   DIG DEEPER ANSWER CARD - Level 5 in card hierarchy
+   Slides up when user clicks a dig deeper question
+   ========================================== */
+
+.dig-deeper-answer-card {
+    position: absolute;
+    /* Fill entire container */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    /* Default: Hidden below card */
+    transform: translateY(100%);
+    /* Layer above Dig Deeper Q&A card */
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 300ms ease-out, opacity 200ms ease;
+    /* No scroll bars - content will be truncated */
+    overflow: hidden;
+    overscroll-behavior: contain;
+}
+
+.dig-deeper-answer-card.active {
+    transform: translateY(0);
+    pointer-events: auto;
+    opacity: 1;
+}
+
+/* Dig Deeper Answer Card uses same styling as Answer Card */
+.dig-deeper-answer-card .answer-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.dig-deeper-answer-card .answer-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.dig-deeper-answer-card .answer-question-text {
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-normal);
+    font-weight: 600;
+    color: var(--text-primary);
+    /* Text truncation - max 3 lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dig-deeper-answer-card .answer-body {
+    flex: 1;
+    margin-bottom: var(--spacing-lg);
+    overflow: hidden;
+}
+
+.dig-deeper-answer-card .answer-text {
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-relaxed);
+    color: var(--text-secondary);
+    /* Text truncation - flexible based on available space */
+    display: -webkit-box;
+    -webkit-line-clamp: 12;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dig-deeper-answer-card .answer-rating {
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.dig-deeper-answer-card .rating-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.dig-deeper-answer-card .rating-stars {
+    display: inline-flex;
+    gap: var(--spacing-xs);
+}
+
+.dig-deeper-answer-card .rating-star {
+    font-size: 28px;
+    color: var(--text-tertiary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.dig-deeper-answer-card .rating-star:hover {
+    transform: scale(1.15);
+}
+
+.dig-deeper-answer-card .rating-star.active {
+    color: var(--warning);
+}
+
+.dig-deeper-answer-card .answer-footer {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.dig-deeper-answer-card .answer-done-btn {
+    flex: 1;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--accent);
+    color: white;
+    border: none;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.dig-deeper-answer-card .answer-done-btn:hover {
+    background: var(--accent-light);
+}
+
+.dig-deeper-answer-card .answer-done-btn:active {
+    transform: scale(0.96);
 }
 
 /* ==========================================
@@ -1672,6 +2091,7 @@ button {
    ========================================== */
 
 /* Q&A backdrop container - positioned within card area */
+/* NOTE: This is a LEGACY modal system - may be vestigial */
 .modal-backdrop {
     position: fixed;
     /* Position in card area, below header/progress */
@@ -1683,6 +2103,8 @@ button {
     z-index: var(--z-qa-card);
     pointer-events: none;
     overflow: hidden;
+    /* Hidden by default - prevents vestigial elements showing on large viewports */
+    visibility: hidden;
 }
 
 /* Q&A Card - matches story card EXACTLY */
@@ -1711,12 +2133,20 @@ button {
 }
 
 /* STATE 2: Peeking - shows hint at bottom when Summary is visible */
+.modal-backdrop.peeking {
+    visibility: visible;
+}
+
 .modal-backdrop.peeking .modal {
     transform: translateY(calc(100% - 80px));
     pointer-events: auto;
 }
 
 /* STATE 3: Active - fully visible, replaces Summary */
+.modal-backdrop.visible {
+    visibility: visible;
+}
+
 .modal-backdrop.visible .modal {
     transform: translateY(0);
     pointer-events: auto;
@@ -1750,25 +2180,7 @@ button {
     font-weight: 500;
 }
 
-/* Q&A Card bottom nav hint - same style as story card */
-.qa-card-nav-hint {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: var(--spacing-md) var(--spacing-lg);
-    min-height: 48px;
-    background: linear-gradient(transparent, var(--bg-card) 50%);
-}
-
-.qa-card-nav-hint .nav-hint {
-    color: var(--text-tertiary);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-}
+/* Q&A Card nav hint removed - using simple slide transitions */
 
 /* Modal close button - matches modal prev button size (32px) */
 .modal-close {
