@@ -28,7 +28,419 @@ const FAQ_SHEET_NAME = 'FAQs';
 const PLAUSIBLE_DOMAIN = 'https://fyi-news.netlify.app/';
 
 // ==========================================
-// Analytics Helper Functions
+// SUPABASE CONFIGURATION
+// ==========================================
+const SUPABASE_URL = 'https://sxddsipzxpipgyalfurn.supabase.co'; // Replace with your Supabase project URL
+const SUPABASE_ANON_KEY = 'sb_publishable_Lbs7KPXHwE2ZjvR3Q0OW3w_A3jXsTar'; // Replace with your anon key
+
+// Initialize Supabase client (safe - won't crash if library fails to load)
+let supabaseClient = null;
+try {
+    if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('[Supabase] Client initialized');
+    } else {
+        console.warn('[Supabase] Library not loaded, running in offline mode');
+    }
+} catch (e) {
+    console.warn('[Supabase] Init failed, running in offline mode:', e.message);
+}
+
+// ==========================================
+// SUPABASE: Anonymous User Flow
+// ==========================================
+
+/**
+ * Initialize Supabase user - check for existing session or create anonymous user
+ * Called on app load BEFORE showing content
+ * @returns {object|null} The authenticated user, or null if Supabase unavailable
+ */
+async function initializeSupabaseUser() {
+    if (!supabaseClient) return null;
+
+    try {
+        // Check for existing session
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+            console.log('[Supabase] Existing session found:', session.user.id);
+            await updateLastSeen(session.user.id);
+
+            // Update sign-in button text if user is authenticated (not anonymous)
+            if (!session.user.is_anonymous) {
+                updateSignInButton(true);
+            }
+
+            return session.user;
+        }
+
+        // No session - create anonymous user
+        const { data, error } = await supabaseClient.auth.signInAnonymously();
+        if (error) {
+            console.error('[Supabase] Anonymous auth error:', error);
+            return null;
+        }
+
+        console.log('[Supabase] Anonymous user created:', data.user.id);
+
+        // Insert user record
+        await supabaseClient.from('users').insert({
+            id: data.user.id,
+            is_anonymous: true,
+            display_name: 'Reader'
+        }).single();
+
+        return data.user;
+    } catch (e) {
+        console.error('[Supabase] User init failed:', e.message);
+        return null;
+    }
+}
+
+/**
+ * Update user's last_seen timestamp
+ */
+async function updateLastSeen(userId) {
+    if (!supabaseClient) return;
+    try {
+        await supabaseClient.from('users').update({
+            last_seen: new Date().toISOString()
+        }).eq('id', userId);
+    } catch (e) {
+        console.debug('[Supabase] updateLastSeen failed:', e.message);
+    }
+}
+
+/**
+ * Update sign-in button visibility based on auth state
+ */
+function updateSignInButton(isSignedIn) {
+    const signInBtn = document.getElementById('signInBtn');
+    if (signInBtn) {
+        signInBtn.textContent = isSignedIn ? 'Signed In' : 'Sign In';
+        signInBtn.disabled = isSignedIn;
+        if (isSignedIn) {
+            signInBtn.style.opacity = '0.5';
+        }
+    }
+}
+
+// ==========================================
+// SUPABASE: Sign-In Modal
+// ==========================================
+
+function showSignInModal() {
+    const modal = document.getElementById('signInModal');
+    if (modal) {
+        modal.classList.add('visible');
+        document.body.classList.add('no-scroll');
+    }
+}
+
+function hideSignInModal() {
+    const modal = document.getElementById('signInModal');
+    if (modal) {
+        modal.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+    }
+}
+
+function setupSignInModal() {
+    const closeBtn = document.getElementById('signInCloseBtn');
+    const backdrop = document.getElementById('signInModal');
+    const googleBtn = document.getElementById('signInGoogle');
+    const appleBtn = document.getElementById('signInApple');
+    const signInMenuBtn = document.getElementById('signInBtn');
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideSignInModal);
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) hideSignInModal();
+        });
+    }
+
+    if (signInMenuBtn) {
+        signInMenuBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            if (elements.dropdownMenu) elements.dropdownMenu.classList.remove('visible');
+            showSignInModal();
+        });
+    }
+
+    if (googleBtn) {
+        googleBtn.addEventListener('click', async () => {
+            if (!supabaseClient) {
+                showToast('', 'Sign-in unavailable offline');
+                return;
+            }
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo: window.location.origin }
+                });
+                if (error) {
+                    console.error('[Supabase] Google sign-in error:', error);
+                    showToast('', 'Google sign-in failed');
+                }
+            } catch (e) {
+                console.error('[Supabase] Google sign-in error:', e.message);
+                showToast('', 'Sign-in failed');
+            }
+        });
+    }
+
+    if (appleBtn) {
+        appleBtn.addEventListener('click', async () => {
+            if (!supabaseClient) {
+                showToast('', 'Sign-in unavailable offline');
+                return;
+            }
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'apple',
+                    options: { redirectTo: window.location.origin }
+                });
+                if (error) {
+                    console.error('[Supabase] Apple sign-in error:', error);
+                    showToast('', 'Apple sign-in failed');
+                }
+            } catch (e) {
+                console.error('[Supabase] Apple sign-in error:', e.message);
+                showToast('', 'Sign-in failed');
+            }
+        });
+    }
+}
+
+// ==========================================
+// SUPABASE: Bookmark Functions
+// ==========================================
+
+/**
+ * Save a bookmark to Supabase
+ * @param {object} bookmarkData - { type, storyDate, storyHeadline, questionPath, content }
+ * @returns {boolean} success
+ */
+async function saveBookmark(bookmarkData) {
+    if (!supabaseClient) return false;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) { console.error('[Supabase] No session for bookmark'); return false; }
+
+        const { error } = await supabaseClient.from('bookmarks').insert({
+            user_id: session.user.id,
+            bookmark_type: bookmarkData.type,
+            story_date: bookmarkData.storyDate,
+            story_headline: bookmarkData.storyHeadline,
+            question_path: bookmarkData.questionPath || null,
+            bookmark_content: bookmarkData.content
+        });
+
+        if (error) {
+            if (error.code === '23505') {
+                // Duplicate - toggle off
+                return await removeBookmark(bookmarkData);
+            }
+            console.error('[Supabase] Bookmark save error:', error);
+            return false;
+        }
+
+        await logSupabaseEvent('bookmark_added', {
+            bookmark_type: bookmarkData.type,
+            story_headline: bookmarkData.storyHeadline
+        });
+        return true;
+    } catch (e) {
+        console.error('[Supabase] saveBookmark failed:', e.message);
+        return false;
+    }
+}
+
+/**
+ * Remove a bookmark from Supabase
+ */
+async function removeBookmark(bookmarkData) {
+    if (!supabaseClient) return false;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return false;
+
+        const { error } = await supabaseClient.from('bookmarks').delete().match({
+            user_id: session.user.id,
+            story_date: bookmarkData.storyDate,
+            story_headline: bookmarkData.storyHeadline,
+            question_path: bookmarkData.questionPath || null
+        });
+
+        if (error) { console.error('[Supabase] Bookmark remove error:', error); return false; }
+
+        await logSupabaseEvent('bookmark_removed', {
+            bookmark_type: bookmarkData.type,
+            story_headline: bookmarkData.storyHeadline
+        });
+        return true;
+    } catch (e) {
+        console.error('[Supabase] removeBookmark failed:', e.message);
+        return false;
+    }
+}
+
+/**
+ * Check if an item is bookmarked
+ */
+async function checkIsBookmarked(storyDate, storyHeadline, questionPath = null) {
+    if (!supabaseClient) return false;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return false;
+
+        const query = {
+            user_id: session.user.id,
+            story_date: storyDate,
+            story_headline: storyHeadline
+        };
+        if (questionPath !== null) {
+            query.question_path = questionPath;
+        }
+
+        const { data } = await supabaseClient.from('bookmarks')
+            .select('id')
+            .match(query)
+            .single();
+
+        return !!data;
+    } catch (e) {
+        // .single() throws when no match - that's expected
+        return false;
+    }
+}
+
+/**
+ * Get all bookmarks for current user
+ */
+async function getUserBookmarks() {
+    if (!supabaseClient) return [];
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return [];
+
+        const { data, error } = await supabaseClient.from('bookmarks')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) { console.error('[Supabase] Fetch bookmarks error:', error); return []; }
+        return data || [];
+    } catch (e) {
+        console.error('[Supabase] getUserBookmarks failed:', e.message);
+        return [];
+    }
+}
+
+/**
+ * Handle bookmark button click - toggle with Supabase persistence
+ */
+async function handleBookmarkClick(button, bookmarkData) {
+    const isCurrentlyBookmarked = button.classList.contains('bookmarked');
+
+    // Optimistic UI update
+    button.classList.toggle('bookmarked');
+    triggerHaptic('light');
+
+    let success;
+    if (isCurrentlyBookmarked) {
+        success = await removeBookmark(bookmarkData);
+    } else {
+        success = await saveBookmark(bookmarkData);
+    }
+
+    if (success) {
+        showToast('', isCurrentlyBookmarked ? 'Removed from bookmarks' : 'Saved to bookmarks');
+    } else {
+        // Revert optimistic update on failure
+        button.classList.toggle('bookmarked');
+        if (!supabaseClient) {
+            // Offline mode - just toggle locally
+            button.classList.toggle('bookmarked');
+            showToast('', isCurrentlyBookmarked ? 'Bookmark removed' : 'Bookmarked');
+        }
+    }
+}
+
+// ==========================================
+// SUPABASE: Analytics Event Logging
+// ==========================================
+
+/**
+ * Log an analytics event to Supabase
+ * @param {string} eventType - Event type name
+ * @param {object} eventData - Event payload
+ */
+async function logSupabaseEvent(eventType, eventData = {}) {
+    if (!supabaseClient) return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+
+        const sessionId = sessionStorage.getItem('fyi_session_id') || generateSupabaseSessionId();
+
+        await supabaseClient.from('analytics_events').insert({
+            user_id: session.user.id,
+            event_type: eventType,
+            event_data: eventData,
+            session_id: sessionId
+        });
+    } catch (e) {
+        console.debug('[Supabase] Event log failed:', e.message);
+    }
+}
+
+/**
+ * Generate a unique session ID for analytics
+ */
+function generateSupabaseSessionId() {
+    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem('fyi_session_id', id);
+    return id;
+}
+
+// ==========================================
+// SUPABASE: Bookmark State Management
+// ==========================================
+
+/**
+ * Update bookmark button states for the current story
+ * Checks Supabase to see if story/answer is bookmarked and updates UI
+ */
+async function updateBookmarkStates() {
+    if (!supabaseClient) return;
+
+    const currentStory = state.stories[state.currentIndex];
+    if (!currentStory) return;
+
+    try {
+        const isStoryBookmarked = await checkIsBookmarked(
+            currentStory.date,
+            currentStory.headline,
+            null
+        );
+
+        // Update all story-level bookmark buttons on current card
+        document.querySelectorAll('.btn-bookmark').forEach(btn => {
+            // Only update story-level bookmarks (not answer-level)
+            if (!btn.closest('.answer-card-top-bar')) {
+                btn.classList.toggle('bookmarked', isStoryBookmarked);
+            }
+        });
+    } catch (e) {
+        console.debug('[Supabase] updateBookmarkStates failed:', e.message);
+    }
+}
+
+// ==========================================
+// Analytics Helper Functions (Plausible)
 // ==========================================
 
 /**
@@ -514,17 +926,15 @@ const state = {
     currentDigDeeperQuestionIndex: null  // Index of selected dig deeper question (0-2)
 };
 
-// Q&A Card States - THREE DISTINCT STATES
+// Q&A Card States - TWO STATES (peeking removed to fix bottom bar visibility)
 const QA_STATES = {
     HIDDEN: 'hidden',   // Below viewport, not visible
-    PEEKING: 'peeking', // Hint visible at bottom when Summary shows
-    ACTIVE: 'active'    // Fully visible, replaces Summary
+    ACTIVE: 'active'    // Fully visible, user can tap questions
 };
 
 /**
- * Set Q&A card state - manages the three-state system
+ * Set Q&A card state - manages HIDDEN/ACTIVE states
  * HIDDEN: Q&A not visible (translateY 100%)
- * PEEKING: Only "Are you curious about" visible at bottom of card
  * ACTIVE: Q&A fully visible, user can tap questions
  *
  * Q&A card is now INSIDE the story card, not a sibling
@@ -538,13 +948,10 @@ function setQACardState(newState) {
     if (!qaCard) return;
 
     // Remove all state classes
-    qaCard.classList.remove('peeking', 'active');
+    qaCard.classList.remove('active');
 
     // Apply new state
     switch (newState) {
-        case QA_STATES.PEEKING:
-            qaCard.classList.add('peeking');
-            break;
         case QA_STATES.ACTIVE:
             qaCard.classList.add('active');
             break;
@@ -922,6 +1329,11 @@ function cacheElements() {
     elements.recapStoriesList = document.getElementById('recapStoriesList');
     elements.recapEmpty = document.getElementById('recapEmpty');
     elements.recapBackBtn = document.getElementById('recapBackBtn');
+
+    // Story Navigation Buttons (below card)
+    elements.storyNavButtons = document.getElementById('storyNavButtons');
+    elements.storyPrevBtn = document.getElementById('storyPrevBtn');
+    elements.storyNextBtn = document.getElementById('storyNextBtn');
 }
 
 // ==========================================
@@ -940,11 +1352,23 @@ async function init() {
 
         loadFromStorage();
         applyTheme();
+        loadTextSizePreference();
 
         setupEventListeners();
+        setupSignInModal();
         console.log('[init] Event listeners attached');
 
         setupSessionTracking();
+
+        // Initialize Supabase user (anonymous or existing session)
+        generateSupabaseSessionId();
+        const supabaseUser = await initializeSupabaseUser();
+        if (supabaseUser) {
+            console.log('[init] Supabase user ready:', supabaseUser.id);
+            await logSupabaseEvent('session_started', {
+                entry_point: document.referrer ? 'link' : 'direct'
+            });
+        }
 
         // Check if user has set their name
         const savedName = localStorage.getItem('fyi_user_name');
@@ -967,6 +1391,9 @@ async function init() {
         // Show loading and fetch stories
         await loadAppContent();
         console.log('[init] App content loaded');
+
+        // Update bookmark states for current story
+        await updateBookmarkStates();
 
         // Track app opened
         trackAppOpened();
@@ -1034,6 +1461,15 @@ async function loadAppContent() {
     renderHistory();
     showSwipeHint();
     registerServiceWorker();
+
+    // Log first story opened
+    if (state.stories.length > 0 && state.stories[state.currentIndex]) {
+        const firstStory = state.stories[state.currentIndex];
+        logSupabaseEvent('story_opened', {
+            story_headline: firstStory.headline,
+            story_date: firstStory.date
+        });
+    }
 }
 
 // Format and display today's date (or appropriate text for FAQ/archive mode)
@@ -2204,6 +2640,72 @@ function toggleTheme() {
 }
 
 // ==========================================
+// Text Size Toggle
+// ==========================================
+
+let textEnlarged = false;
+
+function toggleTextSize() {
+    textEnlarged = !textEnlarged;
+    document.body.classList.toggle('text-enlarged', textEnlarged);
+
+    // Update all AA button states
+    document.querySelectorAll('.btn-text-size').forEach(btn => {
+        btn.classList.toggle('active', textEnlarged);
+    });
+
+    // Persist preference
+    localStorage.setItem('fyi_text_enlarged', textEnlarged);
+
+    triggerHaptic('light');
+    trackEvent('Text Size Toggled', { enlarged: textEnlarged });
+}
+
+function loadTextSizePreference() {
+    if (localStorage.getItem('fyi_text_enlarged') === 'true') {
+        textEnlarged = true;
+        document.body.classList.add('text-enlarged');
+        document.querySelectorAll('.btn-text-size').forEach(btn => {
+            btn.classList.add('active');
+        });
+    }
+}
+
+// ==========================================
+// Bookmark Toggle (Supabase-backed)
+// ==========================================
+
+function toggleBookmark(button) {
+    const currentStory = state.stories[state.currentIndex];
+    if (!currentStory) {
+        // Fallback: just toggle visually
+        button.classList.toggle('bookmarked');
+        triggerHaptic('light');
+        return;
+    }
+
+    const bookmarkData = {
+        type: 'story',
+        storyDate: currentStory.date,
+        storyHeadline: currentStory.headline,
+        questionPath: null,
+        content: {
+            headline: currentStory.headline,
+            teaser: currentStory.teaser,
+            emoji: currentStory.emoji
+        }
+    };
+
+    // Use Supabase-backed handler
+    handleBookmarkClick(button, bookmarkData);
+
+    // Also track with Plausible
+    const storyId = button.dataset.storyId;
+    const isBookmarked = button.classList.contains('bookmarked');
+    trackEvent('Bookmark Toggled', { storyId, bookmarked: isBookmarked });
+}
+
+// ==========================================
 // Loading State
 // ==========================================
 
@@ -2325,11 +2827,17 @@ function createCardElement(story, position) {
                     <h2 class="card-headline">${parseFormattedText(story.headline)}</h2>
                     <p class="card-teaser">${parseFormattedText(teaserText)}</p>
                 </div>
-                <!-- Bottom Navigation Hints - ALWAYS show all 3 for grid alignment -->
+                <!-- Bottom Navigation Bar - AA (left), Read ahead (center), Bookmark (right) -->
                 <div class="card-nav-hints">
-                    <span class="nav-hint nav-hint-prev ${isFirstStory ? 'disabled' : ''}" data-action="prev">← Prev</span>
+                    <button class="btn-text-size" aria-label="Toggle text size">
+                        <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                    </button>
                     <span class="nav-hint nav-hint-center" data-action="flip">Read ahead ↑</span>
-                    <span class="nav-hint nav-hint-next ${isLastStory ? 'disabled' : ''}" data-action="next">Next →</span>
+                    <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
+                        <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
+                            <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
@@ -2341,9 +2849,17 @@ function createCardElement(story, position) {
                     <h3 class="card-back-header">Summary</h3>
                     <div class="card-summary-text">${summaryHTML}</div>
                 </div>
-                <!-- Summary face: subtle hint to swipe up for questions -->
+                <!-- Summary face: AA (left), ↑ hint (center), Bookmark (right) -->
                 <div class="card-nav-hints card-nav-hints-summary">
+                    <button class="btn-text-size" aria-label="Toggle text size">
+                        <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                    </button>
                     <span class="nav-hint nav-hint-center-subtle">↑</span>
+                    <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
+                        <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
+                            <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -2358,6 +2874,13 @@ function createCardElement(story, position) {
 
         <!-- ANSWER CARD - slides up when question is clicked -->
         <div class="answer-card" data-story-id="${story.id}">
+            <div class="answer-card-top-bar">
+                <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
+                    <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
             <div class="answer-header">
                 <span class="answer-label">✦</span>
                 <p class="answer-question-text"></p>
@@ -2397,6 +2920,13 @@ function createCardElement(story, position) {
 
         <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
         <div class="dig-deeper-answer-card" data-story-id="${story.id}">
+            <div class="answer-card-top-bar">
+                <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
+                    <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
             <div class="answer-header">
                 <span class="answer-label">✦</span>
                 <p class="answer-question-text"></p>
@@ -2444,11 +2974,12 @@ function flipCard(card, story) {
         card.classList.add('flipped');
         card.dataset.flipped = 'true';
         trackCardFlip(story.headline, 'to_summary');
+        logSupabaseEvent('card_flipped_to_summary', { story_headline: story.headline });
 
-        // CRITICAL: Show Q&A card peeking when summary is visible
-        // First populate Q&A content, then show peek
+        // Populate Q&A card content (but keep it HIDDEN until user swipes up)
         populateQACard(story);
-        setQACardState(QA_STATES.PEEKING);
+        // Q&A stays HIDDEN on summary - user swipes up to see it
+        setQACardState(QA_STATES.HIDDEN);
 
         // Hide the "Tap to flip" hint permanently after first flip
         if (localStorage.getItem('fyi_has_flipped') !== 'true') {
@@ -2558,6 +3089,42 @@ function setupCardInteractions(card, story) {
 
     // Setup rating star handlers
     setupRatingStars(card);
+
+    // Setup text size toggle buttons
+    setupTextSizeButtons(card);
+
+    // Setup bookmark buttons
+    setupBookmarkButtons(card);
+}
+
+/**
+ * Setup text size toggle buttons on card
+ */
+function setupTextSizeButtons(card) {
+    const textSizeBtns = card.querySelectorAll('.btn-text-size');
+    textSizeBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTextSize();
+        });
+        // Apply current state
+        if (textEnlarged) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+/**
+ * Setup bookmark buttons on card
+ */
+function setupBookmarkButtons(card) {
+    const bookmarkBtns = card.querySelectorAll('.btn-bookmark');
+    bookmarkBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleBookmark(btn);
+        });
+    });
 }
 
 /**
@@ -2719,6 +3286,11 @@ function handleStarClick(clickedStar, cardElement) {
     // Track the rating (for analytics)
     if (state.currentQuestion) {
         trackAnswerRated(state.currentStory?.headline, state.currentQuestion.text, value);
+        logSupabaseEvent('answer_rated', {
+            story_headline: state.currentStory?.headline || '',
+            question_path: state.currentQuestion.text,
+            rating: value
+        });
     }
 }
 
@@ -2727,19 +3299,16 @@ function handleStarClick(clickedStar, cardElement) {
  * Tapping the peeking Q&A card activates it to full view
  */
 function setupQACardClickHandler(card) {
+    // Q&A card is now activated via swipe up or Read Ahead click
+    // No longer needs tap-to-expand from peeking state
     const qaCard = card.querySelector('.qa-card');
     if (!qaCard) return;
 
+    // Stop propagation when clicking inside active Q&A card
     qaCard.addEventListener('click', (e) => {
-        // Only activate from PEEKING state (not when already active)
-        if (state.qaCardState === QA_STATES.PEEKING) {
-            e.stopPropagation();
-            triggerHaptic('light');
-            state.cardLayer = 'questions';
-            setQACardState(QA_STATES.ACTIVE);
-            setupQACardSwipe(); // Setup swipe-down to dismiss
+        if (state.qaCardState === QA_STATES.ACTIVE) {
+            // Let question button clicks propagate normally
         }
-        // If already ACTIVE, let normal click propagation happen (question buttons)
     });
 }
 
@@ -2947,6 +3516,15 @@ function handleDragEnd(e, card, story) {
  * Right 1/3 = Next story
  */
 function handleTapZone(e, card, story) {
+    // CRITICAL: Ignore taps on buttons (text size toggle, bookmark, etc.)
+    const target = e.target;
+    if (target.closest('.btn-text-size') ||
+        target.closest('.btn-bookmark') ||
+        target.closest('.nav-hint-center') ||
+        target.closest('button')) {
+        return; // Let the button handle its own click
+    }
+
     const tapX = e.type.includes('touch')
         ? (e.changedTouches ? e.changedTouches[0].clientX : state.startX)
         : e.clientX;
@@ -3046,16 +3624,15 @@ function handleSwipeUp(card, story) {
 
     if (!isFlipped) {
         // Currently on HEADLINE - flip to SUMMARY
-        // flipCard will also set Q&A to PEEKING state
         flipCard(card, story);
         state.isCardFlipped = true;
         state.cardLayer = 'summary';
     } else {
-        // Currently on SUMMARY with Q&A peeking
-        // Transition Q&A from PEEKING to ACTIVE
+        // Currently on SUMMARY - show Q&A (ACTIVE)
         state.cardLayer = 'questions';
         setQACardState(QA_STATES.ACTIVE);
         setupQACardSwipe(); // Setup swipe-down to dismiss
+        logSupabaseEvent('questions_opened', { story_headline: story.headline });
     }
 }
 
@@ -3195,9 +3772,12 @@ function nextCard() {
     state.isCardFlipped = false;
     state.cardLayer = 'headline';
 
+    // Log navigation to Supabase
+    const fromStory = state.stories[state.currentIndex];
+
     // Mark current story as viewed
-    if (state.stories[state.currentIndex]) {
-        state.viewedStories.push(state.stories[state.currentIndex].id);
+    if (fromStory) {
+        state.viewedStories.push(fromStory.id);
     }
 
     state.currentIndex++;
@@ -3210,6 +3790,19 @@ function nextCard() {
         renderProgressDots();
         renderCards();
         updatePrevButtonVisibility();
+        updateBookmarkStates();
+
+        // Log navigation event
+        const toStory = state.stories[state.currentIndex];
+        logSupabaseEvent('story_navigation', {
+            direction: 'next',
+            from_story: fromStory ? fromStory.headline : '',
+            to_story: toStory ? toStory.headline : ''
+        });
+        logSupabaseEvent('story_opened', {
+            story_headline: toStory ? toStory.headline : '',
+            story_date: toStory ? toStory.date : ''
+        });
     }
 }
 
@@ -3217,6 +3810,8 @@ function prevCard() {
     // Reset card layer state for new navigation
     state.isCardFlipped = false;
     state.cardLayer = 'headline';
+
+    const fromStory = state.stories[state.currentIndex];
 
     // If on completion screen, clear it first and show last story
     if (elements.completionScreen.classList.contains('visible')) {
@@ -3235,6 +3830,7 @@ function prevCard() {
         renderProgressDots();
         renderCards();
         updatePrevButtonVisibility();
+        updateBookmarkStates();
         triggerHaptic('light');
         return;
     }
@@ -3247,7 +3843,16 @@ function prevCard() {
         renderProgressDots();
         renderCards();
         updatePrevButtonVisibility();
+        updateBookmarkStates();
         triggerHaptic('light');
+
+        // Log navigation event
+        const toStory = state.stories[state.currentIndex];
+        logSupabaseEvent('story_navigation', {
+            direction: 'prev',
+            from_story: fromStory ? fromStory.headline : '',
+            to_story: toStory ? toStory.headline : ''
+        });
     }
 }
 
@@ -3256,6 +3861,24 @@ function updatePrevButtonVisibility() {
         // Hide prev button on first story, unless we came from completion screen
         const shouldHide = state.currentIndex === 0 && !state.cameFromCompletion && !state.inRecapView;
         elements.prevStoryBtn.classList.toggle('hidden', shouldHide);
+    }
+
+    // Update the new story nav buttons (below card)
+    updateStoryNavButtons();
+}
+
+/**
+ * Update visibility of Prev/Next story navigation buttons below card
+ */
+function updateStoryNavButtons() {
+    if (elements.storyPrevBtn) {
+        const hidePrev = state.currentIndex === 0;
+        elements.storyPrevBtn.classList.toggle('hidden', hidePrev);
+    }
+
+    if (elements.storyNextBtn) {
+        const hideNext = state.currentIndex >= state.totalStories - 1;
+        elements.storyNextBtn.classList.toggle('hidden', hideNext);
     }
 }
 
@@ -3579,12 +4202,12 @@ function setupQACardSwipe() {
 }
 
 /**
- * Close Q&A card - return from ACTIVE to PEEKING state
+ * Close Q&A card - return from ACTIVE to HIDDEN state
  * Called when swiping down from Q&A
  */
 function closeQACard() {
-    // Transition Q&A from ACTIVE back to PEEKING
-    setQACardState(QA_STATES.PEEKING);
+    // Transition Q&A from ACTIVE back to HIDDEN
+    setQACardState(QA_STATES.HIDDEN);
 
     // Update layer state - return to SUMMARY
     state.cardLayer = 'summary';
@@ -3598,7 +4221,7 @@ function closeQACard() {
         }
     }
 
-    console.log('[closeQACard] Returned to Summary with Q&A peeking');
+    console.log('[closeQACard] Returned to Summary with Q&A hidden');
 }
 
 // ==========================================
@@ -4055,6 +4678,10 @@ function showAnswer(question) {
 
     // Track question clicked
     trackQuestionClicked(state.currentStory.headline, question.text);
+    logSupabaseEvent('question_clicked', {
+        story_headline: state.currentStory.headline,
+        question_text: question.text
+    });
 
     console.log('[showAnswer] Transitioning from Q&A to answer view');
 
@@ -4697,6 +5324,11 @@ function setRating(rating, skipAnimation = false) {
     // Track rating if not skipping animation (i.e., user clicked)
     if (!skipAnimation && state.currentStory) {
         trackRatingGiven(state.currentStory.headline, rating);
+        logSupabaseEvent('answer_rated', {
+            story_headline: state.currentStory.headline,
+            question_path: state.currentQuestion ? state.currentQuestion.text : '',
+            rating: rating
+        });
     }
 
     stars.forEach((star, index) => {
@@ -5236,6 +5868,26 @@ function setupEventListeners() {
 
     // Star rating
     setupStarRating();
+
+    // Story Navigation Buttons (below card) - Prev
+    if (elements.storyPrevBtn) {
+        elements.storyPrevBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            if (state.currentIndex > 0) {
+                prevCard();
+            }
+        });
+    }
+
+    // Story Navigation Buttons (below card) - Next
+    if (elements.storyNextBtn) {
+        elements.storyNextBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            if (state.currentIndex < state.totalStories - 1) {
+                nextCard();
+            }
+        });
+    }
 
     // History toggle (legacy floating button, may be removed)
     if (elements.historyToggle) {
