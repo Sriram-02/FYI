@@ -93,6 +93,20 @@ function trackRatingGiven(storyHeadline, rating) {
 }
 
 /**
+ * Track answer rated event (new card system)
+ * @param {string} storyHeadline - The story headline
+ * @param {string} questionText - The question that was answered
+ * @param {number} rating - Rating value (1-5)
+ */
+function trackAnswerRated(storyHeadline, questionText, rating) {
+    trackEvent('Answer Rated', {
+        story: storyHeadline ? storyHeadline.substring(0, 50) : 'Unknown',
+        question: questionText ? questionText.substring(0, 50) : 'Unknown',
+        rating: rating
+    });
+}
+
+/**
  * Track modal opened event
  * @param {string} modalName - 'What is FYI' or 'Our Philosophy'
  */
@@ -208,6 +222,73 @@ function trackSessionEnd() {
 
 // Session start time for duration tracking
 const sessionStartTime = Date.now();
+
+// ==========================================
+// FIXED CARD HEIGHT SYSTEM
+// ==========================================
+// Calculate and set explicit card height as CSS custom property
+// This ensures all story cards have identical height regardless of content
+
+/**
+ * Calculate and set the fixed card height based on viewport
+ * Called on init, resize, and orientation change
+ */
+function setCardHeight() {
+    // Safety buffer for browser chrome, Android scaling, and visual breathing room
+    const BUFFER = 100;
+
+    // Use most conservative viewport measurement
+    const viewportHeight = Math.min(
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        window.visualViewport?.height || Infinity
+    );
+
+    // Measure actual elements when possible, with fallbacks
+    const header = document.querySelector('.header');
+    const progressArea = document.querySelector('.progress-area');
+
+    const headerHeight = header ? header.offsetHeight : 60;
+    const progressHeight = progressArea ? progressArea.offsetHeight : 50;
+
+    // Get safe areas with sensible defaults
+    const rootStyles = getComputedStyle(document.documentElement);
+    const safeTop = parseInt(rootStyles.getPropertyValue('--sat')) || 0;
+    const safeBottom = parseInt(rootStyles.getPropertyValue('--sab')) || 20; // Default accounts for gesture areas
+
+    // Bottom margin for visual breathing room
+    const bottomMargin = 24;
+
+    // Calculate available height (conservative)
+    const cardHeight = viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER;
+
+    // Set as CSS custom property
+    document.documentElement.style.setProperty('--card-height', cardHeight + 'px');
+
+    console.log('[setCardHeight] Card height set to:', cardHeight + 'px',
+        '(viewport:', viewportHeight, 'header:', headerHeight, 'progress:', progressHeight, ')');
+}
+
+/**
+ * Initialize card height system with event listeners
+ */
+function initCardHeightSystem() {
+    // Set initial height
+    setCardHeight();
+
+    // Update on resize
+    window.addEventListener('resize', setCardHeight);
+
+    // Update on orientation change (with delay for iOS)
+    window.addEventListener('orientationchange', () => {
+        setTimeout(setCardHeight, 100);
+    });
+
+    // For iOS Safari: use visualViewport API if available
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setCardHeight);
+    }
+}
 
 // ==========================================
 // Fallback Story Data (used when sheet not configured)
@@ -426,7 +507,11 @@ const state = {
     isCardFlipped: false,
 
     // Q&A Card State: 'hidden' | 'peeking' | 'active'
-    qaCardState: 'hidden'
+    qaCardState: 'hidden',
+
+    // Track selected question indices for Answer and Dig Deeper flows
+    currentQuestionIndex: null,          // Index of selected question (0-3)
+    currentDigDeeperQuestionIndex: null  // Index of selected dig deeper question (0-2)
 };
 
 // Q&A Card States - THREE DISTINCT STATES
@@ -439,11 +524,17 @@ const QA_STATES = {
 /**
  * Set Q&A card state - manages the three-state system
  * HIDDEN: Q&A not visible (translateY 100%)
- * PEEKING: Only "Are you curious about" visible at bottom of container
- * ACTIVE: Q&A fully visible, replacing Summary visually
+ * PEEKING: Only "Are you curious about" visible at bottom of card
+ * ACTIVE: Q&A fully visible, user can tap questions
+ *
+ * Q&A card is now INSIDE the story card, not a sibling
  */
 function setQACardState(newState) {
-    const qaCard = elements.qaCard;
+    // Find Q&A card inside current story card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const qaCard = currentCard.querySelector('.qa-card');
     if (!qaCard) return;
 
     // Remove all state classes
@@ -755,9 +846,8 @@ function cacheElements() {
     elements.historyToggle = document.getElementById('historyToggle');
     elements.historyBackBtn = document.getElementById('historyBackBtn');
 
-    // NEW Q&A Card (inside card-container)
-    elements.qaCard = document.getElementById('qaCard');
-    elements.qaQuestionsList = document.getElementById('qaQuestionsList');
+    // Q&A Card is now created dynamically inside each story card
+    // No longer a static element - query it from the current story card when needed
 
     // LEGACY Modal (still used for Answer and Dig Deeper views)
     elements.modalBackdrop = document.getElementById('modalBackdrop');
@@ -839,6 +929,9 @@ function cacheElements() {
 // ==========================================
 
 async function init() {
+    // Initialize fixed card height system FIRST
+    initCardHeightSystem();
+
     cacheElements();
     loadFromStorage();
     applyTheme();
@@ -2238,6 +2331,77 @@ function createCardElement(story, position) {
                 </div>
             </div>
         </div>
+
+        <!-- Q&A CARD - slides up from bottom of story card -->
+        <div class="qa-card" data-story-id="${story.id}">
+            <p class="qa-prompt">Are you curious about:</p>
+            <div class="qa-questions-list">
+                <!-- Questions injected by populateQACard() -->
+            </div>
+        </div>
+
+        <!-- ANSWER CARD - slides up when question is clicked -->
+        <div class="answer-card" data-story-id="${story.id}">
+            <div class="answer-header">
+                <span class="answer-label">✦</span>
+                <p class="answer-question-text"></p>
+            </div>
+            <div class="answer-body">
+                <p class="answer-text"></p>
+            </div>
+            <div class="answer-rating">
+                <p class="rating-label">Was this helpful?</p>
+                <div class="rating-stars">
+                    <button class="rating-star" data-value="1">★</button>
+                    <button class="rating-star" data-value="2">★</button>
+                    <button class="rating-star" data-value="3">★</button>
+                    <button class="rating-star" data-value="4">★</button>
+                    <button class="rating-star" data-value="5">★</button>
+                </div>
+            </div>
+            <div class="answer-footer">
+                <button class="answer-done-btn">Done</button>
+                <button class="answer-dig-deeper-btn">Dig Deeper</button>
+            </div>
+        </div>
+
+        <!-- DIG DEEPER Q&A CARD - slides up when Dig Deeper is clicked -->
+        <div class="dig-deeper-qa-card" data-story-id="${story.id}">
+            <div class="dig-deeper-header">
+                <h2 class="dig-deeper-headline">Dig deeper</h2>
+                <p class="dig-deeper-subheading">Curiosity never killed the cat</p>
+            </div>
+            <div class="dig-deeper-questions-list">
+                <!-- Dig Deeper questions injected by populateDigDeeperQACard() -->
+            </div>
+            <div class="dig-deeper-footer">
+                <button class="back-to-headline-link">Back to headline</button>
+            </div>
+        </div>
+
+        <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
+        <div class="dig-deeper-answer-card" data-story-id="${story.id}">
+            <div class="answer-header">
+                <span class="answer-label">✦</span>
+                <p class="answer-question-text"></p>
+            </div>
+            <div class="answer-body">
+                <p class="answer-text"></p>
+            </div>
+            <div class="answer-rating">
+                <p class="rating-label">Was this helpful?</p>
+                <div class="rating-stars">
+                    <button class="rating-star" data-value="1">★</button>
+                    <button class="rating-star" data-value="2">★</button>
+                    <button class="rating-star" data-value="3">★</button>
+                    <button class="rating-star" data-value="4">★</button>
+                    <button class="rating-star" data-value="5">★</button>
+                </div>
+            </div>
+            <div class="answer-footer">
+                <button class="answer-done-btn">Done</button>
+            </div>
+        </div>
     `;
 
     if (position === 0) {
@@ -2283,21 +2447,27 @@ function flipCard(card, story) {
 /**
  * Populate Q&A card with story questions
  * Called when flipping to summary to prepare the peek state
- * Uses the NEW Q&A card structure (inside card-container)
+ * Q&A card is now INSIDE the story card element
  */
 function populateQACard(story) {
     if (!story || !story.questions) return;
 
     state.currentStory = story;
 
-    // Clear the NEW Q&A questions list
-    if (!elements.qaQuestionsList) return;
-    elements.qaQuestionsList.innerHTML = '';
+    // Find the Q&A card INSIDE the current story card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const qaCard = currentCard.querySelector('.qa-card');
+    const questionsList = currentCard.querySelector('.qa-questions-list');
+    if (!questionsList) return;
+
+    questionsList.innerHTML = '';
 
     // For FAQs, only show first 3 questions
     const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
 
-    questionsToShow.forEach((q) => {
+    questionsToShow.forEach((q, index) => {
         const button = document.createElement('button');
         button.className = 'qa-question-btn';
         button.innerHTML = `
@@ -2306,9 +2476,10 @@ function populateQACard(story) {
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
-            showAnswer(q);
+            // Use new Answer Card system instead of legacy modal
+            showAnswerCard(index);
         });
-        elements.qaQuestionsList.appendChild(button);
+        questionsList.appendChild(button);
     });
 
     // Add skip button
@@ -2333,7 +2504,7 @@ function populateQACard(story) {
         state.isCardFlipped = false;
         setTimeout(() => nextCard(), 300);
     });
-    elements.qaQuestionsList.appendChild(skipButton);
+    questionsList.appendChild(skipButton);
 
     // Also populate legacy modal for Answer/Dig Deeper views
     if (elements.modalEmoji) elements.modalEmoji.textContent = story.emoji || '✦';
@@ -2356,6 +2527,204 @@ function setupCardInteractions(card, story) {
 
     // Setup click handlers for nav hints
     setupNavHintClickHandlers(card, story);
+
+    // Setup Q&A card click handler (tap to expand from peeking state)
+    setupQACardClickHandler(card);
+
+    // Setup Answer card button handlers
+    setupAnswerCardButtons(card);
+
+    // Setup Dig Deeper Answer card button handlers
+    setupDigDeeperAnswerCardButtons(card);
+
+    // Setup Dig Deeper Q&A card button handlers (Back to headline)
+    setupDigDeeperQACardButtons(card);
+
+    // Setup rating star handlers
+    setupRatingStars(card);
+}
+
+/**
+ * Setup click handlers for Dig Deeper Q&A card (Back to headline)
+ */
+function setupDigDeeperQACardButtons(card) {
+    const digDeeperQACard = card.querySelector('.dig-deeper-qa-card');
+    if (!digDeeperQACard) return;
+
+    const backToHeadlineBtn = digDeeperQACard.querySelector('.back-to-headline-link');
+
+    if (backToHeadlineBtn) {
+        backToHeadlineBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            // Reset ALL card states and return to headline
+            backToHeadline();
+        });
+    }
+}
+
+/**
+ * Return all the way back to headline from any depth
+ */
+function backToHeadline() {
+    console.log('[backToHeadline] Returning to headline from deep state');
+
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    // Hide all overlay cards
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    const answerCard = currentCard.querySelector('.answer-card');
+    const qaCard = currentCard.querySelector('.qa-card');
+
+    if (digDeeperAnswerCard) {
+        digDeeperAnswerCard.classList.remove('active');
+        digDeeperAnswerCard.style.transform = '';
+    }
+    if (digDeeperQACard) {
+        digDeeperQACard.classList.remove('active');
+        digDeeperQACard.style.transform = '';
+    }
+    if (answerCard) {
+        answerCard.classList.remove('active');
+        answerCard.style.transform = '';
+    }
+
+    // Hide Q&A card
+    setQACardState(QA_STATES.HIDDEN);
+    if (qaCard) {
+        qaCard.style.transform = '';
+    }
+
+    // Flip card back to headline
+    currentCard.classList.remove('flipped');
+    currentCard.dataset.flipped = 'false';
+
+    // Reset state
+    state.cardLayer = 'headline';
+    state.isCardFlipped = false;
+    state.currentQuestionIndex = null;
+    state.currentDigDeeperQuestionIndex = null;
+}
+
+/**
+ * Setup click handlers for Answer card buttons (Done and Dig Deeper)
+ */
+function setupAnswerCardButtons(card) {
+    const answerCard = card.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    const doneBtn = answerCard.querySelector('.answer-done-btn');
+    const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
+
+    if (doneBtn) {
+        doneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            hideAnswerCard();
+        });
+    }
+
+    if (digDeeperBtn) {
+        digDeeperBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            showDigDeeperQACard();
+        });
+    }
+}
+
+/**
+ * Setup click handlers for Dig Deeper Answer card buttons (Done only)
+ */
+function setupDigDeeperAnswerCardButtons(card) {
+    const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    const doneBtn = digDeeperAnswerCard.querySelector('.answer-done-btn');
+
+    if (doneBtn) {
+        doneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            hideDigDeeperAnswerCard();
+        });
+    }
+}
+
+/**
+ * Setup rating star click handlers for both answer cards
+ */
+function setupRatingStars(card) {
+    // Answer Card stars
+    const answerCard = card.querySelector('.answer-card');
+    if (answerCard) {
+        const stars = answerCard.querySelectorAll('.rating-star');
+        stars.forEach(star => {
+            star.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleStarClick(star, answerCard);
+            });
+        });
+    }
+
+    // Dig Deeper Answer Card stars
+    const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
+    if (digDeeperAnswerCard) {
+        const stars = digDeeperAnswerCard.querySelectorAll('.rating-star');
+        stars.forEach(star => {
+            star.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleStarClick(star, digDeeperAnswerCard);
+            });
+        });
+    }
+}
+
+/**
+ * Handle star click - highlight clicked star and all before it
+ */
+function handleStarClick(clickedStar, cardElement) {
+    const value = parseInt(clickedStar.dataset.value);
+    const stars = cardElement.querySelectorAll('.rating-star');
+
+    stars.forEach(star => {
+        const starValue = parseInt(star.dataset.value);
+        if (starValue <= value) {
+            star.classList.add('active');
+        } else {
+            star.classList.remove('active');
+        }
+    });
+
+    triggerHaptic('light');
+
+    // Track the rating (for analytics)
+    if (state.currentQuestion) {
+        trackAnswerRated(state.currentStory?.headline, state.currentQuestion.text, value);
+    }
+}
+
+/**
+ * Setup click handler for Q&A card inside story card
+ * Tapping the peeking Q&A card activates it to full view
+ */
+function setupQACardClickHandler(card) {
+    const qaCard = card.querySelector('.qa-card');
+    if (!qaCard) return;
+
+    qaCard.addEventListener('click', (e) => {
+        // Only activate from PEEKING state (not when already active)
+        if (state.qaCardState === QA_STATES.PEEKING) {
+            e.stopPropagation();
+            triggerHaptic('light');
+            state.cardLayer = 'questions';
+            setQACardState(QA_STATES.ACTIVE);
+            setupQACardSwipe(); // Setup swipe-down to dismiss
+        }
+        // If already ACTIVE, let normal click propagation happen (question buttons)
+    });
 }
 
 // Click handlers for nav hints
@@ -2590,8 +2959,11 @@ function handleTapZone(e, card, story) {
  * CRITICAL: Only works from headline/summary, NOT from Q&A/answer
  */
 function handleSwipeLeft(card, story) {
-    // Block story navigation from Q&A or Answer views
-    if (state.cardLayer === 'questions' || state.cardLayer === 'answer') {
+    // Block story navigation from Q&A or deeper views
+    if (state.cardLayer === 'questions' ||
+        state.cardLayer === 'answer' ||
+        state.cardLayer === 'dig-deeper-qa' ||
+        state.cardLayer === 'dig-deeper-answer') {
         snapCardBack(card);
         return;
     }
@@ -2615,11 +2987,14 @@ function handleSwipeLeft(card, story) {
 
 /**
  * Handle RIGHT swipe = Navigate to NEXT story
- * CRITICAL: Only works from headline/summary, NOT from Q&A/answer
+ * CRITICAL: Only works from headline/summary, NOT from Q&A/answer/dig-deeper
  */
 function handleSwipeRight(card, story) {
-    // Block story navigation from Q&A or Answer views
-    if (state.cardLayer === 'questions' || state.cardLayer === 'answer') {
+    // Block story navigation from Q&A or deeper views
+    if (state.cardLayer === 'questions' ||
+        state.cardLayer === 'answer' ||
+        state.cardLayer === 'dig-deeper-qa' ||
+        state.cardLayer === 'dig-deeper-answer') {
         snapCardBack(card);
         return;
     }
@@ -2670,17 +3045,30 @@ function handleSwipeUp(card, story) {
 
 /**
  * Handle SWIPE DOWN = Return to previous layer
+ * From Q&A/Answer/etc -> handled by their own swipe handlers, do nothing here
  * From summary -> flip back to headline
  * From headline -> do nothing (already at top)
  */
 function handleSwipeDown(card, story) {
+    // CRITICAL: If we're in Q&A or deeper layers, their own handlers manage swipe down
+    // Do NOT flip the card - just snap back and let the layer handler do its job
+    if (state.cardLayer === 'questions' ||
+        state.cardLayer === 'answer' ||
+        state.cardLayer === 'dig-deeper-qa' ||
+        state.cardLayer === 'dig-deeper-answer') {
+        snapCardBack(card);
+        return;
+    }
+
     const isFlipped = card.dataset.flipped === 'true';
 
-    if (isFlipped) {
+    if (isFlipped && state.cardLayer === 'summary') {
         // Currently on SUMMARY - flip back to HEADLINE
         flipCard(card, story);
         state.isCardFlipped = false;
         state.cardLayer = 'headline';
+        // Also hide Q&A card completely when going back to headline
+        setQACardState(QA_STATES.HIDDEN);
     } else {
         // Already on HEADLINE - bounce back, nothing to do
         snapCardBack(card);
@@ -3111,11 +3499,15 @@ function setupModalSwipe() {
 }
 
 /**
- * Setup swipe-to-dismiss for NEW Q&A card (inside card-container)
+ * Setup swipe-to-dismiss for Q&A card (inside story card)
  * Swipe down from Q&A returns to Summary (Q&A becomes peeking)
  */
 function setupQACardSwipe() {
-    const qaCard = elements.qaCard;
+    // Find Q&A card inside current story card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const qaCard = currentCard.querySelector('.qa-card');
     if (!qaCard) return;
 
     let startY = 0;
@@ -3139,8 +3531,8 @@ function setupQACardSwipe() {
         // Only allow dragging down when at top of scroll
         if (deltaY > 0 && qaCard.scrollTop === 0) {
             e.preventDefault();
-            // Apply visual feedback during drag
-            qaCard.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
+            // Apply visual feedback during drag - NO translateX since it's inside card
+            qaCard.style.transform = `translateY(${deltaY}px)`;
         }
     };
 
@@ -3152,8 +3544,8 @@ function setupQACardSwipe() {
             triggerHaptic('light');
             closeQACard();
         } else {
-            // Reset position to active state
-            qaCard.style.transform = 'translateX(-50%) translateY(0)';
+            // Reset position to active state (translateY 0)
+            qaCard.style.transform = 'translateY(0)';
         }
 
         startY = 0;
@@ -3182,12 +3574,462 @@ function closeQACard() {
     state.cardLayer = 'summary';
 
     // Reset Q&A card inline transform
-    if (elements.qaCard) {
-        elements.qaCard.style.transform = '';
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (currentCard) {
+        const qaCard = currentCard.querySelector('.qa-card');
+        if (qaCard) {
+            qaCard.style.transform = '';
+        }
     }
 
     console.log('[closeQACard] Returned to Summary with Q&A peeking');
 }
+
+// ==========================================
+// ANSWER CARD STATE MANAGEMENT
+// ==========================================
+
+/**
+ * Show Answer Card - slide up from bottom
+ * @param {number} questionIndex - Index of the selected question (0-3)
+ */
+function showAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    // Store the question index
+    state.currentQuestionIndex = questionIndex;
+
+    // Populate the answer card with content
+    populateAnswerCard(questionIndex);
+
+    // Show the card
+    answerCard.classList.add('active');
+
+    // Update state
+    state.cardLayer = 'answer';
+
+    // Setup swipe handler for this card
+    setupAnswerCardSwipe();
+
+    console.log('[showAnswerCard] Showing answer for question', questionIndex);
+}
+
+/**
+ * Hide Answer Card - slide down, return to Q&A
+ */
+function hideAnswerCard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (answerCard) {
+        answerCard.classList.remove('active');
+        answerCard.style.transform = '';
+    }
+
+    // Update state - return to Q&A
+    state.cardLayer = 'questions';
+    state.currentQuestionIndex = null;
+
+    console.log('[hideAnswerCard] Returned to Q&A');
+}
+
+/**
+ * Populate Answer Card with question and answer content
+ * @param {number} questionIndex - Index of the question
+ */
+function populateAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard || !state.currentStory) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    const question = state.currentStory.questions[questionIndex];
+    if (!question) return;
+
+    // Store for later use (dig deeper, history, etc.)
+    state.currentQuestion = question;
+
+    // Populate content
+    const questionText = answerCard.querySelector('.answer-question-text');
+    const answerText = answerCard.querySelector('.answer-text');
+    const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
+
+    if (questionText) questionText.innerHTML = parseFormattedText(question.text);
+    if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
+
+    // Show/hide Dig Deeper button based on availability
+    const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
+    if (digDeeperBtn) {
+        digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
+    }
+
+    // Reset rating stars
+    resetAnswerCardStars(answerCard);
+
+    // Add to history
+    addToHistory(state.currentStory, question);
+
+    // Track analytics
+    trackQuestionClicked(state.currentStory.headline, question.text);
+}
+
+/**
+ * Reset rating stars in answer card
+ */
+function resetAnswerCardStars(answerCard) {
+    const stars = answerCard.querySelectorAll('.rating-star');
+    stars.forEach(star => star.classList.remove('active'));
+}
+
+// ==========================================
+// DIG DEEPER Q&A CARD STATE MANAGEMENT
+// ==========================================
+
+/**
+ * Show Dig Deeper Q&A Card - slide up from bottom
+ */
+function showDigDeeperQACard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    if (!digDeeperQACard) return;
+
+    // Populate with dig deeper questions
+    populateDigDeeperQACard();
+
+    // Show the card
+    digDeeperQACard.classList.add('active');
+
+    // Update state
+    state.cardLayer = 'dig-deeper-qa';
+
+    // Setup swipe handler
+    setupDigDeeperQACardSwipe();
+
+    console.log('[showDigDeeperQACard] Showing dig deeper questions');
+}
+
+/**
+ * Hide Dig Deeper Q&A Card - slide down, return to Answer
+ */
+function hideDigDeeperQACard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    if (digDeeperQACard) {
+        digDeeperQACard.classList.remove('active');
+        digDeeperQACard.style.transform = '';
+    }
+
+    // Update state - return to Answer
+    state.cardLayer = 'answer';
+
+    console.log('[hideDigDeeperQACard] Returned to Answer');
+}
+
+/**
+ * Populate Dig Deeper Q&A Card with follow-up questions
+ */
+function populateDigDeeperQACard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard || !state.currentQuestion) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    const questionsList = digDeeperQACard?.querySelector('.dig-deeper-questions-list');
+    if (!questionsList) return;
+
+    // Clear existing questions
+    questionsList.innerHTML = '';
+
+    const deepQuestions = state.currentQuestion.deepQuestions || [];
+
+    // Create button for each dig deeper question
+    deepQuestions.forEach((q, index) => {
+        const button = document.createElement('button');
+        button.className = 'qa-question-btn';
+        button.innerHTML = `
+            <span class="qa-question-label">✦</span>
+            <span class="qa-question-text">${parseFormattedText(q.text)}</span>
+        `;
+        button.addEventListener('click', () => {
+            triggerHaptic('light');
+            showDigDeeperAnswerCard(index);
+        });
+        questionsList.appendChild(button);
+    });
+}
+
+// ==========================================
+// DIG DEEPER ANSWER CARD STATE MANAGEMENT
+// ==========================================
+
+/**
+ * Show Dig Deeper Answer Card - slide up from bottom
+ * @param {number} questionIndex - Index of the dig deeper question (0-2)
+ */
+function showDigDeeperAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    // Store the question index
+    state.currentDigDeeperQuestionIndex = questionIndex;
+
+    // Populate the card with content
+    populateDigDeeperAnswerCard(questionIndex);
+
+    // Show the card
+    digDeeperAnswerCard.classList.add('active');
+
+    // Update state
+    state.cardLayer = 'dig-deeper-answer';
+
+    // Setup swipe handler
+    setupDigDeeperAnswerCardSwipe();
+
+    console.log('[showDigDeeperAnswerCard] Showing dig deeper answer', questionIndex);
+}
+
+/**
+ * Hide Dig Deeper Answer Card - slide down, return to Dig Deeper Q&A
+ */
+function hideDigDeeperAnswerCard() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (digDeeperAnswerCard) {
+        digDeeperAnswerCard.classList.remove('active');
+        digDeeperAnswerCard.style.transform = '';
+    }
+
+    // Update state - return to Dig Deeper Q&A
+    state.cardLayer = 'dig-deeper-qa';
+    state.currentDigDeeperQuestionIndex = null;
+
+    console.log('[hideDigDeeperAnswerCard] Returned to Dig Deeper Q&A');
+}
+
+/**
+ * Populate Dig Deeper Answer Card with content
+ * @param {number} questionIndex - Index of the dig deeper question
+ */
+function populateDigDeeperAnswerCard(questionIndex) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard || !state.currentQuestion) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    const deepQuestions = state.currentQuestion.deepQuestions || [];
+    const question = deepQuestions[questionIndex];
+    if (!question) return;
+
+    // Populate content
+    const questionText = digDeeperAnswerCard.querySelector('.answer-question-text');
+    const answerText = digDeeperAnswerCard.querySelector('.answer-text');
+
+    if (questionText) questionText.innerHTML = parseFormattedText(question.text);
+    if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
+
+    // Reset rating stars
+    resetAnswerCardStars(digDeeperAnswerCard);
+
+    // Track analytics
+    trackQuestionClicked(state.currentStory.headline, question.text);
+}
+
+// ==========================================
+// SWIPE HANDLERS FOR NEW CARDS
+// ==========================================
+
+/**
+ * Setup swipe-to-dismiss for Answer Card
+ * Swipe down returns to Q&A card
+ */
+function setupAnswerCardSwipe() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners
+    if (answerCard._touchStartHandler) {
+        answerCard.removeEventListener('touchstart', answerCard._touchStartHandler);
+        answerCard.removeEventListener('touchmove', answerCard._touchMoveHandler);
+        answerCard.removeEventListener('touchend', answerCard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && answerCard.scrollTop === 0) {
+            e.preventDefault();
+            answerCard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            triggerHaptic('light');
+            hideAnswerCard();
+        } else {
+            answerCard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    answerCard._touchStartHandler = handleTouchStart;
+    answerCard._touchMoveHandler = handleTouchMove;
+    answerCard._touchEndHandler = handleTouchEnd;
+
+    answerCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    answerCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    answerCard.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Setup swipe-to-dismiss for Dig Deeper Q&A Card
+ * Swipe down returns to Answer card
+ */
+function setupDigDeeperQACardSwipe() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+    if (!digDeeperQACard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners
+    if (digDeeperQACard._touchStartHandler) {
+        digDeeperQACard.removeEventListener('touchstart', digDeeperQACard._touchStartHandler);
+        digDeeperQACard.removeEventListener('touchmove', digDeeperQACard._touchMoveHandler);
+        digDeeperQACard.removeEventListener('touchend', digDeeperQACard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && digDeeperQACard.scrollTop === 0) {
+            e.preventDefault();
+            digDeeperQACard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            triggerHaptic('light');
+            hideDigDeeperQACard();
+        } else {
+            digDeeperQACard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    digDeeperQACard._touchStartHandler = handleTouchStart;
+    digDeeperQACard._touchMoveHandler = handleTouchMove;
+    digDeeperQACard._touchEndHandler = handleTouchEnd;
+
+    digDeeperQACard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    digDeeperQACard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    digDeeperQACard.addEventListener('touchend', handleTouchEnd);
+}
+
+/**
+ * Setup swipe-to-dismiss for Dig Deeper Answer Card
+ * Swipe down returns to Dig Deeper Q&A card
+ */
+function setupDigDeeperAnswerCardSwipe() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    let startY = 0;
+    let currentY = 0;
+
+    // Remove old listeners
+    if (digDeeperAnswerCard._touchStartHandler) {
+        digDeeperAnswerCard.removeEventListener('touchstart', digDeeperAnswerCard._touchStartHandler);
+        digDeeperAnswerCard.removeEventListener('touchmove', digDeeperAnswerCard._touchMoveHandler);
+        digDeeperAnswerCard.removeEventListener('touchend', digDeeperAnswerCard._touchEndHandler);
+    }
+
+    const handleTouchStart = (e) => {
+        startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+
+        if (deltaY > 0 && digDeeperAnswerCard.scrollTop === 0) {
+            e.preventDefault();
+            digDeeperAnswerCard.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const deltaY = currentY - startY;
+
+        if (deltaY > 100) {
+            triggerHaptic('light');
+            hideDigDeeperAnswerCard();
+        } else {
+            digDeeperAnswerCard.style.transform = 'translateY(0)';
+        }
+
+        startY = 0;
+        currentY = 0;
+    };
+
+    digDeeperAnswerCard._touchStartHandler = handleTouchStart;
+    digDeeperAnswerCard._touchMoveHandler = handleTouchMove;
+    digDeeperAnswerCard._touchEndHandler = handleTouchEnd;
+
+    digDeeperAnswerCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+    digDeeperAnswerCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+    digDeeperAnswerCard.addEventListener('touchend', handleTouchEnd);
+}
+
+// ==========================================
+// LEGACY ANSWER SYSTEM (keeping for backwards compatibility)
+// ==========================================
 
 function showAnswer(question) {
     addToHistory(state.currentStory, question);
@@ -3575,17 +4417,44 @@ function verifyCleanState() {
 
 /**
  * Reset ALL card states - called on EVERY story navigation
- * CRITICAL: This prevents Q&A card persisting across stories
+ * CRITICAL: This prevents cards persisting across stories
  */
 function resetAllCardStates() {
     console.log('[resetAllCardStates] Resetting all card states');
 
-    // 1. Reset NEW Q&A card to HIDDEN state
+    const storyCard = document.querySelector('.story-card[data-card-type="current"]');
+
+    // 1. Reset Q&A card to HIDDEN state
     setQACardState(QA_STATES.HIDDEN);
 
-    // 2. Reset inline transform on new Q&A card
-    if (elements.qaCard) {
-        elements.qaCard.style.transform = '';
+    // 2. Reset ALL card transforms and states inside current story card
+    if (storyCard) {
+        // Reset Q&A card
+        const qaCard = storyCard.querySelector('.qa-card');
+        if (qaCard) {
+            qaCard.style.transform = '';
+        }
+
+        // Reset Answer card
+        const answerCard = storyCard.querySelector('.answer-card');
+        if (answerCard) {
+            answerCard.classList.remove('active');
+            answerCard.style.transform = '';
+        }
+
+        // Reset Dig Deeper Q&A card
+        const digDeeperQACard = storyCard.querySelector('.dig-deeper-qa-card');
+        if (digDeeperQACard) {
+            digDeeperQACard.classList.remove('active');
+            digDeeperQACard.style.transform = '';
+        }
+
+        // Reset Dig Deeper Answer card
+        const digDeeperAnswerCard = storyCard.querySelector('.dig-deeper-answer-card');
+        if (digDeeperAnswerCard) {
+            digDeeperAnswerCard.classList.remove('active');
+            digDeeperAnswerCard.style.transform = '';
+        }
     }
 
     // 3. Hide LEGACY modal
@@ -3608,7 +4477,11 @@ function resetAllCardStates() {
     state.isCardFlipped = false;
     state.modalStack = [];
 
-    // 7. Remove no-scroll from body
+    // 7. Reset question indices
+    state.currentQuestionIndex = null;
+    state.currentDigDeeperQuestionIndex = null;
+
+    // 8. Remove no-scroll from body
     document.body.classList.remove('no-scroll');
 }
 
@@ -4152,34 +5025,14 @@ function setupEventListeners() {
         }
     });
 
-    // Click on Q&A modal when PEEKING = activate it
-    // This allows users to tap on the peeking hint to open full Q&A
-    // Click on NEW Q&A card when PEEKING = activate it
-    if (elements.qaCard) {
-        elements.qaCard.addEventListener('click', (e) => {
-            // Only activate from PEEKING state (not when already active)
-            if (state.qaCardState === QA_STATES.PEEKING) {
-                e.stopPropagation();
-                triggerHaptic('light');
-                state.cardLayer = 'questions';
-                setQACardState(QA_STATES.ACTIVE);
-                setupQACardSwipe(); // Setup swipe-down to dismiss
-            }
-            // If already ACTIVE, let normal click propagation happen
-        });
-    }
+    // Q&A card click handler is now set up dynamically in setupQACardClickHandler()
+    // Called by setupCardInteractions() when card is created
 
-    // LEGACY: Keep old qaModal click handler for Answer/Dig Deeper
+    // LEGACY: Keep old qaModal click handler for Answer/Dig Deeper views
     if (elements.qaModal) {
         elements.qaModal.addEventListener('click', (e) => {
-            // Only activate from PEEKING state (not when already active)
-            if (state.qaCardState === QA_STATES.PEEKING) {
-                e.stopPropagation();
-                triggerHaptic('light');
-                state.cardLayer = 'questions';
-                setQACardState(QA_STATES.ACTIVE);
-                setupQACardSwipe();
-            }
+            // Clicking inside the modal shouldn't close it
+            e.stopPropagation();
         });
     }
 
@@ -4448,11 +5301,11 @@ function setupEventListeners() {
             return;
         }
 
-        // Check modal states
+        // Check legacy modal states
         const qaModalOpen = elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible');
         const summaryModalOpen = elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible');
 
-        // When in Q&A modal - only down arrow works (to go back)
+        // When in legacy Q&A modal - only down arrow works (to go back)
         if (qaModalOpen) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -4472,45 +5325,129 @@ function setupEventListeners() {
 
         // Card navigation (when no modal is open)
         if (state.currentSection === 'today') {
-            const card = document.querySelector('.story-card[data-position="0"]');
+            const card = document.querySelector('.story-card[data-card-type="current"]');
             const story = state.stories[state.currentIndex];
 
+            // Handle ArrowDown based on current layer state
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                handleKeyboardDown(card, story);
+                return;
+            }
+
+            // Handle ArrowUp based on current layer state
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (card && story) handleSwipeUp(card, story);
+                return;
+            }
+
+            // Left/Right only work on headline/summary
             if (e.key === 'ArrowLeft') {
-                // LEFT = Previous story
                 e.preventDefault();
                 if (card && story) handleSwipeLeft(card, story);
             }
             if (e.key === 'ArrowRight') {
-                // RIGHT = Next story
                 e.preventDefault();
                 if (card && story) handleSwipeRight(card, story);
-            }
-            if (e.key === 'ArrowUp') {
-                // UP = Flip to summary / Reveal questions
-                e.preventDefault();
-                if (card && story) handleSwipeUp(card, story);
-            }
-            if (e.key === 'ArrowDown') {
-                // DOWN = Flip back to headline
-                e.preventDefault();
-                if (card && story) handleSwipeDown(card, story);
             }
         }
     });
 }
 
 /**
+ * Handle ArrowDown key navigation for all card layers
+ */
+function handleKeyboardDown(card, story) {
+    // Handle based on current card layer
+    switch (state.cardLayer) {
+        case 'dig-deeper-answer':
+            // From Dig Deeper Answer -> return to Dig Deeper Q&A
+            hideDigDeeperAnswerCard();
+            break;
+
+        case 'dig-deeper-qa':
+            // From Dig Deeper Q&A -> return to Answer
+            hideDigDeeperQACard();
+            break;
+
+        case 'answer':
+            // From Answer -> return to Q&A
+            hideAnswerCard();
+            break;
+
+        case 'questions':
+            // From Q&A -> return to Summary
+            closeQACard();
+            break;
+
+        case 'summary':
+            // From Summary -> flip back to Headline
+            if (card && story) {
+                flipCard(card, story);
+                state.isCardFlipped = false;
+                state.cardLayer = 'headline';
+                setQACardState(QA_STATES.HIDDEN);
+            }
+            break;
+
+        case 'headline':
+        default:
+            // Already at headline, do nothing
+            break;
+    }
+}
+
+/**
  * Handle keyboard back navigation (Escape key)
- * Pops from modal stack and returns to previous layer
+ * Returns to previous layer based on current state
  */
 function handleKeyboardBack() {
-    // Check what's currently visible and close it
+    // Check legacy modals first
     if (elements.summaryModalBackdrop && elements.summaryModalBackdrop.classList.contains('visible')) {
         closeSummaryModal();
-    } else if (elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible')) {
-        closeModal();
+        return;
     }
-    // If nothing is open, Escape does nothing
+    if (elements.modalBackdrop && elements.modalBackdrop.classList.contains('visible')) {
+        closeModal();
+        return;
+    }
+
+    // Handle new card system layers
+    const card = document.querySelector('.story-card[data-card-type="current"]');
+    const story = state.stories[state.currentIndex];
+
+    switch (state.cardLayer) {
+        case 'dig-deeper-answer':
+            hideDigDeeperAnswerCard();
+            break;
+
+        case 'dig-deeper-qa':
+            hideDigDeeperQACard();
+            break;
+
+        case 'answer':
+            hideAnswerCard();
+            break;
+
+        case 'questions':
+            closeQACard();
+            break;
+
+        case 'summary':
+            // From Summary -> flip back to Headline
+            if (card && story) {
+                flipCard(card, story);
+                state.isCardFlipped = false;
+                state.cardLayer = 'headline';
+                setQACardState(QA_STATES.HIDDEN);
+            }
+            break;
+
+        default:
+            // At headline or unknown state, do nothing
+            break;
+    }
 }
 
 // ==========================================
