@@ -55,6 +55,10 @@
     --line-height-normal: 1.5;
     --line-height-relaxed: 1.7;
 
+    /* Text size toggle - default and enlarged */
+    --body-text-size: var(--font-size-md);
+    --body-text-size-large: var(--font-size-lg);
+
     /* ==========================================
        FLUID SPACING - scales with viewport
        ========================================== */
@@ -176,6 +180,19 @@ body {
     width: 100%;
 
     transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+/* Text size enlarged state - applies larger font to body text */
+body.text-enlarged {
+    --body-text-size: var(--body-text-size-large);
+}
+
+/* Body text elements that respond to text size toggle */
+.card-teaser,
+.card-summary-text,
+.answer-text,
+.qa-question-text {
+    font-size: var(--body-text-size);
 }
 
 /* Headlines use Cabinet Grotesk Variable */
@@ -1008,15 +1025,158 @@ button {
     transform: scale(0.95);
 }
 
-/* Summary card: subtle up-arrow hint only */
+/* Summary card: three-column layout like headline card */
 .card-nav-hints-summary {
-    justify-content: center;
+    /* Uses same grid as .card-nav-hints */
 }
 
 .nav-hint-center-subtle {
     color: var(--text-tertiary);
     font-size: var(--font-size-lg);
     opacity: 0.5;
+}
+
+/* ==========================================
+   Text Size Toggle Button (AA)
+   ========================================== */
+
+.btn-text-size {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: baseline;
+    gap: 1px;
+    padding: var(--spacing-sm);
+    color: var(--text-tertiary);
+    transition: color var(--transition-fast);
+    justify-self: start;
+    position: relative;
+    z-index: 100; /* Above tap zone */
+}
+
+.btn-text-size:hover {
+    color: var(--text-primary);
+}
+
+.text-size-small {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.text-size-large {
+    font-size: 18px;
+    font-weight: 500;
+}
+
+/* Active state when text is enlarged */
+.btn-text-size.active {
+    color: var(--accent);
+}
+
+/* ==========================================
+   Bookmark Button
+   ========================================== */
+
+.btn-bookmark {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    color: var(--text-tertiary);
+    transition: color var(--transition-fast);
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 100; /* Above tap zone */
+}
+
+.btn-bookmark:hover {
+    color: var(--text-primary);
+}
+
+.bookmark-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.bookmark-icon path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    transition: fill var(--transition-fast), stroke var(--transition-fast);
+}
+
+/* Bookmarked state */
+.btn-bookmark.bookmarked .bookmark-icon path {
+    fill: var(--accent);
+    stroke: var(--accent);
+}
+
+/* ==========================================
+   Story Navigation Buttons (Below Card)
+   ========================================== */
+
+.story-nav-buttons {
+    position: fixed;
+    /* Position above footer: safe-bottom + footer padding + footer content + extra buffer */
+    bottom: calc(var(--safe-bottom) + 35px);
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 var(--spacing-lg);
+    pointer-events: none; /* Container doesn't block touches */
+    z-index: 90; /* Below cards but above background */
+    max-width: min(432px, calc(100% - var(--spacing-lg)));
+    margin: 0 auto;
+}
+
+.story-nav-btn {
+    pointer-events: auto; /* Buttons are clickable */
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: var(--spacing-sm) 0;
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    font-family: var(--font-body);
+    transition: color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.story-nav-btn:hover {
+    color: var(--text-primary);
+}
+
+.story-nav-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.nav-arrow {
+    font-size: 12px;
+}
+
+.nav-text {
+    font-size: var(--font-size-sm);
+}
+
+/* Answer Card Top Bar (for bookmark) - absolutely positioned to not affect layout */
+.answer-card-top-bar {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    z-index: 10;
+}
+
+.answer-bookmark {
+    /* Same styling as other bookmark buttons */
 }
 
 /* Swipe visual feedback classes */
@@ -1573,17 +1733,12 @@ button {
     overflow: hidden;
 }
 
-/* STATE 2: Peeking - shows prompt at bottom of card with visual gap */
-.qa-card.peeking {
-    /* Slide up so only top ~50px is visible + 16px gap from summary */
-    transform: translateY(calc(100% - 50px));
-    pointer-events: auto;
-    opacity: 1;
-    /* Visual separator - shadow at top edge */
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3), var(--shadow-card);
-}
+/* STATE 2: Peeking - REMOVED
+   Q&A card now only has HIDDEN and ACTIVE states.
+   Peeking was blocking bottom bar visibility.
+*/
 
-/* STATE 3: Active - fully visible */
+/* STATE 2: Active - fully visible */
 .qa-card.active {
     transform: translateY(0);
     pointer-events: auto;
@@ -1712,6 +1867,7 @@ button {
     align-items: flex-start;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
+    padding-right: 40px; /* Space for bookmark icon */
 }
 
 .answer-card .answer-label {
@@ -1979,6 +2135,7 @@ button {
     align-items: flex-start;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
+    padding-right: 40px; /* Space for bookmark icon */
 }
 
 .dig-deeper-answer-card .answer-label {
@@ -3062,6 +3219,114 @@ button {
 
 .welcome-modal {
     position: relative; /* For absolute positioning of back button */
+}
+
+/* ==========================================
+   Sign In Modal
+   ========================================== */
+
+.signin-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+}
+
+.signin-modal-backdrop.visible {
+    display: flex;
+}
+
+.signin-modal-content {
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-2xl) var(--spacing-xl);
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    position: relative;
+    animation: signinSlideUp 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes signinSlideUp {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.signin-close-btn {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.signin-close-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.signin-logo {
+    font-family: var(--font-logo);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.signin-tagline {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xl);
+    line-height: 1.4;
+}
+
+.signin-btn {
+    width: 100%;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.signin-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--text-tertiary);
+}
+
+.signin-btn:active {
+    transform: scale(0.98);
+}
+
+.signin-skip-text {
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    margin-top: var(--spacing-md);
 }
 
 /* ==========================================
