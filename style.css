@@ -91,6 +91,18 @@
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
+
+    /* Card Layer System - Fixed dimensions for bug-free positioning */
+    --header-height: 60px;
+    --progress-area-height: 80px;
+    --card-margin-horizontal: 16px;
+    --card-margin-bottom: 24px;
+    --card-border-radius: var(--radius-xl);
+
+    /* Card layer z-indices */
+    --z-flip-card: 10;
+    --z-qa-card: 20;
+    --z-answer-card: 30;
 }
 
 /* Light Mode Variables */
@@ -1506,66 +1518,66 @@ button {
 }
 
 /* ==========================================
-   Q&A Card System (Card-based, not modal overlay)
-   Q&A and Answer cards match story card dimensions
+   Q&A Card System - THREE DISTINCT STATES
+   STATE 1: Hidden (below viewport)
+   STATE 2: Peeking (hint visible at bottom when Summary shows)
+   STATE 3: Active (fully visible, replaces Summary)
    ========================================== */
 
-/* Q&A backdrop - positions in card area, NOT covering header/progress */
+/* Q&A backdrop container - positioned within card area */
 .modal-backdrop {
     position: fixed;
-    /* Position below header and progress area */
-    top: calc(var(--safe-top) + 140px);
+    /* Position in card area, below header/progress */
+    top: calc(var(--safe-top) + var(--header-height) + var(--progress-area-height));
+    left: var(--card-margin-horizontal);
+    right: var(--card-margin-horizontal);
+    bottom: var(--card-margin-bottom);
+    background: transparent;
+    z-index: var(--z-qa-card);
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/* Q&A Card - matches story card EXACTLY */
+.modal {
+    position: absolute;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: transparent;
-    z-index: var(--z-modal-backdrop);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 400ms ease, visibility 400ms ease;
+    max-width: min(400px, 100%);
+    margin: 0 auto;
+    background: var(--bg-card);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--safe-bottom) + 80px);
+    z-index: var(--z-qa-card);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    /* STATE 1: Hidden (default) - below viewport */
+    transform: translateY(100%);
+    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1);
     pointer-events: none;
 }
 
-.modal-backdrop.visible {
-    opacity: 1;
-    visibility: visible;
+/* STATE 2: Peeking - shows hint at bottom when Summary is visible */
+.modal-backdrop.peeking .modal {
+    transform: translateY(calc(100% - 80px));
     pointer-events: auto;
 }
 
-/* Q&A Card - matches story card dimensions and styling */
-.modal {
-    position: absolute;
-    /* Match story card sizing */
-    width: calc(100% - var(--spacing-lg) * 2);
-    max-width: min(400px, 90vw);
-    left: 50%;
-    top: 0;
-    transform: translateX(-50%) translateY(100%);
-    /* Card styling to match story cards */
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    padding: var(--spacing-lg);
-    padding-bottom: calc(var(--safe-bottom) + var(--spacing-lg));
-    z-index: var(--z-modal);
-    transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    /* Match story card max height */
-    max-height: calc(100% - var(--spacing-lg));
-}
-
+/* STATE 3: Active - fully visible, replaces Summary */
 .modal-backdrop.visible .modal {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
-/* Push transition for swipe-up navigation */
+/* Push transition for swipe-up animation */
 .modal-backdrop.push-transition .modal {
     transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-.modal-backdrop.push-transition.visible .modal {
-    transform: translateX(-50%) translateY(0);
 }
 
 /* Q&A Card navigation hint - matches story card nav hints */
