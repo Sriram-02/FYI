@@ -656,6 +656,10 @@ button {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Override .section's overflow-y: auto - prevent scrolling */
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: auto !important;
+    overscroll-behavior: none !important;
 }
 
 .section-header {
