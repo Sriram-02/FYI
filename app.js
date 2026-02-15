@@ -1353,6 +1353,7 @@ async function init() {
         loadFromStorage();
         applyTheme();
         loadTextSizePreference();
+        setupTextSizeMutationObserver(); // Watch for dynamically created elements
 
         setupEventListeners();
         setupSignInModal();
@@ -2649,16 +2650,30 @@ function toggleTextSize() {
     textEnlarged = !textEnlarged;
     document.body.classList.toggle('text-enlarged', textEnlarged);
 
+    // Apply inline styles to all body text elements (highest specificity)
+    const enlargedSize = '22px';  // XL size
+    const normalSize = '';  // Empty string removes inline style, uses CSS default
+
+    const selectors = [
+        '.card-teaser',
+        '.card-summary-text',
+        '.answer-text',
+        '.qa-question-text',
+        '.answer-question-text',
+        '.dig-deeper-subheading',
+        '.answer-question',
+        '.dig-deeper-answer-text'
+    ];
+
+    selectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(el => {
+            el.style.fontSize = textEnlarged ? enlargedSize : normalSize;
+        });
+    });
+
     // Debug logging
     console.log('[toggleTextSize] Text enlarged:', textEnlarged);
-    console.log('[toggleTextSize] Body classes:', document.body.className);
-
-    // Check computed style on a test element
-    const testElement = document.querySelector('.card-teaser');
-    if (testElement) {
-        const computedSize = getComputedStyle(testElement).fontSize;
-        console.log('[toggleTextSize] .card-teaser font-size:', computedSize);
-    }
+    console.log('[toggleTextSize] Applied font-size:', textEnlarged ? enlargedSize : 'default');
 
     // Update all AA button states
     document.querySelectorAll('.btn-text-size').forEach(btn => {
@@ -2676,10 +2691,79 @@ function loadTextSizePreference() {
     if (localStorage.getItem('fyi_text_enlarged') === 'true') {
         textEnlarged = true;
         document.body.classList.add('text-enlarged');
+
+        // Apply inline styles to match toggle behavior
+        applyTextSizeToAllElements();
+
         document.querySelectorAll('.btn-text-size').forEach(btn => {
             btn.classList.add('active');
         });
     }
+}
+
+/**
+ * Apply text size to all matching elements
+ * Used by toggle, load preference, and mutation observer
+ */
+function applyTextSizeToAllElements() {
+    if (!textEnlarged) return;
+
+    const enlargedSize = '22px';
+    const selectors = [
+        '.card-teaser',
+        '.card-summary-text',
+        '.answer-text',
+        '.qa-question-text',
+        '.answer-question-text',
+        '.dig-deeper-subheading',
+        '.answer-question',
+        '.dig-deeper-answer-text'
+    ];
+
+    selectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(el => {
+            el.style.fontSize = enlargedSize;
+        });
+    });
+}
+
+/**
+ * Setup mutation observer to apply text size to dynamically created elements
+ */
+function setupTextSizeMutationObserver() {
+    const observer = new MutationObserver((mutations) => {
+        if (!textEnlarged) return;
+
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) { // Element node
+                    // Check if the node itself matches
+                    const selectors = [
+                        '.card-teaser',
+                        '.card-summary-text',
+                        '.answer-text',
+                        '.qa-question-text',
+                        '.answer-question-text',
+                        '.dig-deeper-subheading',
+                        '.answer-question',
+                        '.dig-deeper-answer-text'
+                    ];
+
+                    selectors.forEach(selector => {
+                        if (node.matches && node.matches(selector)) {
+                            node.style.fontSize = '22px';
+                        }
+                        // Also check children
+                        node.querySelectorAll && node.querySelectorAll(selector).forEach(el => {
+                            el.style.fontSize = '22px';
+                        });
+                    });
+                }
+            });
+        });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // ==========================================
