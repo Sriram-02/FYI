@@ -2649,6 +2649,17 @@ function toggleTextSize() {
     textEnlarged = !textEnlarged;
     document.body.classList.toggle('text-enlarged', textEnlarged);
 
+    // Debug logging
+    console.log('[toggleTextSize] Text enlarged:', textEnlarged);
+    console.log('[toggleTextSize] Body classes:', document.body.className);
+
+    // Check computed style on a test element
+    const testElement = document.querySelector('.card-teaser');
+    if (testElement) {
+        const computedSize = getComputedStyle(testElement).fontSize;
+        console.log('[toggleTextSize] .card-teaser font-size:', computedSize);
+    }
+
     // Update all AA button states
     document.querySelectorAll('.btn-text-size').forEach(btn => {
         btn.classList.toggle('active', textEnlarged);
@@ -2849,12 +2860,12 @@ function createCardElement(story, position) {
                     <h3 class="card-back-header">Summary</h3>
                     <div class="card-summary-text">${summaryHTML}</div>
                 </div>
-                <!-- Summary face: AA (left), ↑ hint (center), Bookmark (right) -->
+                <!-- Summary face: AA (left), Dig deeper (center), Bookmark (right) -->
                 <div class="card-nav-hints card-nav-hints-summary">
                     <button class="btn-text-size" aria-label="Toggle text size">
                         <span class="text-size-small">A</span><span class="text-size-large">A</span>
                     </button>
-                    <span class="nav-hint nav-hint-center-subtle">↑</span>
+                    <span class="nav-hint nav-hint-center" data-action="flip">Dig deeper ↓</span>
                     <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
                         <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                             <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3328,14 +3339,16 @@ function setupNavHintClickHandlers(card, story) {
         });
     }
 
-    // Center button (flip/read ahead) - always active
-    if (centerHint) {
-        centerHint.addEventListener('click', (e) => {
+    // Center buttons (flip/read ahead/dig deeper) - always active
+    // Use querySelectorAll to catch BOTH headline and summary center hints
+    const centerHints = card.querySelectorAll('.nav-hint-center');
+    centerHints.forEach(hint => {
+        hint.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
             handleSwipeUp(card, story);
         });
-    }
+    });
 
     // Next button - only active if NOT disabled
     if (nextHint && !nextHint.classList.contains('disabled')) {
@@ -3869,16 +3882,17 @@ function updatePrevButtonVisibility() {
 
 /**
  * Update visibility of Prev/Next story navigation buttons below card
+ * Buttons always remain in DOM to prevent layout shift - use 'disabled' class
  */
 function updateStoryNavButtons() {
     if (elements.storyPrevBtn) {
-        const hidePrev = state.currentIndex === 0;
-        elements.storyPrevBtn.classList.toggle('hidden', hidePrev);
+        const disablePrev = state.currentIndex === 0;
+        elements.storyPrevBtn.classList.toggle('disabled', disablePrev);
     }
 
     if (elements.storyNextBtn) {
-        const hideNext = state.currentIndex >= state.totalStories - 1;
-        elements.storyNextBtn.classList.toggle('hidden', hideNext);
+        const disableNext = state.currentIndex >= state.totalStories - 1;
+        elements.storyNextBtn.classList.toggle('disabled', disableNext);
     }
 }
 
