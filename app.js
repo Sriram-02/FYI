@@ -246,8 +246,9 @@ async function saveBookmark(bookmarkData) {
 
         if (error) {
             if (error.code === '23505') {
-                // Duplicate - toggle off
-                return await removeBookmark(bookmarkData);
+                // Duplicate - bookmark already exists, treat as success
+                console.debug('[Supabase] Bookmark already exists (duplicate)');
+                return true;
             }
             console.error('[Supabase] Bookmark save error:', error);
             return false;
@@ -349,29 +350,33 @@ async function getUserBookmarks() {
  * Handle bookmark button click - toggle with Supabase persistence
  */
 async function handleBookmarkClick(button, bookmarkData) {
-    const isCurrentlyBookmarked = button.classList.contains('bookmarked');
+    const wasBookmarked = button.classList.contains('bookmarked');
 
     // Optimistic UI update
     button.classList.toggle('bookmarked');
     triggerHaptic('light');
 
+    if (!supabaseClient) {
+        // Offline mode - just toggle locally and show toast
+        const isNowBookmarked = button.classList.contains('bookmarked');
+        showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
+        return;
+    }
+
     let success;
-    if (isCurrentlyBookmarked) {
+    if (wasBookmarked) {
         success = await removeBookmark(bookmarkData);
     } else {
         success = await saveBookmark(bookmarkData);
     }
 
     if (success) {
-        showToast('', isCurrentlyBookmarked ? 'Removed from bookmarks' : 'Saved to bookmarks');
+        // Check button's actual state after operation to show correct toast
+        const isNowBookmarked = button.classList.contains('bookmarked');
+        showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
     } else {
         // Revert optimistic update on failure
         button.classList.toggle('bookmarked');
-        if (!supabaseClient) {
-            // Offline mode - just toggle locally
-            button.classList.toggle('bookmarked');
-            showToast('', isCurrentlyBookmarked ? 'Bookmark removed' : 'Bookmarked');
-        }
     }
 }
 
@@ -435,8 +440,8 @@ async function updateBookmarkStates() {
 
         // Update all story-level bookmark buttons on current card
         document.querySelectorAll('.btn-bookmark').forEach(btn => {
-            // Only update story-level bookmarks (not answer-level)
-            if (!btn.closest('.answer-card-top-bar')) {
+            // Only update story-level bookmarks (not answer-level ones inside answer cards)
+            if (!btn.closest('.answer-card') && !btn.closest('.dig-deeper-answer-card')) {
                 btn.classList.toggle('bookmarked', isStoryBookmarked);
             }
         });
@@ -3396,16 +3401,16 @@ function createCardElement(story, position) {
 
         <!-- ANSWER CARD - slides up when question is clicked -->
         <div class="answer-card" data-story-id="${story.id}">
-            <div class="answer-card-top-bar">
+            <div class="answer-header">
+                <button class="btn-text-size" aria-label="Toggle text size">
+                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                </button>
+                <p class="answer-question-text"></p>
                 <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
                     <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                     </svg>
                 </button>
-            </div>
-            <div class="answer-header">
-                <span class="answer-label">✦</span>
-                <p class="answer-question-text"></p>
             </div>
             <div class="answer-body">
                 <p class="answer-text"></p>
@@ -3429,8 +3434,13 @@ function createCardElement(story, position) {
         <!-- DIG DEEPER Q&A CARD - slides up when Dig Deeper is clicked -->
         <div class="dig-deeper-qa-card" data-story-id="${story.id}">
             <div class="dig-deeper-header">
-                <h2 class="dig-deeper-headline">Dig deeper</h2>
-                <p class="dig-deeper-subheading">Curiosity never killed the cat</p>
+                <button class="btn-text-size" aria-label="Toggle text size">
+                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                </button>
+                <div class="dig-deeper-header-text">
+                    <h2 class="dig-deeper-headline">Dig deeper</h2>
+                    <p class="dig-deeper-subheading">Curiosity never killed the cat</p>
+                </div>
             </div>
             <div class="dig-deeper-questions-list">
                 <!-- Dig Deeper questions injected by populateDigDeeperQACard() -->
@@ -3442,16 +3452,16 @@ function createCardElement(story, position) {
 
         <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
         <div class="dig-deeper-answer-card" data-story-id="${story.id}">
-            <div class="answer-card-top-bar">
+            <div class="answer-header">
+                <button class="btn-text-size" aria-label="Toggle text size">
+                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                </button>
+                <p class="answer-question-text"></p>
                 <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
                     <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                     </svg>
                 </button>
-            </div>
-            <div class="answer-header">
-                <span class="answer-label">✦</span>
-                <p class="answer-question-text"></p>
             </div>
             <div class="answer-body">
                 <p class="answer-text"></p>
@@ -4887,13 +4897,10 @@ function populateAnswerCard(questionIndex) {
     state.currentQuestionIndex = questionIndex;
 
     // Populate content
-    const questionLabel = answerCard.querySelector('.answer-label');
     const questionText = answerCard.querySelector('.answer-question-text');
     const answerText = answerCard.querySelector('.answer-text');
     const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
 
-    // Update label to show question number
-    if (questionLabel) questionLabel.textContent = String(questionIndex + 1);
     if (questionText) questionText.innerHTML = parseFormattedText(question.text);
     if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
 
@@ -5071,13 +5078,9 @@ function populateDigDeeperAnswerCard(questionIndex) {
     if (!question) return;
 
     // Populate content
-    const questionLabel = digDeeperAnswerCard.querySelector('.answer-label');
     const questionText = digDeeperAnswerCard.querySelector('.answer-question-text');
     const answerText = digDeeperAnswerCard.querySelector('.answer-text');
 
-    // Update label to show question letter (A, B, C)
-    const letter = String.fromCharCode(65 + questionIndex);
-    if (questionLabel) questionLabel.textContent = letter;
     if (questionText) questionText.innerHTML = parseFormattedText(question.text);
     if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
 
