@@ -229,13 +229,19 @@ async function saveBookmark(bookmarkData) {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (!session) { console.error('[Supabase] No session for bookmark'); return false; }
 
+        // Determine category from story data or auto-guess from headline
+        const category = bookmarkData.category ||
+                         state.currentStory?.category ||
+                         guessCategory(bookmarkData.storyHeadline);
+
         const { error } = await supabaseClient.from('bookmarks').insert({
             user_id: session.user.id,
             bookmark_type: bookmarkData.type,
             story_date: bookmarkData.storyDate,
             story_headline: bookmarkData.storyHeadline,
             question_path: bookmarkData.questionPath || null,
-            bookmark_content: bookmarkData.content
+            bookmark_content: bookmarkData.content,
+            category: category
         });
 
         if (error) {
@@ -437,6 +443,435 @@ async function updateBookmarkStates() {
     } catch (e) {
         console.debug('[Supabase] updateBookmarkStates failed:', e.message);
     }
+}
+
+// ==========================================
+// BOOKMARKS PAGE FUNCTIONALITY
+// ==========================================
+
+const BOOKMARK_CATEGORIES = [
+    'Politics',
+    'Economy',
+    'Technology',
+    'Business',
+    'World',
+    'India',
+    'Science',
+    'Culture',
+    'Uncategorized'
+];
+
+let currentBookmarks = [];
+let filteredBookmarks = [];
+
+/**
+ * Open bookmarks page overlay
+ */
+function openBookmarksPage() {
+    if (elements.bookmarksPage) {
+        elements.bookmarksPage.classList.add('visible');
+        document.body.classList.add('no-scroll');
+        loadBookmarksPage();
+        trackEvent('Bookmarks Page Opened');
+    }
+}
+
+/**
+ * Close bookmarks page overlay
+ */
+function closeBookmarksPage() {
+    if (elements.bookmarksPage) {
+        elements.bookmarksPage.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+    }
+}
+
+/**
+ * Load all bookmarks from Supabase
+ */
+async function loadBookmarksPage() {
+    if (!supabaseClient) {
+        showBookmarksEmpty('Sign in to see your bookmarks');
+        return;
+    }
+
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+
+        if (!session) {
+            showBookmarksEmpty('Sign in to see your bookmarks');
+            return;
+        }
+
+        const { data, error } = await supabaseClient
+            .from('bookmarks')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('[Bookmarks] Load error:', error);
+            showBookmarksEmpty('Error loading bookmarks');
+            return;
+        }
+
+        currentBookmarks = data || [];
+        populateCategoryFilter();
+        applyBookmarkFilters();
+
+        console.log('[Bookmarks] Loaded', currentBookmarks.length, 'bookmarks');
+    } catch (err) {
+        console.error('[Bookmarks] Load failed:', err);
+        showBookmarksEmpty('Error loading bookmarks');
+    }
+}
+
+/**
+ * Populate category filter dropdown with used categories
+ */
+function populateCategoryFilter() {
+    if (!elements.filterCategory) return;
+
+    // Get unique categories from bookmarks
+    const usedCategories = [...new Set(
+        currentBookmarks.map(b => b.category || 'Uncategorized')
+    )];
+
+    let optionsHTML = '<option value="all">All categories</option>';
+    usedCategories.sort().forEach(category => {
+        optionsHTML += `<option value="${escapeHTMLAttr(category)}">${escapeBookmarkHTML(category)}</option>`;
+    });
+
+    elements.filterCategory.innerHTML = optionsHTML;
+}
+
+/**
+ * Apply date and category filters
+ */
+function applyBookmarkFilters() {
+    const dateFilter = elements.filterDate?.value || 'all';
+    const categoryFilter = elements.filterCategory?.value || 'all';
+
+    filteredBookmarks = currentBookmarks.filter(bookmark => {
+        // Date filter
+        if (dateFilter !== 'all') {
+            const bookmarkDate = new Date(bookmark.created_at);
+            const now = new Date();
+
+            if (dateFilter === 'today') {
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                if (bookmarkDate < today) return false;
+            } else if (dateFilter === 'week') {
+                const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                if (bookmarkDate < weekAgo) return false;
+            } else if (dateFilter === 'month') {
+                const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                if (bookmarkDate < monthAgo) return false;
+            }
+        }
+
+        // Category filter
+        if (categoryFilter !== 'all') {
+            const bookmarkCategory = bookmark.category || 'Uncategorized';
+            if (bookmarkCategory !== categoryFilter) return false;
+        }
+
+        return true;
+    });
+
+    renderBookmarksList();
+}
+
+/**
+ * Render the bookmarks list UI
+ */
+function renderBookmarksList() {
+    if (!elements.bookmarksList || !elements.bookmarksEmpty) return;
+
+    if (filteredBookmarks.length === 0) {
+        elements.bookmarksList.style.display = 'none';
+        elements.bookmarksEmpty.style.display = 'flex';
+        return;
+    }
+
+    elements.bookmarksList.style.display = 'flex';
+    elements.bookmarksEmpty.style.display = 'none';
+
+    elements.bookmarksList.innerHTML = filteredBookmarks.map(bookmark => {
+        const badge = getBookmarkBadge(bookmark);
+        const formattedDate = formatBookmarkDate(bookmark.created_at);
+        const category = bookmark.category || 'Uncategorized';
+        const questionText = bookmark.bookmark_content?.question_text || '';
+
+        return `
+            <div class="bookmark-card" data-bookmark-id="${bookmark.id}" onclick="handleBookmarkCardClick('${bookmark.id}')">
+                <div class="bookmark-badge">${badge}</div>
+                <div class="bookmark-content-wrap">
+                    <h3 class="bookmark-headline">${escapeBookmarkHTML(bookmark.story_headline)}</h3>
+                    ${questionText ? `<p class="bookmark-question">${escapeBookmarkHTML(questionText)}</p>` : ''}
+                    <div class="bookmark-meta">
+                        <span class="bookmark-category-tag">${escapeBookmarkHTML(category)}</span>
+                        <span class="bookmark-date">${formattedDate}</span>
+                    </div>
+                </div>
+                <button class="bookmark-delete-btn" onclick="event.stopPropagation(); handleDeleteBookmark('${bookmark.id}')" aria-label="Delete bookmark">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Get badge content for a bookmark
+ * Story bookmarks show star, Q&A show numbers, Dig deeper show letters
+ */
+function getBookmarkBadge(bookmark) {
+    const type = bookmark.bookmark_type;
+    const path = bookmark.question_path;
+
+    if (type === 'story' || !path) {
+        return '&#9733;'; // Star for story
+    }
+
+    // Parse question path: 'Q1', 'Q2', 'Q1-A', 'Q2-B', etc.
+    if (path.includes('-')) {
+        // Dig deeper: Q1-A, Q1-B, etc.
+        const letter = path.split('-')[1];
+        return letter;
+    } else {
+        // Main question: Q1, Q2, etc.
+        const number = path.replace('Q', '');
+        return number;
+    }
+}
+
+/**
+ * Format bookmark date relative to now
+ */
+function formatBookmarkDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+        return 'Today';
+    } else if (diffDays === 1) {
+        return 'Yesterday';
+    } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+    } else {
+        return date.toLocaleDateString('en-IN', {
+            month: 'short',
+            day: 'numeric'
+        });
+    }
+}
+
+/**
+ * Escape HTML for safe rendering in bookmark cards
+ */
+function escapeBookmarkHTML(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+/**
+ * Escape HTML for use in attribute values
+ */
+function escapeHTMLAttr(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Show empty state with custom message
+ */
+function showBookmarksEmpty(message) {
+    if (!elements.bookmarksList || !elements.bookmarksEmpty) return;
+    elements.bookmarksList.style.display = 'none';
+    elements.bookmarksEmpty.style.display = 'flex';
+
+    const emptyText = elements.bookmarksEmpty.querySelector('.empty-text');
+    if (emptyText && message) {
+        emptyText.textContent = message;
+    }
+}
+
+/**
+ * Handle clicking a bookmark card - navigate to the bookmarked content
+ */
+function handleBookmarkCardClick(bookmarkId) {
+    const bookmark = currentBookmarks.find(b => b.id === bookmarkId);
+    if (!bookmark) return;
+
+    // Close bookmarks page
+    closeBookmarksPage();
+
+    // Find the story by headline in current stories
+    const storyIndex = state.stories.findIndex(s =>
+        s.headline === bookmark.story_headline
+    );
+
+    if (storyIndex === -1) {
+        showToast('i', 'Story not in current list');
+        return;
+    }
+
+    // Navigate to the story
+    navigateToStoryIndex(storyIndex);
+
+    const questionPath = bookmark.question_path;
+
+    // If bookmark is for a specific question/answer, navigate there after a delay
+    if (questionPath) {
+        setTimeout(() => {
+            const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+            const currentStory = state.stories[state.currentIndex];
+            if (!currentCard || !currentStory) return;
+
+            // First flip to summary to reveal Q&A
+            flipCard(currentCard, currentStory);
+            state.isCardFlipped = true;
+            state.cardLayer = 'summary';
+
+            setTimeout(() => {
+                // Show Q&A
+                setQACardState(QA_STATES.ACTIVE);
+                state.cardLayer = 'questions';
+                setupQACardSwipe();
+
+                if (questionPath.includes('-')) {
+                    // Dig deeper answer: Q1-A, Q1-B, etc.
+                    const parts = questionPath.split('-');
+                    const qNum = parseInt(parts[0].replace('Q', '')) - 1;
+                    const digDeeperIndex = parts[1].charCodeAt(0) - 65; // A=0, B=1
+
+                    setTimeout(() => {
+                        showAnswerCard(qNum);
+                        setTimeout(() => {
+                            showDigDeeperQACard();
+                            setTimeout(() => {
+                                showDigDeeperAnswerCard(digDeeperIndex);
+                            }, 300);
+                        }, 300);
+                    }, 300);
+                } else {
+                    // Main question: Q1, Q2, etc.
+                    const questionIndex = parseInt(questionPath.replace('Q', '')) - 1;
+                    setTimeout(() => {
+                        showAnswerCard(questionIndex);
+                    }, 300);
+                }
+            }, 300);
+        }, 500);
+    }
+}
+
+/**
+ * Navigate to a specific story index
+ */
+function navigateToStoryIndex(targetIndex) {
+    if (targetIndex < 0 || targetIndex >= state.stories.length) return;
+
+    // Use existing navigation
+    state.currentIndex = targetIndex;
+    renderCards();
+    updateProgress();
+}
+
+/**
+ * Handle deleting a bookmark
+ */
+async function handleDeleteBookmark(bookmarkId) {
+    if (!supabaseClient) return;
+
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+
+        const { error } = await supabaseClient
+            .from('bookmarks')
+            .delete()
+            .eq('id', bookmarkId)
+            .eq('user_id', session.user.id);
+
+        if (error) {
+            console.error('[Bookmarks] Delete error:', error);
+            showToast('!', 'Failed to delete bookmark');
+            return;
+        }
+
+        // Remove from local arrays
+        currentBookmarks = currentBookmarks.filter(b => b.id !== bookmarkId);
+        applyBookmarkFilters();
+
+        showToast('&#10003;', 'Bookmark removed');
+        trackEvent('Bookmark Deleted');
+    } catch (err) {
+        console.error('[Bookmarks] Delete failed:', err);
+        showToast('!', 'Failed to delete bookmark');
+    }
+}
+
+/**
+ * Auto-categorize a story based on headline keywords
+ * Used as fallback when no category is provided
+ */
+function guessCategory(headline) {
+    if (!headline) return 'Uncategorized';
+    const lower = headline.toLowerCase();
+
+    if (lower.includes('election') || lower.includes('government') || lower.includes('minister') ||
+        lower.includes('parliament') || lower.includes('modi') || lower.includes('congress') ||
+        lower.includes('bjp') || lower.includes('political') || lower.includes('vote')) {
+        return 'Politics';
+    }
+    if (lower.includes('economy') || lower.includes('gdp') || lower.includes('inflation') ||
+        lower.includes('rbi') || lower.includes('fiscal') || lower.includes('budget') ||
+        lower.includes('rupee') || lower.includes('stock market') || lower.includes('sensex')) {
+        return 'Economy';
+    }
+    if (lower.includes('tech') || lower.includes('ai') || lower.includes('startup') ||
+        lower.includes('software') || lower.includes('google') || lower.includes('apple') ||
+        lower.includes('meta') || lower.includes('microsoft') || lower.includes('openai') ||
+        lower.includes('digital') || lower.includes('app') || lower.includes('robot')) {
+        return 'Technology';
+    }
+    if (lower.includes('business') || lower.includes('company') || lower.includes('profit') ||
+        lower.includes('revenue') || lower.includes('ceo') || lower.includes('merger') ||
+        lower.includes('acquisition') || lower.includes('ipo') || lower.includes('tata') ||
+        lower.includes('reliance') || lower.includes('adani')) {
+        return 'Business';
+    }
+    if (lower.includes('china') || lower.includes('usa') || lower.includes('europe') ||
+        lower.includes('russia') || lower.includes('ukraine') || lower.includes('global') ||
+        lower.includes('world') || lower.includes('un') || lower.includes('nato') ||
+        lower.includes('war') || lower.includes('trade war') || lower.includes('sanctions')) {
+        return 'World';
+    }
+    if (lower.includes('india') || lower.includes('delhi') || lower.includes('mumbai') ||
+        lower.includes('bengaluru') || lower.includes('chennai') || lower.includes('hyderabad') ||
+        lower.includes('kolkata') || lower.includes('indian')) {
+        return 'India';
+    }
+    if (lower.includes('science') || lower.includes('space') || lower.includes('nasa') ||
+        lower.includes('isro') || lower.includes('research') || lower.includes('climate') ||
+        lower.includes('health') || lower.includes('vaccine') || lower.includes('medical')) {
+        return 'Science';
+    }
+    if (lower.includes('culture') || lower.includes('film') || lower.includes('movie') ||
+        lower.includes('music') || lower.includes('art') || lower.includes('cricket') ||
+        lower.includes('sport') || lower.includes('bollywood') || lower.includes('oscar')) {
+        return 'Culture';
+    }
+
+    return 'Uncategorized';
 }
 
 // ==========================================
@@ -1334,6 +1769,15 @@ function cacheElements() {
     elements.storyNavButtons = document.getElementById('storyNavButtons');
     elements.storyPrevBtn = document.getElementById('storyPrevBtn');
     elements.storyNextBtn = document.getElementById('storyNextBtn');
+
+    // Bookmarks Page
+    elements.bookmarksBtn = document.getElementById('bookmarksBtn');
+    elements.bookmarksPage = document.getElementById('bookmarksPage');
+    elements.bookmarksBackBtn = document.getElementById('bookmarksBackBtn');
+    elements.bookmarksList = document.getElementById('bookmarksList');
+    elements.bookmarksEmpty = document.getElementById('bookmarksEmpty');
+    elements.filterDate = document.getElementById('filterDate');
+    elements.filterCategory = document.getElementById('filterCategory');
 }
 
 // ==========================================
@@ -2646,34 +3090,44 @@ function toggleTheme() {
 
 let textEnlarged = false;
 
+const TEXT_SIZE_SELECTORS = [
+    '.card-teaser',
+    '.card-summary-text',
+    '.answer-text',
+    '.qa-question-text',
+    '.answer-question-text',
+    '.dig-deeper-subheading',
+    '.answer-question',
+    '.dig-deeper-answer-text'
+];
+
+/**
+ * Toggle text size between normal and enlarged
+ * Uses inline styles (highest specificity) to guarantee override
+ */
 function toggleTextSize() {
     textEnlarged = !textEnlarged;
     document.body.classList.toggle('text-enlarged', textEnlarged);
 
-    // Apply inline styles to all body text elements (highest specificity)
-    const enlargedSize = '22px';  // XL size
-    const normalSize = '';  // Empty string removes inline style, uses CSS default
+    console.log('[toggleTextSize] CALLED - textEnlarged:', textEnlarged);
 
-    const selectors = [
-        '.card-teaser',
-        '.card-summary-text',
-        '.answer-text',
-        '.qa-question-text',
-        '.answer-question-text',
-        '.dig-deeper-subheading',
-        '.answer-question',
-        '.dig-deeper-answer-text'
-    ];
+    // Apply inline styles to all body text elements
+    const enlargedSize = '22px';
 
-    selectors.forEach(selector => {
-        document.querySelectorAll(selector).forEach(el => {
-            el.style.fontSize = textEnlarged ? enlargedSize : normalSize;
+    let totalElements = 0;
+    TEXT_SIZE_SELECTORS.forEach(selector => {
+        const els = document.querySelectorAll(selector);
+        totalElements += els.length;
+        els.forEach(el => {
+            if (textEnlarged) {
+                el.style.fontSize = enlargedSize;
+            } else {
+                el.style.fontSize = '';
+            }
         });
     });
 
-    // Debug logging
-    console.log('[toggleTextSize] Text enlarged:', textEnlarged);
-    console.log('[toggleTextSize] Applied font-size:', textEnlarged ? enlargedSize : 'default');
+    console.log('[toggleTextSize] Applied to', totalElements, 'elements');
 
     // Update all AA button states
     document.querySelectorAll('.btn-text-size').forEach(btn => {
@@ -2681,7 +3135,7 @@ function toggleTextSize() {
     });
 
     // Persist preference
-    localStorage.setItem('fyi_text_enlarged', textEnlarged);
+    localStorage.setItem('fyi_text_enlarged', textEnlarged.toString());
 
     triggerHaptic('light');
     trackEvent('Text Size Toggled', { enlarged: textEnlarged });
@@ -2691,10 +3145,7 @@ function loadTextSizePreference() {
     if (localStorage.getItem('fyi_text_enlarged') === 'true') {
         textEnlarged = true;
         document.body.classList.add('text-enlarged');
-
-        // Apply inline styles to match toggle behavior
         applyTextSizeToAllElements();
-
         document.querySelectorAll('.btn-text-size').forEach(btn => {
             btn.classList.add('active');
         });
@@ -2703,26 +3154,13 @@ function loadTextSizePreference() {
 
 /**
  * Apply text size to all matching elements
- * Used by toggle, load preference, and mutation observer
  */
 function applyTextSizeToAllElements() {
     if (!textEnlarged) return;
 
-    const enlargedSize = '22px';
-    const selectors = [
-        '.card-teaser',
-        '.card-summary-text',
-        '.answer-text',
-        '.qa-question-text',
-        '.answer-question-text',
-        '.dig-deeper-subheading',
-        '.answer-question',
-        '.dig-deeper-answer-text'
-    ];
-
-    selectors.forEach(selector => {
+    TEXT_SIZE_SELECTORS.forEach(selector => {
         document.querySelectorAll(selector).forEach(el => {
-            el.style.fontSize = enlargedSize;
+            el.style.fontSize = '22px';
         });
     });
 }
@@ -2736,27 +3174,16 @@ function setupTextSizeMutationObserver() {
 
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === 1) { // Element node
-                    // Check if the node itself matches
-                    const selectors = [
-                        '.card-teaser',
-                        '.card-summary-text',
-                        '.answer-text',
-                        '.qa-question-text',
-                        '.answer-question-text',
-                        '.dig-deeper-subheading',
-                        '.answer-question',
-                        '.dig-deeper-answer-text'
-                    ];
-
-                    selectors.forEach(selector => {
+                if (node.nodeType === 1) {
+                    TEXT_SIZE_SELECTORS.forEach(selector => {
                         if (node.matches && node.matches(selector)) {
                             node.style.fontSize = '22px';
                         }
-                        // Also check children
-                        node.querySelectorAll && node.querySelectorAll(selector).forEach(el => {
-                            el.style.fontSize = '22px';
-                        });
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll(selector).forEach(el => {
+                                el.style.fontSize = '22px';
+                            });
+                        }
                     });
                 }
             });
@@ -2949,7 +3376,7 @@ function createCardElement(story, position) {
                     <button class="btn-text-size" aria-label="Toggle text size">
                         <span class="text-size-small">A</span><span class="text-size-large">A</span>
                     </button>
-                    <span class="nav-hint nav-hint-center" data-action="flip">Dig deeper ↓</span>
+                    <span class="nav-hint nav-hint-center" data-action="flip">Dig deeper ↑</span>
                     <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
                         <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                             <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3113,7 +3540,7 @@ function populateQACard(story) {
         const button = document.createElement('button');
         button.className = 'qa-question-btn';
         button.innerHTML = `
-            <span class="qa-question-label">✦</span>
+            <span class="qa-question-number">${index + 1}</span>
             <span class="qa-question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
@@ -3124,12 +3551,12 @@ function populateQACard(story) {
         questionsList.appendChild(button);
     });
 
-    // Add skip button
+    // Add skip button (no number, use arrow icon)
     const skipButton = document.createElement('button');
     skipButton.className = 'qa-question-btn skip';
     const skipText = story.isFAQ ? 'Skip this FAQ' : 'Skip this story';
     skipButton.innerHTML = `
-        <span class="qa-question-label">✦</span>
+        <span class="qa-question-skip-icon">→</span>
         <span class="qa-question-text">${skipText}</span>
     `;
     skipButton.addEventListener('click', () => {
@@ -3194,14 +3621,49 @@ function setupCardInteractions(card, story) {
 
 /**
  * Setup text size toggle buttons on card
+ * Uses both click AND touchend handlers for bulletproof mobile support.
+ * On mobile, the card's touchstart/touchend drag handlers can intercept before
+ * the synthetic click event fires. Using a direct touchend handler with
+ * stopImmediatePropagation ensures the toggle fires reliably.
  */
 function setupTextSizeButtons(card) {
     const textSizeBtns = card.querySelectorAll('.btn-text-size');
     textSizeBtns.forEach(btn => {
+        // Track touch state to prevent double-fire from touchend + click
+        let touchHandled = false;
+
+        // Touchend handler - fires BEFORE click on mobile
+        btn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            // Only toggle if this was a tap (minimal movement)
+            const touch = e.changedTouches[0];
+            if (touch) {
+                touchHandled = true;
+                console.log('[AA Button] touchend fired - toggling');
+                toggleTextSize();
+                // Reset flag after a tick so click handler doesn't also fire
+                setTimeout(() => { touchHandled = false; }, 300);
+            }
+        }, { capture: true });
+
+        // Prevent touchstart from being captured by card drag handler
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { capture: true });
+
+        // Click handler - for desktop and as fallback
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (touchHandled) {
+                console.log('[AA Button] click ignored (already handled by touchend)');
+                return;
+            }
+            console.log('[AA Button] click fired - toggling');
             toggleTextSize();
         });
+
         // Apply current state
         if (textEnlarged) {
             btn.classList.add('active');
@@ -3338,26 +3800,47 @@ function setupRatingStars(card) {
     // Answer Card stars
     const answerCard = card.querySelector('.answer-card');
     if (answerCard) {
-        const stars = answerCard.querySelectorAll('.rating-star');
-        stars.forEach(star => {
-            star.addEventListener('click', (e) => {
-                e.stopPropagation();
-                handleStarClick(star, answerCard);
-            });
-        });
+        setupStarInteractions(answerCard);
     }
 
     // Dig Deeper Answer Card stars
     const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
     if (digDeeperAnswerCard) {
-        const stars = digDeeperAnswerCard.querySelectorAll('.rating-star');
-        stars.forEach(star => {
-            star.addEventListener('click', (e) => {
-                e.stopPropagation();
-                handleStarClick(star, digDeeperAnswerCard);
+        setupStarInteractions(digDeeperAnswerCard);
+    }
+}
+
+/**
+ * Setup click + hover interactions for rating stars in a card
+ */
+function setupStarInteractions(cardElement) {
+    const stars = cardElement.querySelectorAll('.rating-star');
+
+    stars.forEach(star => {
+        // Click handler
+        star.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleStarClick(star, cardElement);
+        });
+
+        // Cumulative hover: highlight this star and all before it
+        star.addEventListener('mouseenter', () => {
+            const hoverValue = parseInt(star.dataset.value);
+            stars.forEach(s => {
+                const v = parseInt(s.dataset.value);
+                if (v <= hoverValue) {
+                    s.classList.add('hovered');
+                } else {
+                    s.classList.remove('hovered');
+                }
             });
         });
-    }
+
+        // Remove hover state on mouse leave (from each star)
+        star.addEventListener('mouseleave', () => {
+            stars.forEach(s => s.classList.remove('hovered'));
+        });
+    });
 }
 
 /**
@@ -3430,6 +3913,12 @@ function setupNavHintClickHandlers(card, story) {
         hint.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
+
+            // Debug logging to identify which button was clicked
+            const buttonText = hint.textContent.trim();
+            const isFlipped = card.dataset.flipped === 'true';
+            console.log('[CENTER BUTTON CLICKED]', buttonText, '| isFlipped:', isFlipped, '| cardLayer:', state.cardLayer);
+
             handleSwipeUp(card, story);
         });
     });
@@ -3719,13 +4208,17 @@ function handleSwipeRight(card, story) {
 function handleSwipeUp(card, story) {
     const isFlipped = card.dataset.flipped === 'true';
 
+    console.log('[handleSwipeUp] isFlipped:', isFlipped, 'cardLayer:', state.cardLayer);
+
     if (!isFlipped) {
         // Currently on HEADLINE - flip to SUMMARY
+        console.log('[handleSwipeUp] Flipping to summary');
         flipCard(card, story);
         state.isCardFlipped = true;
         state.cardLayer = 'summary';
     } else {
         // Currently on SUMMARY - show Q&A (ACTIVE)
+        console.log('[handleSwipeUp] Showing Q&A');
         state.cardLayer = 'questions';
         setQACardState(QA_STATES.ACTIVE);
         setupQACardSwipe(); // Setup swipe-down to dismiss
@@ -4133,16 +4626,16 @@ function openModal(story) {
     // For FAQs, only show first 3 questions (Question 4 is "Skip this FAQ")
     const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
 
-    questionsToShow.forEach((q) => {
+    questionsToShow.forEach((q, index) => {
         const button = document.createElement('button');
         button.className = 'question-button';
         button.innerHTML = `
-            <span class="question-label">✦</span>
+            <span class="qa-question-number">${index + 1}</span>
             <span class="question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
-            showAnswer(q);
+            showAnswer(q, index);
         });
         elements.questionsContainer.appendChild(button);
     });
@@ -4391,12 +4884,16 @@ function populateAnswerCard(questionIndex) {
 
     // Store for later use (dig deeper, history, etc.)
     state.currentQuestion = question;
+    state.currentQuestionIndex = questionIndex;
 
     // Populate content
+    const questionLabel = answerCard.querySelector('.answer-label');
     const questionText = answerCard.querySelector('.answer-question-text');
     const answerText = answerCard.querySelector('.answer-text');
     const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
 
+    // Update label to show question number
+    if (questionLabel) questionLabel.textContent = String(questionIndex + 1);
     if (questionText) questionText.innerHTML = parseFormattedText(question.text);
     if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
 
@@ -4490,10 +4987,11 @@ function populateDigDeeperQACard() {
 
     // Create button for each dig deeper question
     deepQuestions.forEach((q, index) => {
+        const letter = String.fromCharCode(65 + index); // A, B, C
         const button = document.createElement('button');
         button.className = 'qa-question-btn';
         button.innerHTML = `
-            <span class="qa-question-label">✦</span>
+            <span class="deep-question-number">${letter}</span>
             <span class="qa-question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
@@ -4573,9 +5071,13 @@ function populateDigDeeperAnswerCard(questionIndex) {
     if (!question) return;
 
     // Populate content
+    const questionLabel = digDeeperAnswerCard.querySelector('.answer-label');
     const questionText = digDeeperAnswerCard.querySelector('.answer-question-text');
     const answerText = digDeeperAnswerCard.querySelector('.answer-text');
 
+    // Update label to show question letter (A, B, C)
+    const letter = String.fromCharCode(65 + questionIndex);
+    if (questionLabel) questionLabel.textContent = letter;
     if (questionText) questionText.innerHTML = parseFormattedText(question.text);
     if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
 
@@ -4768,7 +5270,7 @@ function setupDigDeeperAnswerCardSwipe() {
 // LEGACY ANSWER SYSTEM (keeping for backwards compatibility)
 // ==========================================
 
-function showAnswer(question) {
+function showAnswer(question, questionIndex) {
     addToHistory(state.currentStory, question);
 
     // Store current question for Dig Deeper feature
@@ -4784,7 +5286,7 @@ function showAnswer(question) {
     console.log('[showAnswer] Transitioning from Q&A to answer view');
 
     // Prepare answer view content in LEGACY modal
-    elements.answerLabel.textContent = '✦';
+    elements.answerLabel.textContent = (questionIndex !== undefined) ? (questionIndex + 1) : '✦';
     elements.answerQuestion.innerHTML = parseFormattedText(question.text);
     elements.answerText.innerHTML = parseFormattedText(question.answer);
 
@@ -5007,16 +5509,17 @@ function showDigDeeper() {
     // Populate deep questions
     elements.deepQuestionsContainer.innerHTML = '';
     question.deepQuestions.forEach((dq, index) => {
+        const letter = String.fromCharCode(65 + index); // A, B, C
         const button = document.createElement('button');
         button.className = 'deep-question-button';
         button.innerHTML = `
-            <span class="deep-question-label">✦</span>
+            <span class="deep-question-number">${letter}</span>
             <span class="deep-question-text">${parseFormattedText(dq.text)}</span>
         `;
         button.addEventListener('click', () => {
             triggerHaptic('light');
             trackDigDeeper(state.currentStory.headline, dq.text);
-            showDeepAnswer(dq);
+            showDeepAnswer(dq, index);
         });
         elements.deepQuestionsContainer.appendChild(button);
     });
@@ -5051,11 +5554,17 @@ function hideDigDeeper() {
     showQAView();
 }
 
-function showDeepAnswer(deepQuestion) {
+function showDeepAnswer(deepQuestion, questionIndex) {
     console.log('[showDeepAnswer] Transitioning to deep answer view');
 
     // Reset all views first
     resetAllModalViews();
+
+    // Update answer label with letter (A, B, C)
+    const deepAnswerLabel = elements.deepAnswerView?.querySelector('.answer-label');
+    if (deepAnswerLabel && questionIndex !== undefined) {
+        deepAnswerLabel.textContent = String.fromCharCode(65 + questionIndex);
+    }
 
     // Prepare deep answer content
     elements.deepAnswerQuestion.innerHTML = parseFormattedText(deepQuestion.text);
@@ -5342,7 +5851,7 @@ function showHistoryAnswer(entry) {
     elements.qaView.classList.add('hidden');
     elements.answerView.classList.remove('hidden');
 
-    elements.answerLabel.textContent = '✦';
+    elements.answerLabel.textContent = entry.label || '✦';
     elements.answerQuestion.innerHTML = parseFormattedText(entry.question);
     // Apply HTML formatting to history answer
     elements.answerText.innerHTML = parseFormattedText(entry.answer);
@@ -5411,6 +5920,23 @@ function setupStarRating() {
             if (state.currentHistoryEntry) {
                 updateHistoryRating(state.currentHistoryEntry.id, rating);
             }
+        });
+
+        // Cumulative hover for legacy star rating
+        star.addEventListener('mouseenter', () => {
+            const hoverValue = parseInt(star.dataset.rating);
+            stars.forEach(s => {
+                const v = parseInt(s.dataset.rating);
+                if (v <= hoverValue) {
+                    s.classList.add('hovered');
+                } else {
+                    s.classList.remove('hovered');
+                }
+            });
+        });
+
+        star.addEventListener('mouseleave', () => {
+            stars.forEach(s => s.classList.remove('hovered'));
         });
     });
 }
@@ -5718,6 +6244,23 @@ function setupEventListeners() {
             document.body.classList.remove('no-scroll');
         }
     });
+
+    // Bookmarks menu button
+    safeAddListener(elements.bookmarksBtn, 'click', () => {
+        triggerHaptic('light');
+        if (elements.dropdownMenu) elements.dropdownMenu.classList.remove('visible');
+        openBookmarksPage();
+    });
+
+    // Bookmarks page back button
+    safeAddListener(elements.bookmarksBackBtn, 'click', () => {
+        triggerHaptic('light');
+        closeBookmarksPage();
+    });
+
+    // Bookmarks filter change handlers
+    safeAddListener(elements.filterDate, 'change', applyBookmarkFilters);
+    safeAddListener(elements.filterCategory, 'change', applyBookmarkFilters);
 
     // FAQs menu button - force refresh to get latest FAQ content
     safeAddListener(elements.faqsBtn, 'click', async () => {
