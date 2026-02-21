@@ -1937,58 +1937,73 @@ button {
     opacity: 1;
 }
 
-/* Answer Card Header */
+/* Answer Card Header - [Aa] [Question Text] [Bookmark] */
 .answer-card .answer-header {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
+    align-items: flex-start;
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
-    padding-right: 40px; /* Space for bookmark icon */
-}
-
-.answer-card .answer-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    border-radius: 50%;
-    background-color: var(--accent);
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
+    padding-right: 0; /* Override legacy .answer-header padding-right */
     flex-shrink: 0;
 }
 
 .answer-card .answer-question-text {
-    /* font-size set by body text toggle at line 191 */
+    flex: 1;
+    min-width: 0; /* Allow flex item to shrink past content size */
+    /* font-size set by body text toggle */
     line-height: var(--line-height-normal);
     font-weight: 600;
     color: var(--text-primary);
-    /* Text truncation - max 3 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin: 0;
+    padding-top: 2px; /* Align with button text */
 }
 
-/* Answer Card Body - grows to fill available space */
+/* AA button in L3/L5 headers — inherits base .btn-text-size styles (transparent, no border)
+   just needs flex-shrink and alignment for header row */
+.answer-card .answer-header .btn-text-size,
+.dig-deeper-answer-card .answer-header .btn-text-size {
+    flex-shrink: 0;
+    margin-top: 2px; /* Nudge down to align with text baseline */
+}
+
+/* Bookmark in L3/L5 headers — inherits base .btn-bookmark styles (transparent, no border)
+   just needs flex-shrink and margin-left auto to push to right edge */
+.answer-card .answer-header .btn-bookmark,
+.dig-deeper-answer-card .answer-header .btn-bookmark {
+    flex-shrink: 0;
+    margin-left: auto; /* Push bookmark to far right edge */
+}
+
+/* Answer Card Body - grows to fill available space, scrollable */
 .answer-card .answer-body {
     flex: 1;
+    min-height: 0; /* Critical for flex children to shrink and allow scrolling */
     margin-bottom: var(--spacing-lg);
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .answer-card .answer-text {
     /* font-size set by body text toggle at line 191 */
     line-height: var(--line-height-relaxed);
     color: var(--text-secondary);
-    /* Enable scrolling for long text */
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+}
+
+/* Subtle scrollbar for answer bodies */
+.answer-card .answer-body::-webkit-scrollbar,
+.dig-deeper-answer-card .answer-body::-webkit-scrollbar {
+    width: 4px;
+}
+.answer-card .answer-body::-webkit-scrollbar-track,
+.dig-deeper-answer-card .answer-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.answer-card .answer-body::-webkit-scrollbar-thumb,
+.dig-deeper-answer-card .answer-body::-webkit-scrollbar-thumb {
+    background: var(--text-tertiary);
+    border-radius: 4px;
+    opacity: 0.5;
 }
 
 /* Answer Card Rating */
@@ -2034,6 +2049,7 @@ button {
 /* Answer Card Footer - stays at bottom */
 .answer-card .answer-footer {
     display: flex;
+    align-items: center;
     gap: var(--spacing-sm);
     flex-shrink: 0;
 }
@@ -2116,11 +2132,24 @@ button {
     opacity: 1;
 }
 
-/* Dig Deeper Header - headline and subheading (left-aligned to match answer card) */
+/* Dig Deeper Header - [Aa] [Title + Subheading] */
 .dig-deeper-header {
-    text-align: left;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
     flex-shrink: 0;
+}
+
+/* AA button in L4 dig deeper header — inherits base .btn-text-size styles */
+.dig-deeper-header .btn-text-size {
+    flex-shrink: 0;
+    margin-top: 4px; /* Align with headline text */
+}
+
+.dig-deeper-header-text {
+    flex: 1;
+    text-align: left;
 }
 
 .dig-deeper-headline {
@@ -2133,7 +2162,7 @@ button {
 }
 
 .dig-deeper-subheading {
-    /* font-size set by body text toggle at line 191 */
+    /* font-size set by body text toggle */
     line-height: var(--line-height-normal);
     color: var(--text-tertiary);
     margin: 0;
@@ -2156,6 +2185,7 @@ button {
 /* Dig Deeper Footer - back to headline link */
 .dig-deeper-footer {
     display: flex;
+    align-items: center;
     justify-content: center;
     padding-top: var(--spacing-lg);
     flex-shrink: 0;
@@ -2212,57 +2242,40 @@ button {
     opacity: 1;
 }
 
-/* Dig Deeper Answer Card uses same styling as Answer Card */
+/* Dig Deeper Answer Card header - [Aa] [Question Text] [Bookmark] */
 .dig-deeper-answer-card .answer-header {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
+    align-items: flex-start;
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
-    padding-right: 40px; /* Space for bookmark icon */
-}
-
-.dig-deeper-answer-card .answer-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    border-radius: 50%;
-    background-color: var(--accent);
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
+    padding-right: 0; /* Override legacy .answer-header padding-right */
     flex-shrink: 0;
 }
 
 .dig-deeper-answer-card .answer-question-text {
-    /* font-size set by body text toggle at line 191 */
+    flex: 1;
+    min-width: 0; /* Allow flex item to shrink past content size */
+    /* font-size set by body text toggle */
     line-height: var(--line-height-normal);
     font-weight: 600;
     color: var(--text-primary);
-    /* Text truncation - max 3 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin: 0;
+    padding-top: 2px; /* Align with button text */
 }
 
 .dig-deeper-answer-card .answer-body {
     flex: 1;
+    min-height: 0; /* Critical for flex children to shrink and allow scrolling */
     margin-bottom: var(--spacing-lg);
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .dig-deeper-answer-card .answer-text {
     font-size: var(--font-size-md);
     line-height: var(--line-height-relaxed);
     color: var(--text-secondary);
-    /* Enable scrolling for long text */
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
 }
 
 .dig-deeper-answer-card .answer-rating {
@@ -2306,6 +2319,8 @@ button {
 
 .dig-deeper-answer-card .answer-footer {
     display: flex;
+    align-items: center;
+    justify-content: center;
     gap: var(--spacing-sm);
     flex-shrink: 0;
 }
