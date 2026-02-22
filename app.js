@@ -3953,6 +3953,15 @@ function setupNavHintClickHandlers(card, story) {
 // ==========================================
 
 function handleDragStart(e, card, story) {
+    // NUCLEAR FIX: If touch originates inside an active sub-card (answer, dig deeper),
+    // do NOT start drag on the parent story card — the sub-card handles its own gestures
+    const target = e.target || e.srcElement;
+    const activeSubCard = target.closest('.answer-card.active, .dig-deeper-qa-card.active, .dig-deeper-answer-card.active');
+    if (activeSubCard) {
+        state.isDragging = false;
+        return;
+    }
+
     state.isDragging = true;
     state.isLongPress = false;
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -5098,6 +5107,8 @@ function populateDigDeeperAnswerCard(questionIndex) {
 /**
  * Setup swipe-to-dismiss for Answer Card
  * Swipe down returns to Q&A card
+ * NUCLEAR FIX: Respects scrollable .answer-body — only intercepts
+ * swipe-to-dismiss when NOT scrolling content.
  */
 function setupAnswerCardSwipe() {
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
@@ -5108,6 +5119,9 @@ function setupAnswerCardSwipe() {
 
     let startY = 0;
     let currentY = 0;
+    let gestureDecided = false;  // Has the gesture type been determined?
+    let isScrolling = false;     // true = native scroll, false = swipe-to-dismiss
+    let isDismissing = false;    // true = actively dragging card down to dismiss
 
     // Remove old listeners
     if (answerCard._touchStartHandler) {
@@ -5118,13 +5132,51 @@ function setupAnswerCardSwipe() {
 
     const handleTouchStart = (e) => {
         startY = e.touches[0].clientY;
+        currentY = startY;
+        gestureDecided = false;
+        isScrolling = false;
+        isDismissing = false;
     };
 
     const handleTouchMove = (e) => {
         currentY = e.touches[0].clientY;
         const deltaY = currentY - startY;
 
-        if (deltaY > 0 && answerCard.scrollTop === 0) {
+        if (!gestureDecided && Math.abs(deltaY) > 8) {
+            gestureDecided = true;
+
+            // Check if touch is inside a scrollable body with overflowing content
+            const scrollBody = e.target.closest('.answer-body');
+            const hasOverflow = scrollBody && (scrollBody.scrollHeight > scrollBody.clientHeight + 2);
+
+            if (hasOverflow) {
+                const atTop = scrollBody.scrollTop <= 0;
+                const atBottom = scrollBody.scrollTop >= (scrollBody.scrollHeight - scrollBody.clientHeight - 2);
+
+                if (deltaY > 0 && atTop) {
+                    // Pulling down at scroll top → swipe-to-dismiss
+                    isDismissing = true;
+                    isScrolling = false;
+                } else if (deltaY < 0 && atBottom) {
+                    // Pulling up at scroll bottom → let it be (no action)
+                    isScrolling = true;
+                } else {
+                    // Normal scroll within content
+                    isScrolling = true;
+                }
+            } else {
+                // No scrollable content — treat all downward drags as dismiss
+                isDismissing = deltaY > 0;
+                isScrolling = false;
+            }
+        }
+
+        if (isScrolling) {
+            // Let native scroll handle it — don't preventDefault
+            return;
+        }
+
+        if (isDismissing && deltaY > 0) {
             e.preventDefault();
             answerCard.style.transform = `translateY(${deltaY}px)`;
         }
@@ -5133,15 +5185,18 @@ function setupAnswerCardSwipe() {
     const handleTouchEnd = () => {
         const deltaY = currentY - startY;
 
-        if (deltaY > 100) {
+        if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideAnswerCard();
-        } else {
+        } else if (isDismissing) {
             answerCard.style.transform = 'translateY(0)';
         }
 
         startY = 0;
         currentY = 0;
+        gestureDecided = false;
+        isScrolling = false;
+        isDismissing = false;
     };
 
     answerCard._touchStartHandler = handleTouchStart;
@@ -5156,6 +5211,7 @@ function setupAnswerCardSwipe() {
 /**
  * Setup swipe-to-dismiss for Dig Deeper Q&A Card
  * Swipe down returns to Answer card
+ * NUCLEAR FIX: Same scroll-aware pattern as answer card
  */
 function setupDigDeeperQACardSwipe() {
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
@@ -5166,6 +5222,9 @@ function setupDigDeeperQACardSwipe() {
 
     let startY = 0;
     let currentY = 0;
+    let gestureDecided = false;
+    let isScrolling = false;
+    let isDismissing = false;
 
     // Remove old listeners
     if (digDeeperQACard._touchStartHandler) {
@@ -5176,13 +5235,36 @@ function setupDigDeeperQACardSwipe() {
 
     const handleTouchStart = (e) => {
         startY = e.touches[0].clientY;
+        currentY = startY;
+        gestureDecided = false;
+        isScrolling = false;
+        isDismissing = false;
     };
 
     const handleTouchMove = (e) => {
         currentY = e.touches[0].clientY;
         const deltaY = currentY - startY;
 
-        if (deltaY > 0 && digDeeperQACard.scrollTop === 0) {
+        if (!gestureDecided && Math.abs(deltaY) > 8) {
+            gestureDecided = true;
+            const scrollBody = e.target.closest('.dig-deeper-questions-list');
+            const hasOverflow = scrollBody && (scrollBody.scrollHeight > scrollBody.clientHeight + 2);
+
+            if (hasOverflow) {
+                const atTop = scrollBody.scrollTop <= 0;
+                if (deltaY > 0 && atTop) {
+                    isDismissing = true;
+                } else {
+                    isScrolling = true;
+                }
+            } else {
+                isDismissing = deltaY > 0;
+            }
+        }
+
+        if (isScrolling) return;
+
+        if (isDismissing && deltaY > 0) {
             e.preventDefault();
             digDeeperQACard.style.transform = `translateY(${deltaY}px)`;
         }
@@ -5191,15 +5273,18 @@ function setupDigDeeperQACardSwipe() {
     const handleTouchEnd = () => {
         const deltaY = currentY - startY;
 
-        if (deltaY > 100) {
+        if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideDigDeeperQACard();
-        } else {
+        } else if (isDismissing) {
             digDeeperQACard.style.transform = 'translateY(0)';
         }
 
         startY = 0;
         currentY = 0;
+        gestureDecided = false;
+        isScrolling = false;
+        isDismissing = false;
     };
 
     digDeeperQACard._touchStartHandler = handleTouchStart;
@@ -5214,6 +5299,7 @@ function setupDigDeeperQACardSwipe() {
 /**
  * Setup swipe-to-dismiss for Dig Deeper Answer Card
  * Swipe down returns to Dig Deeper Q&A card
+ * NUCLEAR FIX: Same scroll-aware pattern as answer card
  */
 function setupDigDeeperAnswerCardSwipe() {
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
@@ -5224,6 +5310,9 @@ function setupDigDeeperAnswerCardSwipe() {
 
     let startY = 0;
     let currentY = 0;
+    let gestureDecided = false;
+    let isScrolling = false;
+    let isDismissing = false;
 
     // Remove old listeners
     if (digDeeperAnswerCard._touchStartHandler) {
@@ -5234,13 +5323,40 @@ function setupDigDeeperAnswerCardSwipe() {
 
     const handleTouchStart = (e) => {
         startY = e.touches[0].clientY;
+        currentY = startY;
+        gestureDecided = false;
+        isScrolling = false;
+        isDismissing = false;
     };
 
     const handleTouchMove = (e) => {
         currentY = e.touches[0].clientY;
         const deltaY = currentY - startY;
 
-        if (deltaY > 0 && digDeeperAnswerCard.scrollTop === 0) {
+        if (!gestureDecided && Math.abs(deltaY) > 8) {
+            gestureDecided = true;
+            const scrollBody = e.target.closest('.answer-body');
+            const hasOverflow = scrollBody && (scrollBody.scrollHeight > scrollBody.clientHeight + 2);
+
+            if (hasOverflow) {
+                const atTop = scrollBody.scrollTop <= 0;
+                const atBottom = scrollBody.scrollTop >= (scrollBody.scrollHeight - scrollBody.clientHeight - 2);
+
+                if (deltaY > 0 && atTop) {
+                    isDismissing = true;
+                } else if (deltaY < 0 && atBottom) {
+                    isScrolling = true;
+                } else {
+                    isScrolling = true;
+                }
+            } else {
+                isDismissing = deltaY > 0;
+            }
+        }
+
+        if (isScrolling) return;
+
+        if (isDismissing && deltaY > 0) {
             e.preventDefault();
             digDeeperAnswerCard.style.transform = `translateY(${deltaY}px)`;
         }
@@ -5249,15 +5365,18 @@ function setupDigDeeperAnswerCardSwipe() {
     const handleTouchEnd = () => {
         const deltaY = currentY - startY;
 
-        if (deltaY > 100) {
+        if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideDigDeeperAnswerCard();
-        } else {
+        } else if (isDismissing) {
             digDeeperAnswerCard.style.transform = 'translateY(0)';
         }
 
         startY = 0;
         currentY = 0;
+        gestureDecided = false;
+        isScrolling = false;
+        isDismissing = false;
     };
 
     digDeeperAnswerCard._touchStartHandler = handleTouchStart;
