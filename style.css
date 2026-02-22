@@ -1982,6 +1982,7 @@ button {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-y; /* Tell browser: vertical scroll is allowed here */
 }
 
 .answer-card .answer-text {
@@ -1990,20 +1991,28 @@ button {
     color: var(--text-secondary);
 }
 
-/* Subtle scrollbar for answer bodies */
+/* Visible scrollbar for answer bodies — mobile browsers hide by default */
 .answer-card .answer-body::-webkit-scrollbar,
 .dig-deeper-answer-card .answer-body::-webkit-scrollbar {
-    width: 4px;
+    width: 6px;
+    display: block; /* Force visibility on mobile */
 }
 .answer-card .answer-body::-webkit-scrollbar-track,
 .dig-deeper-answer-card .answer-body::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
 }
 .answer-card .answer-body::-webkit-scrollbar-thumb,
 .dig-deeper-answer-card .answer-body::-webkit-scrollbar-thumb {
-    background: var(--text-tertiary);
-    border-radius: 4px;
-    opacity: 0.5;
+    background: rgba(150, 150, 150, 0.5);
+    border-radius: 3px;
+}
+
+/* Firefox scrollbar */
+.answer-card .answer-body,
+.dig-deeper-answer-card .answer-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
 }
 
 /* Answer Card Rating */
@@ -2174,7 +2183,11 @@ button {
     flex-direction: column;
     gap: var(--spacing-sm);
     flex: 1;
-    overflow: hidden;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
 }
 
 /* Dig Deeper questions - same font as main Q&A, truncate to 2 lines for consistency */
@@ -2270,6 +2283,7 @@ button {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-y; /* Tell browser: vertical scroll is allowed here */
 }
 
 .dig-deeper-answer-card .answer-text {
