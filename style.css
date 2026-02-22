@@ -791,6 +791,7 @@ button {
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    flex-shrink: 0; /* Banner stays fixed size */
 }
 
 .card-banner img {
@@ -805,12 +806,16 @@ button {
     opacity: 0.5;
 }
 
-/* Card Content */
+/* Card Content — flex column, fills remaining space */
 .card-body {
     position: relative;
     padding: var(--spacing-lg);
-    /* Extra bottom padding for nav indicators */
-    padding-bottom: calc(var(--spacing-xl) + var(--spacing-xl));
+    padding-bottom: var(--spacing-sm); /* Minimal — nav-hints are outside card-body */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* CRITICAL: allows flex child to shrink for scroll */
+    overflow: hidden;
 }
 
 /* Emoji removed from cards - keeping selector for backwards compatibility */
@@ -827,41 +832,49 @@ button {
     word-wrap: break-word;
     overflow-wrap: break-word;
     hyphens: auto;
+    flex-shrink: 0; /* Headline stays at top, never shrinks */
 }
 
 .card-teaser {
     /* font-size set by body text toggle at line 191 */
     line-height: var(--line-height-relaxed);
     color: var(--text-secondary);
-    margin-bottom: var(--spacing-xl);
-    /* Enable scrolling for long text */
+    margin-bottom: 0;
+    /* Extra bottom padding so last line isn't hidden behind absolute nav-hints */
+    padding-bottom: 56px;
+    /* Fill remaining space and scroll */
+    flex: 1;
+    min-height: 0; /* CRITICAL: allows flex child to shrink for scroll */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    max-height: 200px; /* Limit height, allow scroll */
+    overscroll-behavior: contain;
+    touch-action: pan-y; /* Allow vertical scroll, don't let parent capture */
 }
 
-/* Subtle scrollbar styling for text areas */
+/* Scrollbar styling for L1/L2 text areas */
 .card-teaser::-webkit-scrollbar,
-.card-summary-text::-webkit-scrollbar,
-.answer-card .answer-text::-webkit-scrollbar,
-.dig-deeper-answer-card .answer-text::-webkit-scrollbar {
-    width: 4px;
+.card-summary-text::-webkit-scrollbar {
+    width: 6px;
+    display: block;
 }
 
 .card-teaser::-webkit-scrollbar-thumb,
-.card-summary-text::-webkit-scrollbar-thumb,
-.answer-card .answer-text::-webkit-scrollbar-thumb,
-.dig-deeper-answer-card .answer-text::-webkit-scrollbar-thumb {
-    background: var(--text-tertiary);
-    border-radius: 2px;
-    opacity: 0.5;
+.card-summary-text::-webkit-scrollbar-thumb {
+    background: rgba(150, 150, 150, 0.5);
+    border-radius: 3px;
 }
 
 .card-teaser::-webkit-scrollbar-track,
-.card-summary-text::-webkit-scrollbar-track,
-.answer-card .answer-text::-webkit-scrollbar-track,
-.dig-deeper-answer-card .answer-text::-webkit-scrollbar-track {
-    background: transparent;
+.card-summary-text::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+/* Firefox scrollbar for L1/L2 */
+.card-teaser,
+.card-summary-text {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
 }
 
 .card-hint {
@@ -961,9 +974,11 @@ button {
     box-shadow: var(--shadow-card);
 }
 
-/* Front face */
+/* Front face - flex column for scrollable content */
 .card-front {
     z-index: 2;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Back face (summary) - content starts at top, not centered */
@@ -976,13 +991,17 @@ button {
     justify-content: flex-start;
 }
 
-/* Summary tile content - aligned to top, content-based height */
+/* Summary tile content - flex column, fills remaining space */
 .card-back-content {
     /* Padding inside tile - headline starts near top */
     padding: var(--spacing-md) var(--spacing-lg);
-    /* Space for nav indicators at bottom */
-    padding-bottom: calc(var(--spacing-xl) + 56px);
-    /* No flex:1 - height is content-based */
+    padding-bottom: var(--spacing-sm); /* Minimal — nav-hints are outside */
+    /* Fill available space */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* CRITICAL: allows flex child to shrink for scroll */
+    overflow: hidden;
 }
 
 .card-back-header {
@@ -994,16 +1013,22 @@ button {
     margin-bottom: var(--spacing-md);
     margin-top: 0;
     text-align: center;
+    flex-shrink: 0; /* Header stays at top, never shrinks */
 }
 
 .card-summary-text {
     /* font-size set by body text toggle at line 191 */
     color: var(--text-secondary);
     line-height: var(--line-height-relaxed);
-    /* Enable scrolling for long text */
+    /* Extra bottom padding so last line isn't hidden behind absolute nav-hints */
+    padding-bottom: 56px;
+    /* Fill remaining space and scroll */
+    flex: 1;
+    min-height: 0; /* CRITICAL: allows flex child to shrink for scroll */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    max-height: 350px; /* Limit height, allow scroll */
+    overscroll-behavior: contain;
+    touch-action: pan-y; /* Allow vertical scroll, don't let parent capture */
 }
 
 /* ==========================================
@@ -2865,7 +2890,7 @@ button {
 
     .card-body {
         padding: var(--spacing-md);
-        padding-bottom: calc(var(--spacing-lg) + var(--spacing-xl));
+        padding-bottom: var(--spacing-sm);
     }
 
     .card-headline {
