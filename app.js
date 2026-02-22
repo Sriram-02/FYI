@@ -3962,6 +3962,15 @@ function handleDragStart(e, card, story) {
         return;
     }
 
+    // Check if touch is inside a scrollable L1/L2 content area
+    const scrollableEl = target.closest('.card-teaser, .card-summary-text');
+    state._scrollTarget = null;
+    state._gestureDecided = false;
+    state._isContentScroll = false;
+    if (scrollableEl && scrollableEl.scrollHeight > scrollableEl.clientHeight + 2) {
+        state._scrollTarget = scrollableEl;
+    }
+
     state.isDragging = true;
     state.isLongPress = false;
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -3986,6 +3995,28 @@ function handleDragMove(e, card) {
 
     const deltaX = clientX - state.startX;
     const deltaY = clientY - state.startY;
+
+    // NUCLEAR FIX: If touch is in a scrollable L1/L2 area, decide gesture once
+    if (state._scrollTarget && !state._gestureDecided && (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8)) {
+        state._gestureDecided = true;
+        const isVertical = Math.abs(deltaY) > Math.abs(deltaX);
+        if (isVertical) {
+            // Vertical movement in scrollable area → let native scroll handle it
+            const atTop = state._scrollTarget.scrollTop <= 0;
+            const atBottom = state._scrollTarget.scrollTop >= (state._scrollTarget.scrollHeight - state._scrollTarget.clientHeight - 2);
+            // Only allow native scroll if NOT at boundary, or if at boundary and pulling further into boundary
+            if ((deltaY > 0 && !atTop) || (deltaY < 0 && !atBottom) || (!atTop && !atBottom)) {
+                state._isContentScroll = true;
+            }
+            // If at top pulling down or at bottom pulling up, let card swipe handle it
+        }
+        // Horizontal movement → proceed with card drag (not content scroll)
+    }
+
+    // If content is scrolling, abort all card transforms
+    if (state._isContentScroll) {
+        return; // Let native scroll happen
+    }
 
     state.currentX = deltaX;
     state.currentY = deltaY;
@@ -4055,6 +4086,19 @@ function handleDragEnd(e, card, story) {
 
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down');
+
+    // NUCLEAR FIX: If was content scrolling, just clean up — no swipe action
+    if (state._isContentScroll) {
+        state._scrollTarget = null;
+        state._gestureDecided = false;
+        state._isContentScroll = false;
+        state.currentX = 0;
+        state.currentY = 0;
+        return;
+    }
+    state._scrollTarget = null;
+    state._gestureDecided = false;
+    state._isContentScroll = false;
 
     const deltaX = state.currentX;
     const deltaY = state.currentY;
