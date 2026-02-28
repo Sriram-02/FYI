@@ -52,8 +52,8 @@
 
     /* Line heights */
     --line-height-tight: 1.2;
-    --line-height-normal: 1.5;
-    --line-height-relaxed: 1.7;
+    --line-height-normal: 1.4;
+    --line-height-relaxed: 1.5;
 
     /* Text size toggle - default and enlarged (2 sizes up) */
     --body-text-size: var(--font-size-md);
@@ -167,6 +167,14 @@ body {
     font-size: var(--font-size-md);
     line-height: var(--line-height-normal);
 
+    /* Typographic refinement */
+    text-wrap: pretty;
+    orphans: 2;
+    widows: 2;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    hyphenate-limit-chars: 6 3 2;
+
     background: var(--bg-primary);
     color: var(--text-primary);
 
@@ -184,6 +192,71 @@ body {
     width: 100%;
 
     transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+/* ==========================================
+   Background Blob - Animated amorphous shape
+   Tracks navigation state with color morphing
+   ========================================== */
+
+.background-blob {
+    position: fixed;
+    top: -25%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150vw;
+    height: 150vh;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    filter: blur(60px);
+    transition: top 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                left 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+}
+
+.blob-circle-1, .blob-circle-2 {
+    transition: fill 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                cx 1s cubic-bezier(0.4, 0, 0.2, 1),
+                cy 1s cubic-bezier(0.4, 0, 0.2, 1);
+    fill: var(--accent); /* Default: app accent color */
+}
+
+/* Ambient breathing — very slow, barely perceptible */
+@keyframes blob-breathe {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.02) rotate(0.5deg); }
+}
+
+.background-blob g {
+    animation: blob-breathe 14s ease-in-out infinite;
+    transform-origin: center center;
+}
+
+/* Individual circle drift — slow and subtle */
+@keyframes blob-float-1 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(2px, -1px); }
+}
+
+@keyframes blob-float-2 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(-2px, 1px); }
+}
+
+.blob-circle-1 {
+    animation: blob-float-1 10s ease-in-out infinite;
+}
+
+.blob-circle-2 {
+    animation: blob-float-2 12s ease-in-out infinite;
+}
+
+/* Ensure app content is above blob */
+#app {
+    position: relative;
+    z-index: 1;
 }
 
 /* Body text elements that respond to text size toggle */
@@ -738,6 +811,8 @@ button {
     will-change: transform;
     /* Hide overflow to prevent content from extending beyond card */
     overflow: hidden;
+    /* Prevent iOS elastic overscroll bounce */
+    overscroll-behavior: none;
 }
 
 .story-card:active {
@@ -745,8 +820,7 @@ button {
 }
 
 .story-card.dragging {
-    transition: none;
-    box-shadow: var(--shadow-elevated);
+    /* No transition removal needed — card doesn't move during drag */
 }
 
 .story-card.swiping-right {
@@ -1187,6 +1261,104 @@ button {
 .btn-bookmark.bookmarked .bookmark-icon path {
     fill: var(--accent);
     stroke: var(--accent);
+}
+
+/* ==========================================
+   Universal Back Button ("<")
+   Single adaptive button at story-card level.
+   Sits above ALL card layers (z-index: 60).
+   Hidden on L1 headline, visible on L2+.
+   ========================================== */
+.btn-universal-back {
+    position: absolute;
+    top: calc(var(--spacing-lg) + 8px);
+    left: var(--spacing-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    z-index: 60; /* Above all card layers (max card z-index is 50) */
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+    display: block; /* Visible by default; JS hides it on headline layer */
+    /* Align with question text baseline below progress bar */
+    line-height: 1;
+}
+
+/* Hide back button on headline layer via class */
+.btn-universal-back.back-hidden {
+    display: none !important;
+}
+
+.btn-universal-back:hover {
+    color: var(--text-primary);
+}
+
+.btn-universal-back:active {
+    opacity: 0.7;
+}
+
+.back-chevron {
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1;
+    display: block;
+}
+
+/* ==========================================
+   Answer Card Bottom Bar
+   Matches card-nav-hints grid: AA (left), center text, bookmark (right)
+   ========================================== */
+.answer-bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: 48px;
+    background: linear-gradient(transparent, var(--bg-card) 50%);
+    z-index: 10;
+}
+
+/* Dig Deeper hint button — reset button styles so it looks like a text hint */
+.answer-bottom-bar .answer-dig-deeper-hint {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+}
+
+/* Bookmark in bottom bar — push to right */
+.answer-bottom-bar .btn-bookmark {
+    justify-self: end;
+}
+
+/* ==========================================
+   Three-Segment Progress Bar
+   Shows on Summary (L2) and Answer (L3) cards
+   ========================================== */
+.three-segment-progress {
+    display: flex;
+    gap: 4px;
+    height: 3px;
+    margin-bottom: var(--spacing-md);
+    flex-shrink: 0;
+}
+
+.three-segment-progress .segment {
+    flex: 1;
+    height: 100%;
+    background: var(--border-color); /* Empty state = track color */
+    border-radius: var(--radius-full);
+    transition: background var(--transition-normal);
+}
+
+.three-segment-progress .segment.filled {
+    background: var(--accent); /* Default filled = orange */
 }
 
 /* ==========================================
@@ -1962,13 +2134,14 @@ button {
     opacity: 1;
 }
 
-/* Answer Card Header - [Aa] [Question Text] [Bookmark] */
+/* Answer Card Header - [Question Text] */
 .answer-card .answer-header {
     display: flex;
     align-items: flex-start;
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
-    padding-right: 0; /* Override legacy .answer-header padding-right */
+    padding-left: 20px; /* Clear the universal back button overlay */
+    padding-right: 0;
     flex-shrink: 0;
 }
 
@@ -1983,27 +2156,13 @@ button {
     padding-top: 2px; /* Align with button text */
 }
 
-/* AA button in L3/L5 headers — inherits base .btn-text-size styles (transparent, no border)
-   just needs flex-shrink and alignment for header row */
-.answer-card .answer-header .btn-text-size,
-.dig-deeper-answer-card .answer-header .btn-text-size {
-    flex-shrink: 0;
-    margin-top: 2px; /* Nudge down to align with text baseline */
-}
-
-/* Bookmark in L3/L5 headers — inherits base .btn-bookmark styles (transparent, no border)
-   just needs flex-shrink and margin-left auto to push to right edge */
-.answer-card .answer-header .btn-bookmark,
-.dig-deeper-answer-card .answer-header .btn-bookmark {
-    flex-shrink: 0;
-    margin-left: auto; /* Push bookmark to far right edge */
-}
+/* REMOVED: Old AA/bookmark in L3/L5 headers — now in answer-bottom-bar */
 
 /* Answer Card Body - grows to fill available space, scrollable */
 .answer-card .answer-body {
     flex: 1;
     min-height: 0; /* Critical for flex children to shrink and allow scrolling */
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -2043,14 +2202,11 @@ button {
 /* Answer Card Rating */
 .answer-card .answer-rating {
     text-align: center;
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 56px; /* Clear the absolute bottom bar */
+    flex-shrink: 0;
 }
 
-.answer-card .rating-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-bottom: var(--spacing-sm);
-}
+/* REMOVED: .answer-card .rating-label — "Was this helpful?" text removed */
 
 .answer-card .rating-stars {
     display: inline-flex;
@@ -2080,55 +2236,9 @@ button {
     color: var(--warning);
 }
 
-/* Answer Card Footer - stays at bottom */
-.answer-card .answer-footer {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    flex-shrink: 0;
-}
-
-.answer-card .answer-done-btn,
-.answer-card .answer-dig-deeper-btn {
-    flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.answer-card .answer-done-btn {
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-}
-
-.answer-card .answer-done-btn:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-
-.answer-card .answer-dig-deeper-btn {
-    background: var(--accent);
-    color: white;
-    border: none;
-}
-
-.answer-card .answer-dig-deeper-btn:hover {
-    background: var(--accent-light);
-}
-
-.answer-card .answer-done-btn:active,
-.answer-card .answer-dig-deeper-btn:active {
-    transform: scale(0.96);
-}
+/* REMOVED: Old answer card footer (replaced by answer-bottom-bar)
+   .answer-card .answer-footer, .answer-done-btn, .answer-dig-deeper-btn
+   are no longer used — see .answer-bottom-bar styles above */
 
 /* ==========================================
    DIG DEEPER Q&A CARD - Level 4 in card hierarchy
@@ -2146,6 +2256,7 @@ button {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card);
     padding: var(--spacing-lg);
+    padding-bottom: 64px; /* Space for absolute-positioned bottom bar */
     display: flex;
     flex-direction: column;
     /* Default: Hidden below card */
@@ -2166,19 +2277,14 @@ button {
     opacity: 1;
 }
 
-/* Dig Deeper Header - [Aa] [Title + Subheading] */
+/* Dig Deeper Header - [Title + Subheading] — padded left to clear back button */
 .dig-deeper-header {
     display: flex;
     align-items: flex-start;
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
     flex-shrink: 0;
-}
-
-/* AA button in L4 dig deeper header — inherits base .btn-text-size styles */
-.dig-deeper-header .btn-text-size {
-    flex-shrink: 0;
-    margin-top: 4px; /* Align with headline text */
+    padding-left: 40px; /* Clear back button (24px icon + 16px padding) */
 }
 
 .dig-deeper-header-text {
@@ -2215,18 +2321,33 @@ button {
     touch-action: pan-y;
 }
 
-/* Dig Deeper questions - same font as main Q&A, truncate to 2 lines for consistency */
+/* Dig Deeper questions - show full text, no truncation */
 .dig-deeper-questions-list .qa-question-text {
-    -webkit-line-clamp: 2;
+    display: block;
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: unset;
+    overflow: visible;
+    text-overflow: unset;
 }
 
-/* Dig Deeper Footer - back to headline link */
-.dig-deeper-footer {
-    display: flex;
+/* Dig Deeper Bottom Bar - AA (left), Back to headline (center), Bookmark (right) */
+.dig-deeper-bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: center;
-    padding-top: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: 48px;
+    background: linear-gradient(transparent, var(--bg-card) 50%);
+    z-index: 10;
     flex-shrink: 0;
+}
+
+.dig-deeper-bottom-bar .btn-bookmark {
+    justify-self: end;
 }
 
 .back-to-headline-link {
@@ -2238,6 +2359,7 @@ button {
     cursor: pointer;
     padding: var(--spacing-sm) var(--spacing-md);
     transition: color var(--transition-fast);
+    justify-self: center;
 }
 
 .back-to-headline-link:hover {
@@ -2280,13 +2402,14 @@ button {
     opacity: 1;
 }
 
-/* Dig Deeper Answer Card header - [Aa] [Question Text] [Bookmark] */
+/* Dig Deeper Answer Card header - [Question Text] */
 .dig-deeper-answer-card .answer-header {
     display: flex;
     align-items: flex-start;
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
-    padding-right: 0; /* Override legacy .answer-header padding-right */
+    padding-left: 20px; /* Clear the universal back button overlay */
+    padding-right: 0;
     flex-shrink: 0;
 }
 
@@ -2304,7 +2427,7 @@ button {
 .dig-deeper-answer-card .answer-body {
     flex: 1;
     min-height: 0; /* Critical for flex children to shrink and allow scrolling */
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -2319,14 +2442,11 @@ button {
 
 .dig-deeper-answer-card .answer-rating {
     text-align: center;
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 56px; /* Clear the absolute bottom bar */
+    flex-shrink: 0;
 }
 
-.dig-deeper-answer-card .rating-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-bottom: var(--spacing-sm);
-}
+/* REMOVED: .dig-deeper-answer-card .rating-label — "Was this helpful?" text removed */
 
 .dig-deeper-answer-card .rating-stars {
     display: inline-flex;
@@ -2356,35 +2476,9 @@ button {
     color: var(--warning);
 }
 
-.dig-deeper-answer-card .answer-footer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    flex-shrink: 0;
-}
-
-.dig-deeper-answer-card .answer-done-btn {
-    flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    background: var(--accent);
-    color: white;
-    border: none;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.dig-deeper-answer-card .answer-done-btn:hover {
-    background: var(--accent-light);
-}
-
-.dig-deeper-answer-card .answer-done-btn:active {
-    transform: scale(0.96);
-}
+/* REMOVED: Old dig-deeper-answer-card footer (replaced by answer-bottom-bar)
+   .dig-deeper-answer-card .answer-footer, .answer-done-btn
+   are no longer used — see .answer-bottom-bar styles above */
 
 /* ==========================================
    LEGACY: Old Modal System (keeping for Answer/Dig Deeper views)
@@ -2741,11 +2835,7 @@ button {
     margin-bottom: var(--spacing-xl);
 }
 
-.rating-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-bottom: var(--spacing-sm);
-}
+/* REMOVED: .rating-label — "Was this helpful?" text removed, stars only */
 
 .star-rating {
     display: inline-flex;
