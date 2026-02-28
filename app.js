@@ -4,6 +4,9 @@
  * Filters to show only today's stories
  */
 
+const APP_VERSION = 'v32';
+console.log(`[FYI] App version: ${APP_VERSION} loaded at ${new Date().toLocaleTimeString()}`);
+
 // ==========================================
 // CONFIGURATION - Edit this!
 // ==========================================
@@ -744,11 +747,13 @@ function handleBookmarkCardClick(bookmarkId) {
             flipCard(currentCard, currentStory);
             state.isCardFlipped = true;
             state.cardLayer = 'summary';
+            updateBackButtonVisibility();
 
             setTimeout(() => {
                 // Show Q&A
                 setQACardState(QA_STATES.ACTIVE);
                 state.cardLayer = 'questions';
+                updateBackButtonVisibility();
                 setupQACardSwipe();
 
                 if (questionPath.includes('-')) {
@@ -1363,7 +1368,13 @@ const state = {
 
     // Track selected question indices for Answer and Dig Deeper flows
     currentQuestionIndex: null,          // Index of selected question (0-3)
-    currentDigDeeperQuestionIndex: null  // Index of selected dig deeper question (0-2)
+    currentDigDeeperQuestionIndex: null, // Index of selected dig deeper question (0-2)
+
+    // Track current navigation path for dynamic progress bar coloring
+    currentPath: { l3QuestionIndex: null, l5QuestionIndex: null },
+
+    // Navigation click counter for blob position cycling
+    navigationClickCount: 0
 };
 
 // Q&A Card States - TWO STATES (peeking removed to fix bottom bar visibility)
@@ -1371,6 +1382,201 @@ const QA_STATES = {
     HIDDEN: 'hidden',   // Below viewport, not visible
     ACTIVE: 'active'    // Fully visible, user can tap questions
 };
+
+// Simple state-based back navigation map — each layer maps to its previous layer
+const BACK_NAVIGATION_MAP = {
+    'summary': 'headline',
+    'questions': 'summary',
+    'answer': 'questions',
+    'dig-deeper-qa': 'answer',
+    'dig-deeper-answer': 'dig-deeper-qa'
+};
+
+// ==========================================
+// COLOR-CODED QUESTION BULLETS
+// ==========================================
+
+// L3 Question colors (parent questions Q1, Q2, Q3)
+const L3_QUESTION_COLORS = [
+    '#A8DADC', // Q1 - pastel blue
+    '#B5E7A0', // Q2 - pastel green
+    '#F4D58D'  // Q3 - pastel gold
+];
+
+// L5 Question colors (child dig-deeper questions, indexed by [parentIndex][childIndex])
+const L5_QUESTION_COLORS = [
+    ['#89CFF0', '#7EC8E3', '#B8B8FF'],  // Q1's children: aqua, light sky, periwinkle
+    ['#77DD77', '#40E0D0', '#98FF98'],   // Q2's children: grass, turquoise, mint
+    ['#FFD700', '#FFFDD0', '#F4A460']    // Q3's children: pale gold, cream, sand
+];
+
+// Determine if text should be dark on a light background for contrast
+function getContrastTextColor(hexColor) {
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.6 ? '#333333' : '#FFFFFF';
+}
+
+// Background blob color palette — maps navigation state to blob color
+const BACKGROUND_COLORS = {
+    headline: '#DA7756',              // Level 1: App accent (orange)
+    summary: '#DA7756',               // Level 2: Same accent
+    questions: '#DA7756',             // Q&A list: Same accent
+    q1: '#A8DADC',                    // L3 Q1 answer - Blue
+    q2: '#B5E7A0',                    // L3 Q2 answer - Green
+    q3: '#F4D58D',                    // L3 Q3 answer - Golden
+    q1_deep1: '#89CFF0',             // L5 Q1.1 - Aqua
+    q1_deep2: '#7EC8E3',             // L5 Q1.2 - Light sky
+    q1_deep3: '#B8B8FF',             // L5 Q1.3 - Periwinkle
+    q2_deep1: '#77DD77',             // L5 Q2.1 - Grass
+    q2_deep2: '#40E0D0',             // L5 Q2.2 - Turquoise
+    q2_deep3: '#98FF98',             // L5 Q2.3 - Mint
+    q3_deep1: '#FFD700',             // L5 Q3.1 - Pale gold
+    q3_deep2: '#FFFDD0',             // L5 Q3.2 - Cream
+    q3_deep3: '#F4A460'              // L5 Q3.3 - Sand
+};
+
+// Blob position/shape state for smooth animation
+const blobState = {
+    currentColor: '#DA7756',
+    rotation: 0,
+    scale: 1
+};
+
+// Per-story progress tracking for three-segment bar
+// Key: storyId, Value: { visitedSummary, clickedL3, clickedL5 }
+const storyProgress = {};
+
+/**
+ * Update the three-segment progress bar on summary and answer cards.
+ * Segments fill based on navigation depth, colored by current path.
+ * @param {string} storyId - The story ID to look up progress for
+ */
+function updateThreeSegmentProgress(storyId) {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    // Resolve storyId — use param or fall back to current story
+    const resolvedStoryId = storyId || state.currentStory?.id;
+    const progress = resolvedStoryId ? (storyProgress[resolvedStoryId] || {}) : {};
+
+    console.log('[Progress] Updating — layer:', state.cardLayer, 'qIdx:', state.currentQuestionIndex, 'deepIdx:', state.currentDigDeeperQuestionIndex);
+
+    // Update ALL progress bars in the current card (summary, answer, and dig-deeper cards each have one)
+    const bars = currentCard.querySelectorAll('.three-segment-progress');
+    bars.forEach(bar => {
+        const s1 = bar.querySelector('.segment-1');
+        const s2 = bar.querySelector('.segment-2');
+        const s3 = bar.querySelector('.segment-3');
+        if (!s1 || !s2 || !s3) return;
+
+        // SEGMENT 1: ALWAYS orange — if we can see the progress bar, summary was visited
+        s1.classList.add('filled');
+        s1.style.background = ''; // Uses CSS accent (orange)
+
+        // SEGMENT 2: Filled when currently on answer level or deeper (L4+)
+        const onAnswerOrDeeper = ['answer', 'dig-deeper-qa', 'dig-deeper-answer'].includes(state.cardLayer);
+        if (onAnswerOrDeeper && state.currentQuestionIndex != null) {
+            s2.classList.add('filled');
+            const l3Color = L3_QUESTION_COLORS[state.currentQuestionIndex] || null;
+            s2.style.background = l3Color || '';
+        } else {
+            // Clear segment 2 — we're above answer level (backward navigation)
+            s2.classList.remove('filled');
+            s2.style.background = '';
+        }
+
+        // SEGMENT 3: Filled ONLY when on dig-deeper-answer level (L6)
+        if (state.cardLayer === 'dig-deeper-answer' && state.currentQuestionIndex != null && state.currentDigDeeperQuestionIndex != null) {
+            s3.classList.add('filled');
+            const parentIdx = state.currentQuestionIndex;
+            const childIdx = state.currentDigDeeperQuestionIndex;
+            const l5Color = (L5_QUESTION_COLORS[parentIdx] && L5_QUESTION_COLORS[parentIdx][childIdx])
+                ? L5_QUESTION_COLORS[parentIdx][childIdx]
+                : null;
+            s3.style.background = l5Color || '';
+        } else {
+            // Clear segment 3 — we're above dig-deeper-answer level
+            s3.classList.remove('filled');
+            s3.style.background = '';
+        }
+    });
+}
+
+/**
+ * Update the background blob color and position based on navigation state.
+ * Called at every navigation transition point.
+ */
+function updateBackgroundBlob() {
+    const blob = document.querySelector('.background-blob');
+    if (!blob) return;
+
+    const circle1 = blob.querySelector('.blob-circle-1');
+    const circle2 = blob.querySelector('.blob-circle-2');
+    if (!circle1 || !circle2) return;
+
+    // Determine color based on current navigation state
+    let colorKey = 'headline';
+
+    if (state.cardLayer === 'summary' || state.cardLayer === 'questions') {
+        colorKey = 'summary';
+    } else if (state.cardLayer === 'answer' && state.currentQuestionIndex != null) {
+        colorKey = ['q1', 'q2', 'q3'][state.currentQuestionIndex] || 'summary';
+    } else if (state.cardLayer === 'dig-deeper-qa' && state.currentQuestionIndex != null) {
+        colorKey = ['q1', 'q2', 'q3'][state.currentQuestionIndex] || 'summary';
+    } else if (state.cardLayer === 'dig-deeper-answer' && state.currentQuestionIndex != null && state.currentDigDeeperQuestionIndex != null) {
+        const deepKeys = [
+            ['q1_deep1', 'q1_deep2', 'q1_deep3'],
+            ['q2_deep1', 'q2_deep2', 'q2_deep3'],
+            ['q3_deep1', 'q3_deep2', 'q3_deep3']
+        ];
+        const family = deepKeys[state.currentQuestionIndex];
+        if (family) {
+            colorKey = family[state.currentDigDeeperQuestionIndex] || colorKey;
+        }
+    }
+
+    const newColor = BACKGROUND_COLORS[colorKey] || BACKGROUND_COLORS.headline;
+
+    // Position offset cycling — minimal shifts to keep blob mostly centered
+    const offsetCycle = [
+        { x: 0, y: -25 },    // Starting position (center-top)
+        { x: 2, y: -24 },    // Barely right
+        { x: 3, y: -23 },    // Slightly right-down
+        { x: 2, y: -25 },    // Back towards center
+        { x: -2, y: -26 },   // Slightly left-up
+        { x: -3, y: -25 }    // Slightly left
+    ];
+
+    const clickIdx = (state.navigationClickCount || 0) % offsetCycle.length;
+    const offset = offsetCycle[clickIdx];
+
+    // Prominent rotation — primary animation driver
+    blobState.rotation += 30;
+    blobState.scale = 1 + (Math.sin(clickIdx * 0.6) * 0.08);
+
+    // Apply position + transform (rotation is the star of the show)
+    blob.style.top = `${offset.y}%`;
+    blob.style.left = `calc(50% + ${offset.x}%)`;
+    blob.style.transform = `translateX(-50%) rotate(${blobState.rotation}deg) scale(${blobState.scale})`;
+
+    // Apply color to both circles
+    circle1.style.fill = newColor;
+    circle2.style.fill = newColor;
+
+    // Morph circle positions for dramatic shape variation
+    const morphX = Math.sin(clickIdx * 0.7) * 20;
+    const morphY = Math.cos(clickIdx * 0.7) * 20;
+    circle1.setAttribute('cx', 100 + morphX);
+    circle1.setAttribute('cy', 100 + morphY);
+    circle2.setAttribute('cx', 120 - morphX);
+    circle2.setAttribute('cy', 90 - morphY);
+
+    blobState.currentColor = newColor;
+    console.log('[Blob] Updated — colorKey:', colorKey, 'color:', newColor, 'rotation:', blobState.rotation);
+}
 
 /**
  * Set Q&A card state - manages HIDDEN/ACTIVE states
@@ -1847,6 +2053,9 @@ async function init() {
 
         // Track app opened
         trackAppOpened();
+
+        // Initialize background blob to default state
+        updateBackgroundBlob();
     } catch (error) {
         console.error('[init] CRITICAL ERROR during initialization:', error);
         // Try to show some feedback to user
@@ -3211,17 +3420,43 @@ function toggleBookmark(button) {
         return;
     }
 
+    // Determine bookmark type and context based on current card layer
+    let bookmarkType = 'story';
+    let questionPath = null;
+    let contentPayload = {
+        headline: currentStory.headline,
+        teaser: currentStory.teaser,
+        emoji: currentStory.emoji
+    };
+
+    if (state.cardLayer === 'answer' && state.currentQuestion) {
+        bookmarkType = 'answer';
+        questionPath = `Q${(state.currentQuestionIndex || 0) + 1}`;
+        contentPayload.question_text = state.currentQuestion.text;
+        contentPayload.answer_text = state.currentQuestion.answer;
+    } else if (state.cardLayer === 'dig-deeper-answer' && state.currentQuestion) {
+        bookmarkType = 'deep_answer';
+        const qIdx = (state.currentQuestionIndex || 0) + 1;
+        const dIdx = state.currentDigDeeperQuestionIndex || 0;
+        // Format: Q1-A, Q1-B, Q2-C — matches handleBookmarkCardClick parser
+        const deepLetter = String.fromCharCode(65 + dIdx); // 0→A, 1→B, 2→C
+        questionPath = `Q${qIdx}-${deepLetter}`;
+        const deepQ = state.currentQuestion.deepQuestions?.[state.currentDigDeeperQuestionIndex];
+        if (deepQ) {
+            contentPayload.question_text = deepQ.text;
+            contentPayload.answer_text = deepQ.answer;
+        }
+    }
+
     const bookmarkData = {
-        type: 'story',
+        type: bookmarkType,
         storyDate: currentStory.date,
         storyHeadline: currentStory.headline,
-        questionPath: null,
-        content: {
-            headline: currentStory.headline,
-            teaser: currentStory.teaser,
-            emoji: currentStory.emoji
-        }
+        questionPath: questionPath,
+        content: contentPayload
     };
+
+    console.log('[Bookmark] Toggling — level:', state.cardLayer, 'type:', bookmarkType, 'path:', questionPath);
 
     // Use Supabase-backed handler
     handleBookmarkClick(button, bookmarkData);
@@ -3229,7 +3464,7 @@ function toggleBookmark(button) {
     // Also track with Plausible
     const storyId = button.dataset.storyId;
     const isBookmarked = button.classList.contains('bookmarked');
-    trackEvent('Bookmark Toggled', { storyId, bookmarked: isBookmarked });
+    trackEvent('Bookmark Toggled', { storyId, bookmarked: isBookmarked, level: state.cardLayer });
 }
 
 // ==========================================
@@ -3359,7 +3594,7 @@ function createCardElement(story, position) {
                     <button class="btn-text-size" aria-label="Toggle text size">
                         <span class="text-size-small">A</span><span class="text-size-large">A</span>
                     </button>
-                    <span class="nav-hint nav-hint-center" data-action="flip">Read ahead ↑</span>
+                    <span class="nav-hint nav-hint-center nav-hint-read-ahead" data-action="flip">Read ahead ↑</span>
                     <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
                         <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                             <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3373,6 +3608,11 @@ function createCardElement(story, position) {
                 <div class="card-swipe-overlay left"></div>
                 <div class="card-swipe-overlay right"></div>
                 <div class="card-back-content">
+                    <div class="three-segment-progress">
+                        <div class="segment segment-1"></div>
+                        <div class="segment segment-2"></div>
+                        <div class="segment segment-3"></div>
+                    </div>
                     <h3 class="card-back-header">Summary</h3>
                     <div class="card-summary-text">${summaryHTML}</div>
                 </div>
@@ -3381,7 +3621,7 @@ function createCardElement(story, position) {
                     <button class="btn-text-size" aria-label="Toggle text size">
                         <span class="text-size-small">A</span><span class="text-size-large">A</span>
                     </button>
-                    <span class="nav-hint nav-hint-center" data-action="flip">Dig deeper ↑</span>
+                    <span class="nav-hint nav-hint-center nav-hint-dig-deeper" data-action="flip">Dig deeper ↑</span>
                     <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
                         <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                             <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3390,6 +3630,9 @@ function createCardElement(story, position) {
                 </div>
             </div>
         </div>
+
+        <!-- SINGLE ADAPTIVE BACK BUTTON — adapts to current layer -->
+        <button class="btn-universal-back back-hidden" aria-label="Go back"><span class="back-chevron">&#8249;</span></button>
 
         <!-- Q&A CARD - slides up from bottom of story card -->
         <div class="qa-card" data-story-id="${story.id}">
@@ -3401,22 +3644,18 @@ function createCardElement(story, position) {
 
         <!-- ANSWER CARD - slides up when question is clicked -->
         <div class="answer-card" data-story-id="${story.id}">
+            <div class="three-segment-progress">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+            </div>
             <div class="answer-header">
-                <button class="btn-text-size" aria-label="Toggle text size">
-                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
-                </button>
                 <p class="answer-question-text"></p>
-                <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
-                    <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                </button>
             </div>
             <div class="answer-body">
                 <p class="answer-text"></p>
             </div>
             <div class="answer-rating">
-                <p class="rating-label">Was this helpful?</p>
                 <div class="rating-stars">
                     <button class="rating-star" data-value="1">★</button>
                     <button class="rating-star" data-value="2">★</button>
@@ -3425,18 +3664,22 @@ function createCardElement(story, position) {
                     <button class="rating-star" data-value="5">★</button>
                 </div>
             </div>
-            <div class="answer-footer">
-                <button class="answer-done-btn">Done</button>
-                <button class="answer-dig-deeper-btn">Dig Deeper</button>
+            <div class="answer-bottom-bar">
+                <button class="btn-text-size" aria-label="Toggle text size">
+                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                </button>
+                <button class="nav-hint nav-hint-center answer-dig-deeper-hint" onclick="event.stopPropagation(); showDigDeeperQACard();">Dig Deeper ↑</button>
+                <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
+                    <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
         <!-- DIG DEEPER Q&A CARD - slides up when Dig Deeper is clicked -->
         <div class="dig-deeper-qa-card" data-story-id="${story.id}">
             <div class="dig-deeper-header">
-                <button class="btn-text-size" aria-label="Toggle text size">
-                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
-                </button>
                 <div class="dig-deeper-header-text">
                     <h2 class="dig-deeper-headline">Dig deeper</h2>
                     <p class="dig-deeper-subheading">Curiosity never killed the cat</p>
@@ -3445,29 +3688,33 @@ function createCardElement(story, position) {
             <div class="dig-deeper-questions-list">
                 <!-- Dig Deeper questions injected by populateDigDeeperQACard() -->
             </div>
-            <div class="dig-deeper-footer">
-                <button class="back-to-headline-link">Back to headline</button>
-            </div>
-        </div>
-
-        <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
-        <div class="dig-deeper-answer-card" data-story-id="${story.id}">
-            <div class="answer-header">
+            <div class="dig-deeper-bottom-bar">
                 <button class="btn-text-size" aria-label="Toggle text size">
                     <span class="text-size-small">A</span><span class="text-size-large">A</span>
                 </button>
-                <p class="answer-question-text"></p>
-                <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
+                <button class="back-to-headline-link">Back to headline</button>
+                <button class="btn-bookmark" aria-label="Bookmark this story" data-story-id="${story.id}">
                     <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                     </svg>
                 </button>
             </div>
+        </div>
+
+        <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
+        <div class="dig-deeper-answer-card" data-story-id="${story.id}">
+            <div class="three-segment-progress">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+            </div>
+            <div class="answer-header">
+                <p class="answer-question-text"></p>
+            </div>
             <div class="answer-body">
                 <p class="answer-text"></p>
             </div>
             <div class="answer-rating">
-                <p class="rating-label">Was this helpful?</p>
                 <div class="rating-stars">
                     <button class="rating-star" data-value="1">★</button>
                     <button class="rating-star" data-value="2">★</button>
@@ -3476,8 +3723,16 @@ function createCardElement(story, position) {
                     <button class="rating-star" data-value="5">★</button>
                 </div>
             </div>
-            <div class="answer-footer">
-                <button class="answer-done-btn">Done</button>
+            <div class="answer-bottom-bar dig-deeper-answer-bottom-bar">
+                <button class="btn-text-size" aria-label="Toggle text size">
+                    <span class="text-size-small">A</span><span class="text-size-large">A</span>
+                </button>
+                <span class="nav-hint nav-hint-center" style="visibility:hidden;">&nbsp;</span>
+                <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
+                    <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
             </div>
         </div>
     `;
@@ -3507,6 +3762,12 @@ function flipCard(card, story) {
         card.dataset.flipped = 'true';
         trackCardFlip(story.headline, 'to_summary');
         logSupabaseEvent('card_flipped_to_summary', { story_headline: story.headline });
+
+        // Track progress: user visited summary
+        const storyId = story.id;
+        if (!storyProgress[storyId]) storyProgress[storyId] = { visitedSummary: false, clickedL3: false, clickedL5: false };
+        storyProgress[storyId].visitedSummary = true;
+        updateThreeSegmentProgress(storyId);
 
         // Populate Q&A card content (but keep it HIDDEN until user swipes up)
         populateQACard(story);
@@ -3547,10 +3808,12 @@ function populateQACard(story) {
     const questionsToShow = story.isFAQ ? story.questions.slice(0, 3) : story.questions;
 
     questionsToShow.forEach((q, index) => {
+        const bulletColor = L3_QUESTION_COLORS[index] || 'var(--accent)';
+        const bulletTextColor = L3_QUESTION_COLORS[index] ? getContrastTextColor(L3_QUESTION_COLORS[index]) : '#FFFFFF';
         const button = document.createElement('button');
         button.className = 'qa-question-btn';
         button.innerHTML = `
-            <span class="qa-question-number">${index + 1}</span>
+            <span class="qa-question-number" style="background-color: ${bulletColor}; color: ${bulletTextColor}">${index + 1}</span>
             <span class="qa-question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
@@ -3581,6 +3844,7 @@ function populateQACard(story) {
         }
         state.cardLayer = 'headline';
         state.isCardFlipped = false;
+        updateBackButtonVisibility();
         setTimeout(() => nextCard(), 300);
     });
     questionsList.appendChild(skipButton);
@@ -3619,6 +3883,9 @@ function setupCardInteractions(card, story) {
     // Setup Dig Deeper Q&A card button handlers (Back to headline)
     setupDigDeeperQACardButtons(card);
 
+    // Setup universal back buttons on all card layers
+    setupUniversalBackButtons(card, story);
+
     // Setup rating star handlers
     setupRatingStars(card);
 
@@ -3627,6 +3894,150 @@ function setupCardInteractions(card, story) {
 
     // Setup bookmark buttons
     setupBookmarkButtons(card);
+}
+
+/**
+ * Setup universal back buttons on all card layers
+ * Each back button has a data-layer attribute indicating which layer it belongs to.
+ * Clicking navigates one level up in the card hierarchy.
+ * Uses both touchend + click handlers (same pattern as AA buttons) for mobile reliability.
+ */
+function setupUniversalBackButtons(card, story) {
+    // Single adaptive back button — reads state.cardLayer to decide action
+    const btn = card.querySelector('.btn-universal-back');
+    if (!btn) return;
+
+    let touchHandled = false;
+
+    const handleBack = () => {
+        triggerHaptic('light');
+
+        // ━━━━ SELF-CONTAINED BACK BUTTON ━━━━
+        // This handler does ALL work itself — no delegation to hide functions
+        // which have their own state management that causes double-calls.
+
+        const entryLayer = state.cardLayer;
+        console.log('╔═══ BACK BUTTON ═══╗');
+        console.log('[BackButton] Current layer:', entryLayer);
+
+        // Defensive: Verify state.cardLayer is valid
+        const validLayers = ['headline', 'summary', 'questions', 'answer', 'dig-deeper-qa', 'dig-deeper-answer'];
+        if (!validLayers.includes(entryLayer)) {
+            console.error('[BackButton] Invalid cardLayer:', entryLayer, '— resetting to headline');
+            state.cardLayer = 'headline';
+            updateBackButtonVisibility(card);
+            return;
+        }
+
+        // Get the previous layer from the map
+        const previousLayer = BACK_NAVIGATION_MAP[entryLayer];
+        if (!previousLayer) {
+            console.log('[BackButton] Already at headline, no back action');
+            return;
+        }
+
+        console.log('[BackButton] Target:', previousLayer);
+
+        // Find the current story card for DOM operations
+        const currentCard = document.querySelector('.story-card[data-card-type="current"]') || card;
+
+        // ── Navigate based on current layer ──
+        if (entryLayer === 'summary') {
+            // L2 → L1: Summary → Headline
+            flipCard(card, story);
+            state.isCardFlipped = false;
+            state.cardLayer = 'headline';
+            setQACardState(QA_STATES.HIDDEN);
+
+        } else if (entryLayer === 'questions') {
+            // L3 → L2: Questions → Summary
+            setQACardState(QA_STATES.HIDDEN);
+            state.cardLayer = 'summary';
+
+        } else if (entryLayer === 'answer') {
+            // L4 → L3: Answer → Questions (DOM only, no hideAnswerCard delegation)
+            const answerCard = currentCard.querySelector('.answer-card');
+            if (answerCard) {
+                answerCard.classList.remove('active');
+                answerCard.style.transform = '';
+            }
+            state.cardLayer = 'questions';
+            // Note: Do NOT clear currentQuestionIndex here — the Q&A card still needs it
+
+        } else if (entryLayer === 'dig-deeper-qa') {
+            // L5 → L4: Dig Deeper QA → Answer (DOM only, no hideDigDeeperQACard delegation)
+            const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
+            if (digDeeperQACard) {
+                digDeeperQACard.classList.remove('active');
+                digDeeperQACard.style.transform = '';
+            }
+            state.cardLayer = 'answer';
+
+        } else if (entryLayer === 'dig-deeper-answer') {
+            // L6 → L5: Dig Deeper Answer → Dig Deeper QA (DOM only)
+            const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
+            if (digDeeperAnswerCard) {
+                digDeeperAnswerCard.classList.remove('active');
+                digDeeperAnswerCard.style.transform = '';
+            }
+            state.cardLayer = 'dig-deeper-qa';
+        }
+
+        // ── Update UI (single call, no double-firing) ──
+        updateBackButtonVisibility(card);
+        updateThreeSegmentProgress();
+        state.navigationClickCount++;
+        updateBackgroundBlob();
+
+        console.log('[BackButton] Done:', entryLayer, '→', state.cardLayer);
+        if (state.cardLayer !== previousLayer) {
+            console.error('[BackButton] MISMATCH! Expected:', previousLayer, 'Got:', state.cardLayer);
+        }
+        console.log('╚═══════════════════╝');
+    };
+
+    // Touchend handler - fires BEFORE click on mobile
+    btn.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        const touch = e.changedTouches[0];
+        if (touch) {
+            touchHandled = true;
+            handleBack();
+            setTimeout(() => { touchHandled = false; }, 300);
+        }
+    }, { capture: true });
+
+    // Click handler for desktop
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (touchHandled) return;
+        handleBack();
+    });
+
+    // Initial visibility
+    updateBackButtonVisibility(card);
+}
+
+/**
+ * Show/hide the single back button based on current card layer.
+ * Hidden on L1 (headline), visible on all other layers.
+ * Uses class-based toggling so CSS default (display: block) works reliably.
+ */
+function updateBackButtonVisibility(card) {
+    if (!card) {
+        card = document.querySelector('.story-card[data-card-type="current"]');
+    }
+    if (!card) return;
+    const btn = card.querySelector('.btn-universal-back');
+    if (!btn) return;
+    // Hide on headline, show on everything else
+    if (state.cardLayer === 'headline') {
+        btn.classList.add('back-hidden');
+    } else {
+        btn.classList.remove('back-hidden');
+    }
 }
 
 /**
@@ -3756,51 +4167,96 @@ function backToHeadline() {
     state.isCardFlipped = false;
     state.currentQuestionIndex = null;
     state.currentDigDeeperQuestionIndex = null;
+
+    updateBackButtonVisibility();
 }
 
 /**
- * Setup click handlers for Answer card buttons (Done and Dig Deeper)
+ * Setup click handlers for Answer card buttons (Dig Deeper)
+ * The dig deeper hint button has an inline onclick as primary handler.
+ * This function adds belt-and-suspenders touchend handler for mobile reliability.
  */
 function setupAnswerCardButtons(card) {
     const answerCard = card.querySelector('.answer-card');
     if (!answerCard) return;
 
-    const doneBtn = answerCard.querySelector('.answer-done-btn');
-    const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
-
-    if (doneBtn) {
-        doneBtn.addEventListener('click', (e) => {
+    // "Dig Deeper ↑" button in the bottom bar
+    // Primary handler: inline onclick="showDigDeeperQACard()" in HTML template
+    // Secondary handler: touchend for guaranteed mobile reliability
+    const digDeeperHint = answerCard.querySelector('.answer-dig-deeper-hint');
+    if (digDeeperHint) {
+        console.log('[setupAnswerCardButtons] Found dig deeper hint, attaching touchend handler');
+        digDeeperHint.addEventListener('touchend', (e) => {
             e.stopPropagation();
-            triggerHaptic('light');
-            hideAnswerCard();
-        });
-    }
-
-    if (digDeeperBtn) {
-        digDeeperBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            triggerHaptic('light');
-            showDigDeeperQACard();
-        });
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            if (e.changedTouches[0]) {
+                console.log('[Dig Deeper] TOUCHEND fired — calling showDigDeeperQACard()');
+                triggerHaptic('light');
+                showDigDeeperQACard();
+            }
+        }, { capture: true });
+    } else {
+        console.warn('[setupAnswerCardButtons] WARNING: dig deeper hint NOT found');
     }
 }
 
 /**
- * Setup click handlers for Dig Deeper Answer card buttons (Done only)
+ * NUCLEAR: Re-attach dig deeper handler with clone-and-replace.
+ * Called every time answer card is shown to guarantee the handler is fresh.
+ * Uses cloneNode to strip ALL existing event listeners, then re-attaches.
+ */
+function reinitializeDigDeeperHandler() {
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (!currentCard) return;
+
+    const answerCard = currentCard.querySelector('.answer-card');
+    if (!answerCard) return;
+
+    const oldBtn = answerCard.querySelector('.answer-dig-deeper-hint');
+    if (!oldBtn) {
+        console.warn('[reinitializeDigDeeperHandler] No dig deeper hint button found');
+        return;
+    }
+
+    // Clone the button to strip ALL existing event listeners
+    const newBtn = oldBtn.cloneNode(true);
+    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+    // Re-attach inline onclick (in case cloning lost it)
+    newBtn.setAttribute('onclick', 'event.stopPropagation(); showDigDeeperQACard();');
+
+    // Attach touchend handler (mobile) - capture phase, highest priority
+    newBtn.addEventListener('touchend', function(e) {
+        console.log('[DigDeeper TOUCHEND] Fired');
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        if (e.changedTouches[0]) {
+            triggerHaptic('light');
+            showDigDeeperQACard();
+        }
+    }, { capture: true, passive: false });
+
+    // Attach click handler (desktop fallback)
+    newBtn.addEventListener('click', function(e) {
+        console.log('[DigDeeper CLICK] Fired');
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        triggerHaptic('light');
+        showDigDeeperQACard();
+    }, { capture: true });
+
+    console.log('[reinitializeDigDeeperHandler] Handler attached to fresh button');
+}
+
+/**
+ * Setup click handlers for Dig Deeper Answer card buttons
+ * Back navigation is now handled by universal back button.
  */
 function setupDigDeeperAnswerCardButtons(card) {
-    const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
-    if (!digDeeperAnswerCard) return;
-
-    const doneBtn = digDeeperAnswerCard.querySelector('.answer-done-btn');
-
-    if (doneBtn) {
-        doneBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            triggerHaptic('light');
-            hideDigDeeperAnswerCard();
-        });
-    }
+    // No more Done/Back button — handled by universal back button
+    // This function is kept for compatibility with setupCardInteractions() call
 }
 
 /**
@@ -3904,7 +4360,6 @@ function setupQACardClickHandler(card) {
 // CRITICAL: Check for 'disabled' class (not 'hidden') - disabled buttons stay in grid but don't work
 function setupNavHintClickHandlers(card, story) {
     const prevHint = card.querySelector('.nav-hint-prev');
-    const centerHint = card.querySelector('.nav-hint-center');
     const nextHint = card.querySelector('.nav-hint-next');
 
     // Prev button - only active if NOT disabled
@@ -3916,22 +4371,52 @@ function setupNavHintClickHandlers(card, story) {
         });
     }
 
-    // Center buttons (flip/read ahead/dig deeper) - always active
-    // Use querySelectorAll to catch BOTH headline and summary center hints
-    const centerHints = card.querySelectorAll('.nav-hint-center');
-    centerHints.forEach(hint => {
-        hint.addEventListener('click', (e) => {
+    // READ AHEAD button (L1 headline → L2 summary) — explicit, isolated handler
+    const readAheadBtn = card.querySelector('.nav-hint-read-ahead');
+    if (readAheadBtn) {
+        readAheadBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
+            console.log('[READ AHEAD] Clicked — cardLayer:', state.cardLayer, 'isFlipped:', card.dataset.flipped);
 
-            // Debug logging to identify which button was clicked
-            const buttonText = hint.textContent.trim();
-            const isFlipped = card.dataset.flipped === 'true';
-            console.log('[CENTER BUTTON CLICKED]', buttonText, '| isFlipped:', isFlipped, '| cardLayer:', state.cardLayer);
-
-            handleSwipeUp(card, story);
+            // EXPLICIT: Always go headline → summary, never skip
+            if (card.dataset.flipped !== 'true') {
+                flipCard(card, story);
+                state.isCardFlipped = true;
+                state.cardLayer = 'summary';
+                updateBackButtonVisibility(card);
+                state.navigationClickCount++;
+                updateBackgroundBlob();
+                console.log('[READ AHEAD] Navigated to SUMMARY');
+            } else {
+                console.warn('[READ AHEAD] Already flipped — ignoring');
+            }
         });
-    });
+    }
+
+    // DIG DEEPER button (L2 summary → Q&A questions) — explicit, isolated handler
+    const digDeeperBtn = card.querySelector('.card-nav-hints .nav-hint-dig-deeper');
+    if (digDeeperBtn) {
+        digDeeperBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            console.log('[DIG DEEPER L2] Clicked — cardLayer:', state.cardLayer, 'isFlipped:', card.dataset.flipped);
+
+            // EXPLICIT: Always go summary → questions, never skip
+            if (card.dataset.flipped === 'true' && state.cardLayer === 'summary') {
+                state.cardLayer = 'questions';
+                setQACardState(QA_STATES.ACTIVE);
+                setupQACardSwipe();
+                updateBackButtonVisibility(card);
+                logSupabaseEvent('questions_opened', { story_headline: story.headline });
+                state.navigationClickCount++;
+                updateBackgroundBlob();
+                console.log('[DIG DEEPER L2] Navigated to QUESTIONS');
+            } else {
+                console.warn('[DIG DEEPER L2] Not on summary — ignoring');
+            }
+        });
+    }
 
     // Next button - only active if NOT disabled
     if (nextHint && !nextHint.classList.contains('disabled')) {
@@ -4025,17 +4510,12 @@ function handleDragMove(e, card) {
     const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
 
     if (isHorizontal) {
-        // Horizontal swipe - apply card transform
+        // Horizontal swipe - DO NOT move current card, only show direction indicators
         if (e.type === 'touchmove' && Math.abs(deltaX) > 10) {
             e.preventDefault();
         }
 
-        const rotation = deltaX * 0.03; // Reduced rotation for subtler effect
-        const scale = Math.max(0.97, 1 - Math.abs(deltaX) * 0.0001);
-
-        card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg) scale(${scale})`;
-
-        // Show visual indicators for swipe direction
+        // Show visual indicators for swipe direction (no card transform)
         card.classList.toggle('swiping-left', deltaX < -20);
         card.classList.toggle('swiping-right', deltaX > 20);
 
@@ -4065,17 +4545,12 @@ function handleDragMove(e, card) {
             }
         }
     } else {
-        // Vertical swipe - apply vertical transform
+        // Vertical swipe - DO NOT move card, only track direction indicators
         if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
             e.preventDefault();
         }
 
-        // Limit vertical drag distance
-        const constrainedY = Math.max(-100, Math.min(100, deltaY));
-        const scale = Math.max(0.97, 1 - Math.abs(constrainedY) * 0.0003);
-
-        card.style.transform = `translateY(${constrainedY * 0.5}px) scale(${scale})`;
-
+        // Direction classes only — no translateY on card
         card.classList.toggle('swiping-up', deltaY < -20);
         card.classList.toggle('swiping-down', deltaY > 20);
     }
@@ -4269,24 +4744,38 @@ function handleSwipeRight(card, story) {
  * From summary -> Q&A becomes active (from peeking to active)
  */
 function handleSwipeUp(card, story) {
-    const isFlipped = card.dataset.flipped === 'true';
+    // Guard: Only handle swipe up on headline or summary layers
+    // Q&A, answer, and dig-deeper layers have their own swipe handlers
+    if (state.cardLayer !== 'headline' && state.cardLayer !== 'summary') {
+        console.log('[handleSwipeUp] Ignoring — already on deeper layer:', state.cardLayer);
+        return;
+    }
 
+    const isFlipped = card.dataset.flipped === 'true';
     console.log('[handleSwipeUp] isFlipped:', isFlipped, 'cardLayer:', state.cardLayer);
 
-    if (!isFlipped) {
+    if (!isFlipped && state.cardLayer === 'headline') {
         // Currently on HEADLINE - flip to SUMMARY
-        console.log('[handleSwipeUp] Flipping to summary');
+        console.log('[handleSwipeUp] Headline → Summary');
         flipCard(card, story);
         state.isCardFlipped = true;
         state.cardLayer = 'summary';
-    } else {
+        updateBackButtonVisibility(card);
+    } else if (isFlipped && state.cardLayer === 'summary') {
         // Currently on SUMMARY - show Q&A (ACTIVE)
-        console.log('[handleSwipeUp] Showing Q&A');
+        console.log('[handleSwipeUp] Summary → Questions');
         state.cardLayer = 'questions';
         setQACardState(QA_STATES.ACTIVE);
         setupQACardSwipe(); // Setup swipe-down to dismiss
+        updateBackButtonVisibility(card);
         logSupabaseEvent('questions_opened', { story_headline: story.headline });
+    } else {
+        console.warn('[handleSwipeUp] State mismatch — isFlipped:', isFlipped, 'cardLayer:', state.cardLayer);
+        return;
     }
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
 }
 
 /**
@@ -4315,6 +4804,9 @@ function handleSwipeDown(card, story) {
         state.cardLayer = 'headline';
         // Also hide Q&A card completely when going back to headline
         setQACardState(QA_STATES.HIDDEN);
+        updateBackButtonVisibility(card);
+        state.navigationClickCount++;
+        updateBackgroundBlob();
     } else {
         // Already on HEADLINE - bounce back, nothing to do
         snapCardBack(card);
@@ -4325,8 +4817,9 @@ function handleSwipeDown(card, story) {
  * Snap card back to original position with spring animation
  */
 function snapCardBack(card) {
-    card.style.transition = 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-    card.style.transform = 'translateX(0) translateY(0) rotate(0) scale(1)';
+    // Current card stays in place — no transform needed (card never moves during drag)
+    card.style.transform = '';
+    card.style.transition = '';
 
     // Reset adjacent cards to their off-screen positions
     const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
@@ -4345,7 +4838,6 @@ function snapCardBack(card) {
     }
 
     setTimeout(() => {
-        card.style.transition = '';
         if (prevCard) prevCard.style.transition = '';
         if (nextCard) nextCard.style.transition = '';
     }, 300);
@@ -4821,25 +5313,21 @@ function setupQACardSwipe() {
         currentY = e.touches[0].clientY;
         const deltaY = currentY - startY;
 
-        // Only allow dragging down when at top of scroll
+        // Only prevent default when swiping down at top of scroll — NO card movement
         if (deltaY > 0 && qaCard.scrollTop === 0) {
             e.preventDefault();
-            // Apply visual feedback during drag - NO translateX since it's inside card
-            qaCard.style.transform = `translateY(${deltaY}px)`;
         }
     };
 
     const handleTouchEnd = () => {
         const deltaY = currentY - startY;
 
-        if (deltaY > 100) {
-            // Swipe down threshold met - return to Summary (Q&A becomes peeking)
+        if (deltaY > 100 && qaCard.scrollTop === 0) {
+            // Swipe down threshold met - return to Summary
             triggerHaptic('light');
             closeQACard();
-        } else {
-            // Reset position to active state (translateY 0)
-            qaCard.style.transform = 'translateY(0)';
         }
+        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -4875,6 +5363,7 @@ function closeQACard() {
         }
     }
 
+    updateBackButtonVisibility();
     console.log('[closeQACard] Returned to Summary with Q&A hidden');
 }
 
@@ -4896,6 +5385,15 @@ function showAnswerCard(questionIndex) {
     // Store the question index
     state.currentQuestionIndex = questionIndex;
 
+    // Track progress and path
+    state.currentPath.l3QuestionIndex = questionIndex;
+    state.currentPath.l5QuestionIndex = null; // Reset L5 when choosing new L3
+    const storyId = state.currentStory?.id;
+    if (storyId) {
+        if (!storyProgress[storyId]) storyProgress[storyId] = { visitedSummary: false, clickedL3: false, clickedL5: false };
+        storyProgress[storyId].clickedL3 = true;
+    }
+
     // Populate the answer card with content
     populateAnswerCard(questionIndex);
 
@@ -4905,8 +5403,19 @@ function showAnswerCard(questionIndex) {
     // Update state
     state.cardLayer = 'answer';
 
+    // Update progress bar
+    if (storyId) updateThreeSegmentProgress(storyId);
+
     // Setup swipe handler for this card
     setupAnswerCardSwipe();
+
+    updateBackButtonVisibility();
+
+    // NUCLEAR: Re-attach dig deeper handler every time answer card is shown
+    reinitializeDigDeeperHandler();
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
 
     console.log('[showAnswerCard] Showing answer for question', questionIndex);
 }
@@ -4927,6 +5436,16 @@ function hideAnswerCard() {
     // Update state - return to Q&A
     state.cardLayer = 'questions';
     state.currentQuestionIndex = null;
+
+    // Reset path tracking
+    state.currentPath = { l3QuestionIndex: null, l5QuestionIndex: null };
+    const storyId = state.currentStory?.id;
+    if (storyId) updateThreeSegmentProgress(storyId);
+
+    updateBackButtonVisibility();
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
 
     console.log('[hideAnswerCard] Returned to Q&A');
 }
@@ -4952,15 +5471,15 @@ function populateAnswerCard(questionIndex) {
     // Populate content
     const questionText = answerCard.querySelector('.answer-question-text');
     const answerText = answerCard.querySelector('.answer-text');
-    const digDeeperBtn = answerCard.querySelector('.answer-dig-deeper-btn');
+    const digDeeperHint = answerCard.querySelector('.answer-dig-deeper-hint');
 
     if (questionText) questionText.innerHTML = parseFormattedText(question.text);
     if (answerText) answerText.innerHTML = parseFormattedText(question.answer);
 
-    // Show/hide Dig Deeper button based on availability
+    // Show/hide Dig Deeper hint in bottom bar based on availability
     const hasDeepQuestions = question.deepQuestions && question.deepQuestions.length > 0;
-    if (digDeeperBtn) {
-        digDeeperBtn.style.display = hasDeepQuestions ? 'flex' : 'none';
+    if (digDeeperHint) {
+        digDeeperHint.style.visibility = hasDeepQuestions ? 'visible' : 'hidden';
     }
 
     // Reset rating stars
@@ -4989,17 +5508,27 @@ function resetAnswerCardStars(answerCard) {
  * Show Dig Deeper Q&A Card - slide up from bottom
  */
 function showDigDeeperQACard() {
+    console.log('[showDigDeeperQACard] START — cardLayer:', state.cardLayer, 'currentQuestion:', !!state.currentQuestion);
+
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) return;
+    if (!currentCard) {
+        console.error('[showDigDeeperQACard] ERROR: No current card found');
+        return;
+    }
 
     const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
-    if (!digDeeperQACard) return;
+    if (!digDeeperQACard) {
+        console.error('[showDigDeeperQACard] ERROR: No dig-deeper-qa-card found');
+        return;
+    }
 
     // Populate with dig deeper questions
+    console.log('[showDigDeeperQACard] Populating questions...');
     populateDigDeeperQACard();
 
     // Show the card
     digDeeperQACard.classList.add('active');
+    console.log('[showDigDeeperQACard] Added .active class, classList:', digDeeperQACard.classList.toString());
 
     // Update state
     state.cardLayer = 'dig-deeper-qa';
@@ -5007,7 +5536,12 @@ function showDigDeeperQACard() {
     // Setup swipe handler
     setupDigDeeperQACardSwipe();
 
-    console.log('[showDigDeeperQACard] Showing dig deeper questions');
+    updateBackButtonVisibility();
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
+
+    console.log('[showDigDeeperQACard] COMPLETE — cardLayer:', state.cardLayer);
 }
 
 /**
@@ -5026,6 +5560,11 @@ function hideDigDeeperQACard() {
     // Update state - return to Answer
     state.cardLayer = 'answer';
 
+    updateBackButtonVisibility();
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
+
     console.log('[hideDigDeeperQACard] Returned to Answer');
 }
 
@@ -5033,25 +5572,41 @@ function hideDigDeeperQACard() {
  * Populate Dig Deeper Q&A Card with follow-up questions
  */
 function populateDigDeeperQACard() {
+    console.log('[populateDigDeeperQACard] START — currentQuestion:', !!state.currentQuestion, 'questionIndex:', state.currentQuestionIndex);
+
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard || !state.currentQuestion) return;
+    if (!currentCard || !state.currentQuestion) {
+        console.error('[populateDigDeeperQACard] ERROR: No current card or question', { card: !!currentCard, question: !!state.currentQuestion });
+        return;
+    }
 
     const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
     const questionsList = digDeeperQACard?.querySelector('.dig-deeper-questions-list');
-    if (!questionsList) return;
+    if (!questionsList) {
+        console.error('[populateDigDeeperQACard] ERROR: No questions list found');
+        return;
+    }
 
     // Clear existing questions
     questionsList.innerHTML = '';
 
     const deepQuestions = state.currentQuestion.deepQuestions || [];
+    console.log('[populateDigDeeperQACard] Deep questions count:', deepQuestions.length);
 
     // Create button for each dig deeper question
+    const parentIndex = state.currentQuestionIndex;
     deepQuestions.forEach((q, index) => {
         const letter = String.fromCharCode(65 + index); // A, B, C
+        const childColor = (L5_QUESTION_COLORS[parentIndex] && L5_QUESTION_COLORS[parentIndex][index])
+            ? L5_QUESTION_COLORS[parentIndex][index]
+            : 'var(--accent)';
+        const childTextColor = (L5_QUESTION_COLORS[parentIndex] && L5_QUESTION_COLORS[parentIndex][index])
+            ? getContrastTextColor(L5_QUESTION_COLORS[parentIndex][index])
+            : '#FFFFFF';
         const button = document.createElement('button');
         button.className = 'qa-question-btn';
         button.innerHTML = `
-            <span class="deep-question-number">${letter}</span>
+            <span class="deep-question-number" style="background-color: ${childColor}; color: ${childTextColor}">${letter}</span>
             <span class="qa-question-text">${parseFormattedText(q.text)}</span>
         `;
         button.addEventListener('click', () => {
@@ -5071,14 +5626,24 @@ function populateDigDeeperQACard() {
  * @param {number} questionIndex - Index of the dig deeper question (0-2)
  */
 function showDigDeeperAnswerCard(questionIndex) {
+    console.log('[showDigDeeperAnswerCard] START — questionIndex:', questionIndex, 'cardLayer:', state.cardLayer);
+
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) return;
+    if (!currentCard) { console.error('[showDigDeeperAnswerCard] ERROR: No current card'); return; }
 
     const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
-    if (!digDeeperAnswerCard) return;
+    if (!digDeeperAnswerCard) { console.error('[showDigDeeperAnswerCard] ERROR: No dig-deeper-answer-card'); return; }
 
     // Store the question index
     state.currentDigDeeperQuestionIndex = questionIndex;
+
+    // Track progress and path
+    state.currentPath.l5QuestionIndex = questionIndex;
+    const storyId = state.currentStory?.id;
+    if (storyId) {
+        if (!storyProgress[storyId]) storyProgress[storyId] = { visitedSummary: false, clickedL3: false, clickedL5: false };
+        storyProgress[storyId].clickedL5 = true;
+    }
 
     // Populate the card with content
     populateDigDeeperAnswerCard(questionIndex);
@@ -5089,8 +5654,16 @@ function showDigDeeperAnswerCard(questionIndex) {
     // Update state
     state.cardLayer = 'dig-deeper-answer';
 
+    // Update progress bar
+    if (storyId) updateThreeSegmentProgress(storyId);
+
     // Setup swipe handler
     setupDigDeeperAnswerCardSwipe();
+
+    updateBackButtonVisibility();
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
 
     console.log('[showDigDeeperAnswerCard] Showing dig deeper answer', questionIndex);
 }
@@ -5111,6 +5684,16 @@ function hideDigDeeperAnswerCard() {
     // Update state - return to Dig Deeper Q&A
     state.cardLayer = 'dig-deeper-qa';
     state.currentDigDeeperQuestionIndex = null;
+
+    // Reset L5 path tracking
+    state.currentPath.l5QuestionIndex = null;
+    const storyId = state.currentStory?.id;
+    if (storyId) updateThreeSegmentProgress(storyId);
+
+    updateBackButtonVisibility();
+
+    state.navigationClickCount++;
+    updateBackgroundBlob();
 
     console.log('[hideDigDeeperAnswerCard] Returned to Dig Deeper Q&A');
 }
@@ -5222,7 +5805,7 @@ function setupAnswerCardSwipe() {
 
         if (isDismissing && deltaY > 0) {
             e.preventDefault();
-            answerCard.style.transform = `translateY(${deltaY}px)`;
+            // NO card transform — card stays in place during swipe
         }
     };
 
@@ -5232,9 +5815,8 @@ function setupAnswerCardSwipe() {
         if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideAnswerCard();
-        } else if (isDismissing) {
-            answerCard.style.transform = 'translateY(0)';
         }
+        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -5310,7 +5892,7 @@ function setupDigDeeperQACardSwipe() {
 
         if (isDismissing && deltaY > 0) {
             e.preventDefault();
-            digDeeperQACard.style.transform = `translateY(${deltaY}px)`;
+            // NO card transform — card stays in place during swipe
         }
     };
 
@@ -5320,9 +5902,8 @@ function setupDigDeeperQACardSwipe() {
         if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideDigDeeperQACard();
-        } else if (isDismissing) {
-            digDeeperQACard.style.transform = 'translateY(0)';
         }
+        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -5402,7 +5983,7 @@ function setupDigDeeperAnswerCardSwipe() {
 
         if (isDismissing && deltaY > 0) {
             e.preventDefault();
-            digDeeperAnswerCard.style.transform = `translateY(${deltaY}px)`;
+            // NO card transform — card stays in place during swipe
         }
     };
 
@@ -5412,9 +5993,8 @@ function setupDigDeeperAnswerCardSwipe() {
         if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideDigDeeperAnswerCard();
-        } else if (isDismissing) {
-            digDeeperAnswerCard.style.transform = 'translateY(0)';
         }
+        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -5897,8 +6477,14 @@ function resetAllCardStates() {
     state.currentQuestionIndex = null;
     state.currentDigDeeperQuestionIndex = null;
 
-    // 8. Remove no-scroll from body
+    // 8. Reset navigation path
+    state.currentPath = { l3QuestionIndex: null, l5QuestionIndex: null };
+
+    // 9. Remove no-scroll from body
     document.body.classList.remove('no-scroll');
+
+    // 10. Reset blob to default state
+    updateBackgroundBlob();
 }
 
 /**
@@ -6872,6 +7458,7 @@ function handleKeyboardDown(card, story) {
                 state.isCardFlipped = false;
                 state.cardLayer = 'headline';
                 setQACardState(QA_STATES.HIDDEN);
+                updateBackButtonVisibility();
             }
             break;
 
@@ -6925,6 +7512,7 @@ function handleKeyboardBack() {
                 state.isCardFlipped = false;
                 state.cardLayer = 'headline';
                 setQACardState(QA_STATES.HIDDEN);
+                updateBackButtonVisibility();
             }
             break;
 
