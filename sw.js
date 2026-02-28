@@ -3,7 +3,7 @@
  * Enables offline functionality and caching
  */
 
-const CACHE_NAME = 'fyi-v18';
+const CACHE_NAME = 'fyi-v32';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -55,44 +55,65 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request)
-            .then((cachedResponse) => {
-                if (cachedResponse) {
-                    // Return cached version
-                    return cachedResponse;
-                }
+    // Network-first for core app files (JS, CSS, HTML) to ensure freshness
+    // Cache-first for fonts and other static assets
+    const isCoreAsset = url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html') || url.pathname === '/';
 
-                // Fetch from network
-                return fetch(event.request)
-                    .then((response) => {
-                        // Don't cache non-successful responses
-                        if (!response || response.status !== 200 || response.type !== 'basic') {
-                            // Allow caching of opaque responses for fonts
-                            if (response && response.type === 'opaque') {
-                                const responseToCache = response.clone();
-                                caches.open(CACHE_NAME)
-                                    .then((cache) => cache.put(event.request, responseToCache));
-                            }
-                            return response;
-                        }
-
-                        // Clone response and cache it
+    if (isCoreAsset) {
+        // NETWORK-FIRST: Try network, fall back to cache
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    if (response && response.status === 200) {
                         const responseToCache = response.clone();
                         caches.open(CACHE_NAME)
                             .then((cache) => cache.put(event.request, responseToCache));
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    return caches.match(event.request)
+                        .then((cachedResponse) => {
+                            if (cachedResponse) return cachedResponse;
+                            if (event.request.mode === 'navigate') {
+                                return caches.match('/index.html');
+                            }
+                            return new Response('Offline', { status: 503 });
+                        });
+                })
+        );
+    } else {
+        // CACHE-FIRST: For fonts and other static assets
+        event.respondWith(
+            caches.match(event.request)
+                .then((cachedResponse) => {
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
 
-                        return response;
-                    })
-                    .catch(() => {
-                        // Return offline page for navigation requests
-                        if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
-                        }
-                        return new Response('Offline', { status: 503 });
-                    });
-            })
-    );
+                    return fetch(event.request)
+                        .then((response) => {
+                            if (!response || response.status !== 200 || response.type !== 'basic') {
+                                if (response && response.type === 'opaque') {
+                                    const responseToCache = response.clone();
+                                    caches.open(CACHE_NAME)
+                                        .then((cache) => cache.put(event.request, responseToCache));
+                                }
+                                return response;
+                            }
+
+                            const responseToCache = response.clone();
+                            caches.open(CACHE_NAME)
+                                .then((cache) => cache.put(event.request, responseToCache));
+
+                            return response;
+                        })
+                        .catch(() => {
+                            return new Response('Offline', { status: 503 });
+                        });
+                })
+        );
+    }
 });
 
 // Handle messages from the main thread
