@@ -27,7 +27,22 @@
       plausible.init()
     </script>
 </head>
-<body>
+<body style="overscroll-behavior-y: none;">
+    <!-- Background blob - animated amorphous shape that tracks navigation state -->
+    <svg class="background-blob" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <filter id="goo">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="goo" />
+                <feBlend in="SourceGraphic" in2="goo" />
+            </filter>
+        </defs>
+        <g filter="url(#goo)">
+            <circle class="blob-circle-1" cx="100" cy="100" r="40" />
+            <circle class="blob-circle-2" cx="120" cy="90" r="35" />
+        </g>
+    </svg>
+
     <div id="app">
         <!-- Header -->
         <header class="header">
@@ -38,6 +53,7 @@
             <!-- Dropdown Menu -->
             <div class="dropdown-menu" id="dropdownMenu">
                 <button class="dropdown-item" id="signInBtn">Sign In</button>
+                <button class="dropdown-item" id="bookmarksBtn">Bookmarks</button>
                 <button class="dropdown-item" id="faqsBtn">FAQs</button>
                 <button class="dropdown-item" id="whatIsFYIBtn">What is FYI</button>
                 <button class="dropdown-item" id="ourPhilosophyBtn">Our Philosophy</button>
@@ -257,7 +273,6 @@
                         <p class="answer-text" id="answerText"></p>
                     </div>
                     <div class="rating-section">
-                        <p class="rating-label">Was this helpful?</p>
                         <div class="star-rating" id="starRating">
                             <span class="star" data-rating="1">★</span>
                             <span class="star" data-rating="2">★</span>
@@ -271,7 +286,7 @@
                             <span>Dig Deeper</span>
                         </button>
                         <button class="action-button primary" id="doneBtn">
-                            <span>Done</span>
+                            <span>Back</span>
                         </button>
                     </div>
                 </div>
@@ -308,7 +323,7 @@
                     </div>
                     <div class="answer-actions">
                         <button class="action-button primary full-width" id="deepDoneBtn">
-                            <span>Done</span>
+                            <span>Back</span>
                         </button>
                     </div>
                 </div>
@@ -391,6 +406,55 @@
                 <p class="welcome-subtitle">What should we call you?</p>
                 <input type="text" class="welcome-input" id="welcomeNameInput" maxlength="15" placeholder="Your name" autocomplete="off" autocapitalize="words">
                 <button class="welcome-button" id="welcomeSubmitBtn">Let's go</button>
+            </div>
+        </div>
+
+        <!-- Bookmarks Page (full-screen overlay) -->
+        <div class="bookmarks-page" id="bookmarksPage">
+            <!-- Header -->
+            <div class="bookmarks-header">
+                <button class="bookmarks-back-btn" id="bookmarksBackBtn" aria-label="Close bookmarks">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <h1 class="bookmarks-title">Bookmarks</h1>
+            </div>
+
+            <!-- Filters -->
+            <div class="bookmarks-filters">
+                <div class="filter-group">
+                    <label class="filter-label">Date</label>
+                    <select class="filter-select" id="filterDate">
+                        <option value="all">All time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This week</option>
+                        <option value="month">This month</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">Category</label>
+                    <select class="filter-select" id="filterCategory">
+                        <option value="all">All categories</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Bookmarks List -->
+            <div class="bookmarks-list" id="bookmarksList">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Empty State -->
+            <div class="bookmarks-empty" id="bookmarksEmpty" style="display: none;">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24" width="48" height="48">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </div>
+                <p class="empty-text">No bookmarks yet</p>
+                <p class="empty-subtext">Tap the bookmark icon on any story, question, or answer to save it here.</p>
             </div>
         </div>
 
