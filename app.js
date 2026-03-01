@@ -4,59 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v35';
-console.log(`[FYI] App version: ${APP_VERSION} loaded at ${new Date().toLocaleTimeString()}`);
-
-// ==========================================
-// PERFORMANCE MONITOR - Diagnostic instrumentation
-// ==========================================
-const PerfMonitor = {
-    _entries: [],
-    _enabled: true,
-    start(label) {
-        if (!this._enabled) return;
-        performance.mark(`perf-${label}-start`);
-    },
-    end(label) {
-        if (!this._enabled) return;
-        performance.mark(`perf-${label}-end`);
-        try {
-            performance.measure(label, `perf-${label}-start`, `perf-${label}-end`);
-            const measure = performance.getEntriesByName(label).pop();
-            if (measure) {
-                const entry = { label, duration: Math.round(measure.duration * 100) / 100, ts: Date.now() };
-                this._entries.push(entry);
-                if (entry.duration > 16) {
-                    console.warn(`[Perf] SLOW: ${label} took ${entry.duration}ms`);
-                } else {
-                    console.log(`[Perf] ${label}: ${entry.duration}ms`);
-                }
-            }
-        } catch (e) { /* noop */ }
-    },
-    report() {
-        console.table(this._entries.slice(-20));
-        return this._entries;
-    }
-};
-
-// ==========================================
-// TOUCH DIAGNOSTICS - Latency measurement
-// ==========================================
-const TouchDiagnostics = {
-    measurements: [],
-    logTouch(type, timestamp) {
-        const now = performance.now();
-        this.measurements.push({ type, latency: Math.round((now - timestamp) * 100) / 100 });
-        if (this.measurements.length > 20) this.measurements.shift();
-    },
-    report() {
-        if (!this.measurements.length) return;
-        const avg = this.measurements.reduce((s, m) => s + m.latency, 0) / this.measurements.length;
-        console.log('[TouchDiag] Avg latency:', avg.toFixed(2), 'ms (target: <16ms)');
-        console.table(this.measurements.slice(-5));
-    }
-};
+const APP_VERSION = 'v36-lean';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -92,7 +40,6 @@ let supabaseClient = null;
 try {
     if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('[Supabase] Client initialized');
     } else {
         console.warn('[Supabase] Library not loaded, running in offline mode');
     }
@@ -116,7 +63,6 @@ async function initializeSupabaseUser() {
         // Check for existing session
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
-            console.log('[Supabase] Existing session found:', session.user.id);
             await updateLastSeen(session.user.id);
 
             // Update sign-in button text if user is authenticated (not anonymous)
@@ -134,7 +80,6 @@ async function initializeSupabaseUser() {
             return null;
         }
 
-        console.log('[Supabase] Anonymous user created:', data.user.id);
 
         // Insert user record
         await supabaseClient.from('users').insert({
@@ -160,7 +105,6 @@ async function updateLastSeen(userId) {
             last_seen: new Date().toISOString()
         }).eq('id', userId);
     } catch (e) {
-        console.debug('[Supabase] updateLastSeen failed:', e.message);
     }
 }
 
@@ -301,7 +245,6 @@ async function saveBookmark(bookmarkData) {
         if (error) {
             if (error.code === '23505') {
                 // Duplicate - bookmark already exists, treat as success
-                console.debug('[Supabase] Bookmark already exists (duplicate)');
                 return true;
             }
             console.error('[Supabase] Bookmark save error:', error);
@@ -405,8 +348,6 @@ async function getUserBookmarks() {
  */
 async function handleBookmarkClick(button, bookmarkData) {
     const wasBookmarked = button.classList.contains('bookmarked');
-    console.log('[Bookmark] handleBookmarkClick — wasBookmarked:', wasBookmarked,
-        'supabaseClient:', !!supabaseClient);
 
     // Set toggling flag to prevent updateBookmarkStates from overriding UI
     state._bookmarkToggling = true;
@@ -449,9 +390,7 @@ async function handleBookmarkClick(button, bookmarkData) {
             } else {
                 await saveBookmark(bookmarkData);
             }
-            console.log('[Bookmark] Supabase sync success');
         } catch (e) {
-            console.debug('[Bookmark] Supabase sync failed (keeping local state):', e.message);
         }
     }
 }
@@ -480,7 +419,6 @@ async function logSupabaseEvent(eventType, eventData = {}) {
             session_id: sessionId
         });
     } catch (e) {
-        console.debug('[Supabase] Event log failed:', e.message);
     }
 }
 
@@ -504,7 +442,6 @@ function generateSupabaseSessionId() {
 async function updateBookmarkStates() {
     // Don't override optimistic UI during an active toggle
     if (state._bookmarkToggling) {
-        console.log('[Bookmark] updateBookmarkStates skipped — toggle in progress');
         return;
     }
 
@@ -531,7 +468,6 @@ async function updateBookmarkStates() {
                 isStoryBookmarked = supabaseResult || isLocallyBookmarked;
             }
         } catch (e) {
-            console.debug('[Supabase] updateBookmarkStates query failed:', e.message);
         }
     }
 
@@ -621,7 +557,6 @@ async function loadBookmarksPage() {
         populateCategoryFilter();
         applyBookmarkFilters();
 
-        console.log('[Bookmarks] Loaded', currentBookmarks.length, 'bookmarks');
     } catch (err) {
         console.error('[Bookmarks] Load failed:', err);
         showBookmarksEmpty('Error loading bookmarks');
@@ -996,7 +931,6 @@ function trackEvent(eventName, props = {}) {
         }
     } catch (e) {
         // Silently fail - analytics should never break the app
-        console.debug('Analytics tracking skipped:', e.message);
     }
 }
 
@@ -1227,8 +1161,6 @@ function setCardHeight() {
     // Set as CSS custom property
     document.documentElement.style.setProperty('--card-height', cardHeight + 'px');
 
-    console.log('[setCardHeight] Card height set to:', cardHeight + 'px',
-        '(viewport:', viewportHeight, 'cardWidth:', cardWidth, 'aspectCap:', maxAspectHeight, ')');
 }
 
 /**
@@ -1432,8 +1364,6 @@ const state = {
     theme: 'dark',
     isLoading: true,
     viewedStories: [],
-    longPressTimer: null,
-    isLongPress: false,
     userName: '',
     // Archive mode
     archiveMode: false,
@@ -1463,9 +1393,7 @@ const state = {
     // NEW: Card layer stack for navigation
     // Layers: 'headline' (front) -> 'summary' (flipped) -> 'questions' -> 'answer' -> 'deep-questions' -> 'deep-answer'
     cardLayer: 'headline', // Current visible layer
-    modalStack: [], // Stack of modal states for back navigation
-
-    // NEW: Track if card is flipped (on summary side)
+    // Track if card is flipped (on summary side)
     isCardFlipped: false,
 
     // Q&A Card State: 'hidden' | 'peeking' | 'active'
@@ -1478,8 +1406,6 @@ const state = {
     // Track current navigation path for dynamic progress bar coloring
     currentPath: { l3QuestionIndex: null, l5QuestionIndex: null },
 
-    // Navigation click counter for blob position cycling
-    navigationClickCount: 0
 };
 
 // Q&A Card States - TWO STATES (peeking removed to fix bottom bar visibility)
@@ -1545,9 +1471,7 @@ const BACKGROUND_COLORS = {
 
 // Blob position/shape state for smooth animation
 const blobState = {
-    currentColor: '#DA7756',
-    rotation: 0,
-    scale: 1
+    currentColor: '#DA7756'
 };
 
 // Per-story progress tracking for three-segment bar
@@ -1563,7 +1487,6 @@ function updateThreeSegmentProgress(storyId) {
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (!currentCard) return;
 
-    console.log('[Progress] Updating — layer:', state.cardLayer, 'qIdx:', state.currentQuestionIndex, 'deepIdx:', state.currentDigDeeperQuestionIndex);
 
     // Update ALL gradient progress bars in the current card
     const bars = currentCard.querySelectorAll('.progress-bar-gradient');
@@ -1631,45 +1554,13 @@ function updateBackgroundBlob() {
 
     const newColor = BACKGROUND_COLORS[colorKey] || BACKGROUND_COLORS.headline;
 
-    // Position offset cycling — wider shifts for visible movement on all sides
-    const offsetCycle = [
-        { x: 0, y: -10 },    // Center
-        { x: 5, y: -8 },     // Right shift
-        { x: 8, y: -5 },     // Far right, rising
-        { x: 3, y: -12 },    // Slight right, higher
-        { x: -5, y: -8 },    // Left shift
-        { x: -8, y: -6 },    // Far left
-        { x: -3, y: -14 },   // Slight left, higher
-        { x: 0, y: -10 }     // Return to center
-    ];
+    // Early return — skip DOM writes if color hasn't changed
+    if (newColor === blobState.currentColor) return;
 
-    const clickIdx = (state.navigationClickCount || 0) % offsetCycle.length;
-    const offset = offsetCycle[clickIdx];
-
-    // Balanced rotation — visible from all directions, no vertical line bias
-    blobState.rotation += 45;
-    blobState.scale = 1 + (Math.sin(clickIdx * 0.8) * 0.06);
-    const rotAngle = blobState.rotation;
-
-    // Apply position + transform — balanced spread, no vertical stretch
-    blob.style.top = `${offset.y}%`;
-    blob.style.left = `calc(50% + ${offset.x}%)`;
-    blob.style.transform = `translateX(-50%) rotate(${rotAngle}deg) scale(${blobState.scale})`;
-
-    // Apply color to both circles
+    // Apply color to both circles (CSS breathing animation handles movement)
     circle1.style.fill = newColor;
     circle2.style.fill = newColor;
-
-    // Morph circle positions for dramatic shape variation — wider range
-    const morphX = Math.sin(clickIdx * 0.7) * 30;
-    const morphY = Math.cos(clickIdx * 0.7) * 25;
-    circle1.setAttribute('cx', 95 + morphX);
-    circle1.setAttribute('cy', 100 + morphY);
-    circle2.setAttribute('cx', 115 - morphX);
-    circle2.setAttribute('cy', 95 - morphY);
-
     blobState.currentColor = newColor;
-    console.log('[Blob] Updated — colorKey:', colorKey, 'color:', newColor, 'rotation:', blobState.rotation);
 }
 
 /**
@@ -1702,7 +1593,6 @@ function setQACardState(newState) {
     }
 
     state.qaCardState = newState;
-    console.log('[Q&A State]', newState);
 }
 
 // ==========================================
@@ -1714,7 +1604,6 @@ function setQACardState(newState) {
  * Must be called before ANY state transition
  */
 function cleanupCurrentState() {
-    console.log('[STATE] Cleaning up current state:', state.appMode);
 
     // CRITICAL: Reset Q&A card to hidden state
     setQACardState(QA_STATES.HIDDEN);
@@ -1765,7 +1654,6 @@ function cleanupCurrentState() {
     // Remove any stray backdrop overlays
     document.body.classList.remove('no-scroll');
 
-    console.log('[STATE] Cleanup complete');
 }
 
 /**
@@ -1775,7 +1663,6 @@ function cleanupCurrentState() {
  */
 async function transitionToMode(newMode, options = {}) {
     const previousMode = state.appMode;
-    console.log(`[STATE TRANSITION] ${previousMode} → ${newMode}`, options);
 
     // Skip cleanup for welcome → name input transitions
     if (!(previousMode === 'welcome' && newMode === 'welcome')) {
@@ -1823,7 +1710,6 @@ async function transitionToMode(newMode, options = {}) {
     // Update Prev button visibility
     updatePrevButtonVisibility();
 
-    console.log(`[STATE] Transition complete. Now in: ${state.appMode}`);
 
     // Verify clean state after transition
     setTimeout(verifyCleanState, 450);
@@ -1835,7 +1721,6 @@ async function transitionToMode(newMode, options = {}) {
  * @param {boolean} forceRefresh - True to bypass cache and fetch fresh data
  */
 async function initFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
-    console.log('[initFAQMode] Loading FAQ content, isNewUserOnboarding:', isNewUserOnboarding, 'forceRefresh:', forceRefresh);
 
     // Use custom loading text for new user onboarding
     const loadingText = isNewUserOnboarding ? "Let's show you around" : "Loading FAQs...";
@@ -1862,7 +1747,6 @@ async function initFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
  * Initialize Stories mode - load today's stories
  */
 async function initStoriesMode(options = {}) {
-    console.log('[initStoriesMode] Loading today\'s stories');
 
     // Clear FAQ state completely
     state.faqMode = false;
@@ -1901,7 +1785,6 @@ async function initStoriesMode(options = {}) {
  * Initialize Archives mode - load archive stories
  */
 async function initArchivesMode(options = {}) {
-    console.log('[initArchivesMode] Loading archive stories');
 
     showLoading(true);
 
@@ -1940,7 +1823,6 @@ async function initArchivesMode(options = {}) {
  * Initialize No Stories mode - show empty state
  */
 function initNoStoriesMode() {
-    console.log('[initNoStoriesMode] Showing no stories page');
 
     if (elements.noStoriesState) {
         elements.noStoriesState.style.display = 'flex';
@@ -2091,13 +1973,11 @@ function cacheElements() {
 
 async function init() {
     try {
-        console.log('[init] Starting app initialization...');
 
         // Initialize fixed card height system FIRST
         initCardHeightSystem();
 
         cacheElements();
-        console.log('[init] Elements cached');
 
         loadFromStorage();
         applyTheme();
@@ -2106,7 +1986,6 @@ async function init() {
 
         setupEventListeners();
         setupSignInModal();
-        console.log('[init] Event listeners attached');
 
         setupSessionTracking();
 
@@ -2114,7 +1993,6 @@ async function init() {
         generateSupabaseSessionId();
         const supabaseUser = await initializeSupabaseUser();
         if (supabaseUser) {
-            console.log('[init] Supabase user ready:', supabaseUser.id);
             await logSupabaseEvent('session_started', {
                 entry_point: document.referrer ? 'link' : 'direct'
             });
@@ -2129,18 +2007,15 @@ async function init() {
             state.faqCompleted = faqCompleted;
             state.isFirstTimeUser = false;
             updateUserNameDisplay();
-            console.log('[init] Returning user:', savedName);
         } else {
             // First-time user - show welcome choice modal
             state.isFirstTimeUser = true;
-            console.log('[init] First-time user, showing welcome modal');
             showWelcomeChoice();
             return; // Don't load content until name is set
         }
 
         // Show loading and fetch stories
         await loadAppContent();
-        console.log('[init] App content loaded');
 
         // Update bookmark states for current story
         await updateBookmarkStates();
@@ -2249,8 +2124,7 @@ function updateDateDisplay() {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('SW registered'))
-            .catch(err => console.log('SW registration failed:', err));
+            .catch(err => console.error('SW registration failed:', err));
     }
 }
 
@@ -2315,7 +2189,6 @@ function saveToStorage() {
 async function fetchStories() {
     // Check if sheet ID is configured
     if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
-        console.log('Sheet ID not configured, using fallback stories');
         state.stories = fallbackStories;
         state.totalStories = state.stories.length;
         return;
@@ -2454,7 +2327,6 @@ async function fetchFAQs(forceRefresh = false) {
 
     // Check if sheet ID is configured
     if (SHEET_ID === 'YOUR_SHEET_ID_HERE' || !SHEET_ID) {
-        console.log('Sheet ID not configured, using fallback FAQs');
         return getFallbackFAQs();
     }
 
@@ -2466,14 +2338,12 @@ async function fetchFAQs(forceRefresh = false) {
         if (cachedData && cachedTimestamp) {
             const cacheAge = Date.now() - parseInt(cachedTimestamp, 10);
             if (cacheAge < CACHE_DURATION_MS) {
-                console.log('[FAQ] Using cached FAQ data (age:', Math.round(cacheAge / 1000 / 60), 'minutes)');
                 try {
                     return JSON.parse(cachedData);
                 } catch (e) {
                     console.warn('[FAQ] Cache parse error, fetching fresh data');
                 }
             } else {
-                console.log('[FAQ] Cache expired, fetching fresh data');
             }
         }
     }
@@ -2514,7 +2384,6 @@ async function fetchFAQs(forceRefresh = false) {
             try {
                 localStorage.setItem(CACHE_KEY, JSON.stringify(processedFaqs));
                 localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-                console.log('[FAQ] Cached', processedFaqs.length, 'FAQs from Google Sheets');
             } catch (e) {
                 console.warn('[FAQ] Failed to cache FAQs:', e.message);
             }
@@ -2532,7 +2401,6 @@ async function fetchFAQs(forceRefresh = false) {
         // Try to use cached data even if expired
         const cachedData = localStorage.getItem(CACHE_KEY);
         if (cachedData) {
-            console.log('[FAQ] Using expired cache due to fetch error');
             try {
                 return JSON.parse(cachedData);
             } catch (e) {
@@ -2701,7 +2569,6 @@ function getFallbackFAQs() {
  * @param {boolean} forceRefresh - True to bypass cache and fetch fresh FAQ data (used when accessed from menu)
  */
 async function enterFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
-    console.log('[enterFAQMode] Transitioning to FAQ mode via state machine, isNewUserOnboarding:', isNewUserOnboarding, 'forceRefresh:', forceRefresh);
     await transitionToMode('faqs', { isNewUserOnboarding, forceRefresh });
 }
 
@@ -2709,7 +2576,6 @@ async function enterFAQMode(isNewUserOnboarding = false, forceRefresh = false) {
  * Exit FAQ mode and return to stories using state machine
  */
 async function exitFAQMode() {
-    console.log('[exitFAQMode] Transitioning to stories mode via state machine');
     await transitionToMode('stories');
 }
 
@@ -2859,7 +2725,6 @@ function exitArchiveModeToCompletion() {
  * Similar to regular archive mode but tracks source for proper Prev button behavior
  */
 async function enterArchiveModeFromNoStories() {
-    console.log('[enterArchiveModeFromNoStories] Starting archive mode from no-stories page');
 
     showLoading(true);
 
@@ -3385,13 +3250,11 @@ function applyTheme() {
 }
 
 function toggleTheme() {
-    PerfMonitor.start('toggleTheme');
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     applyTheme();
     saveToStorage();
     triggerHaptic('light');
     trackThemeChanged(state.theme);
-    PerfMonitor.end('toggleTheme');
 }
 
 // ==========================================
@@ -3420,12 +3283,10 @@ const TEXT_SIZE_SELECTORS = [
  * Toggle text size between normal and enlarged (tap behavior)
  */
 function toggleTextSize() {
-    PerfMonitor.start('toggleTextSize');
     textEnlarged = !textEnlarged;
     textMultiplier = textEnlarged ? TEXT_ENLARGED_MULTIPLIER : TEXT_DEFAULT_MULTIPLIER;
     document.body.classList.toggle('text-enlarged', textEnlarged);
 
-    console.log('[toggleTextSize] CALLED - textEnlarged:', textEnlarged, 'multiplier:', textMultiplier);
 
     applyTextSizeToAllElements();
 
@@ -3443,7 +3304,6 @@ function toggleTextSize() {
 
     triggerHaptic('light');
     trackEvent('Text Size Toggled', { enlarged: textEnlarged, multiplier: textMultiplier });
-    PerfMonitor.end('toggleTextSize');
 }
 
 function loadTextSizePreference() {
@@ -3581,10 +3441,6 @@ function setupTextSizeMutationObserver() {
 
 function toggleBookmark(button) {
     const currentStory = state.stories[state.currentIndex];
-    console.log('[Bookmark] toggleBookmark called — currentIndex:', state.currentIndex,
-        'currentStory:', !!currentStory, 'cardLayer:', state.cardLayer,
-        'button.dataset.storyId:', button.dataset.storyId,
-        'button.classList:', button.classList.toString());
     if (!currentStory) {
         // Fallback: just toggle visually
         button.classList.toggle('bookmarked');
@@ -3628,7 +3484,6 @@ function toggleBookmark(button) {
         content: contentPayload
     };
 
-    console.log('[Bookmark] Toggling — level:', state.cardLayer, 'type:', bookmarkType, 'path:', questionPath);
 
     // Use Supabase-backed handler
     handleBookmarkClick(button, bookmarkData);
@@ -3836,7 +3691,7 @@ function createCardElement(story, position) {
                 <button class="btn-text-size" aria-label="Toggle text size">
                     <span class="text-size-small">A</span><span class="text-size-large">A</span>
                 </button>
-                <button class="nav-hint nav-hint-center answer-dig-deeper-hint" onclick="event.stopPropagation(); showDigDeeperQACard();">Dig Deeper ↑</button>
+                <button class="nav-hint nav-hint-center answer-dig-deeper-hint">Dig Deeper ↑</button>
                 <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
                     <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3903,16 +3758,11 @@ function createCardElement(story, position) {
         </div>
     `;
 
-    if (position === 0) {
-        setupCardInteractions(card, story);
-    }
-
     return card;
 }
 
 // Flip card function - manages headline/summary flip AND Q&A peek state
 function flipCard(card, story) {
-    PerfMonitor.start('flipCard');
     const isFlipped = card.dataset.flipped === 'true';
 
     if (isFlipped) {
@@ -3949,7 +3799,6 @@ function flipCard(card, story) {
             });
         }
     }
-    PerfMonitor.end('flipCard');
 }
 
 /**
@@ -4062,6 +3911,9 @@ function setupCardInteractions(card, story) {
 
     // Setup bookmark buttons
     setupBookmarkButtons(card);
+
+    // Setup dig deeper hint button (answer card → dig deeper Q&A)
+    setupDigDeeperHintButton(card);
 }
 
 /**
@@ -4085,8 +3937,6 @@ function setupUniversalBackButtons(card, story) {
         // which have their own state management that causes double-calls.
 
         const entryLayer = state.cardLayer;
-        console.log('╔═══ BACK BUTTON ═══╗');
-        console.log('[BackButton] Current layer:', entryLayer);
 
         // Defensive: Verify state.cardLayer is valid
         const validLayers = ['headline', 'summary', 'questions', 'answer', 'dig-deeper-qa', 'dig-deeper-answer'];
@@ -4100,11 +3950,9 @@ function setupUniversalBackButtons(card, story) {
         // Get the previous layer from the map
         const previousLayer = BACK_NAVIGATION_MAP[entryLayer];
         if (!previousLayer) {
-            console.log('[BackButton] Already at headline, no back action');
             return;
         }
 
-        console.log('[BackButton] Target:', previousLayer);
 
         // Find the current story card for DOM operations
         const currentCard = document.querySelector('.story-card[data-card-type="current"]') || card;
@@ -4151,17 +3999,8 @@ function setupUniversalBackButtons(card, story) {
             state.cardLayer = 'dig-deeper-qa';
         }
 
-        // ── Update UI (single call, no double-firing) ──
-        updateBackButtonVisibility(card);
-        updateThreeSegmentProgress();
-        state.navigationClickCount++;
-        updateBackgroundBlob();
-
-        console.log('[BackButton] Done:', entryLayer, '→', state.cardLayer);
-        if (state.cardLayer !== previousLayer) {
-            console.error('[BackButton] MISMATCH! Expected:', previousLayer, 'Got:', state.cardLayer);
-        }
-        console.log('╚═══════════════════╝');
+        // ── Update UI (single consolidated call) ──
+        updateUI(card);
     };
 
     // Touchend handler - fires BEFORE click on mobile
@@ -4206,6 +4045,18 @@ function updateBackButtonVisibility(card) {
     } else {
         btn.classList.remove('back-hidden');
     }
+}
+
+/**
+ * Consolidated UI update — call once per navigation event.
+ * Replaces scattered updateBackButtonVisibility + updateThreeSegmentProgress + updateBackgroundBlob calls.
+ */
+function updateUI(card) {
+    card = card || document.querySelector('.story-card[data-card-type="current"]');
+    if (!card) return;
+    updateBackButtonVisibility(card);
+    updateThreeSegmentProgress();
+    updateBackgroundBlob();
 }
 
 /**
@@ -4254,37 +4105,28 @@ function setupTextSizeButtons(card) {
  * Setup bookmark buttons on card
  */
 function setupBookmarkButtons(card) {
-    const bookmarkBtns = card.querySelectorAll('.btn-bookmark');
-    bookmarkBtns.forEach(btn => {
-        if (btn.dataset.bookmarkBound === 'v35') return; // Already bound this version
-
-        // Clone to remove ALL existing listeners (nuclear cleanup)
-        const newBtn = btn.cloneNode(true);
-        newBtn.dataset.bookmarkBound = 'v35';
-        btn.parentNode.replaceChild(newBtn, btn);
+    card.querySelectorAll('.btn-bookmark').forEach(btn => {
+        if (btn._bookmarkBound) return; // Already bound
+        btn._bookmarkBound = true;
 
         let touchHandled = false;
 
-        // Single click handler with maximum propagation blocking
-        newBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            if (touchHandled) return;
-            console.log('[Bookmark] click handler fired');
-            toggleBookmark(newBtn);
-        }, { capture: true });
-
-        // Touch handler for mobile reliability
-        newBtn.addEventListener('touchend', (e) => {
+        btn.addEventListener('touchend', (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
             touchHandled = true;
-            console.log('[Bookmark] touchend handler fired');
-            toggleBookmark(newBtn);
+            toggleBookmark(btn);
             setTimeout(() => { touchHandled = false; }, 300);
         }, { capture: true, passive: false });
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (touchHandled) return;
+            toggleBookmark(btn);
+        }, { capture: true });
     });
 }
 
@@ -4311,7 +4153,6 @@ function setupDigDeeperQACardButtons(card) {
  * Return all the way back to headline from any depth
  */
 function backToHeadline() {
-    console.log('[backToHeadline] Returning to headline from deep state');
 
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (!currentCard) return;
@@ -4351,7 +4192,7 @@ function backToHeadline() {
     state.currentQuestionIndex = null;
     state.currentDigDeeperQuestionIndex = null;
 
-    updateBackButtonVisibility();
+    updateUI();
 }
 
 /**
@@ -4368,13 +4209,11 @@ function setupAnswerCardButtons(card) {
     // Secondary handler: touchend for guaranteed mobile reliability
     const digDeeperHint = answerCard.querySelector('.answer-dig-deeper-hint');
     if (digDeeperHint) {
-        console.log('[setupAnswerCardButtons] Found dig deeper hint, attaching touchend handler');
         digDeeperHint.addEventListener('touchend', (e) => {
             e.stopPropagation();
             e.stopImmediatePropagation();
             e.preventDefault();
             if (e.changedTouches[0]) {
-                console.log('[Dig Deeper] TOUCHEND fired — calling showDigDeeperQACard()');
                 triggerHaptic('light');
                 showDigDeeperQACard();
             }
@@ -4389,48 +4228,37 @@ function setupAnswerCardButtons(card) {
  * Called every time answer card is shown to guarantee the handler is fresh.
  * Uses cloneNode to strip ALL existing event listeners, then re-attaches.
  */
-function reinitializeDigDeeperHandler() {
-    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) return;
+/**
+ * Setup dig deeper hint button — bound once per card creation.
+ * Uses guard to prevent double-binding.
+ */
+function setupDigDeeperHintButton(card) {
+    const btn = card.querySelector('.answer-dig-deeper-hint');
+    if (!btn || btn._digDeeperBound) return;
+    btn._digDeeperBound = true;
 
-    const answerCard = currentCard.querySelector('.answer-card');
-    if (!answerCard) return;
+    // Remove inline onclick if present (we handle it properly here)
+    btn.removeAttribute('onclick');
 
-    const oldBtn = answerCard.querySelector('.answer-dig-deeper-hint');
-    if (!oldBtn) {
-        console.warn('[reinitializeDigDeeperHandler] No dig deeper hint button found');
-        return;
-    }
+    let touchHandled = false;
 
-    // Clone the button to strip ALL existing event listeners
-    const newBtn = oldBtn.cloneNode(true);
-    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
-
-    // Re-attach inline onclick (in case cloning lost it)
-    newBtn.setAttribute('onclick', 'event.stopPropagation(); showDigDeeperQACard();');
-
-    // Attach touchend handler (mobile) - capture phase, highest priority
-    newBtn.addEventListener('touchend', function(e) {
-        console.log('[DigDeeper TOUCHEND] Fired');
+    btn.addEventListener('touchend', (e) => {
         e.stopPropagation();
         e.stopImmediatePropagation();
         e.preventDefault();
-        if (e.changedTouches[0]) {
-            triggerHaptic('light');
-            showDigDeeperQACard();
-        }
+        touchHandled = true;
+        triggerHaptic('light');
+        showDigDeeperQACard();
+        setTimeout(() => { touchHandled = false; }, 300);
     }, { capture: true, passive: false });
 
-    // Attach click handler (desktop fallback)
-    newBtn.addEventListener('click', function(e) {
-        console.log('[DigDeeper CLICK] Fired');
+    btn.addEventListener('click', (e) => {
         e.stopPropagation();
         e.stopImmediatePropagation();
+        if (touchHandled) return;
         triggerHaptic('light');
         showDigDeeperQACard();
     }, { capture: true });
-
-    console.log('[reinitializeDigDeeperHandler] Handler attached to fresh button');
 }
 
 /**
@@ -4569,19 +4397,13 @@ function setupNavHintClickHandlers(card, story) {
         readAheadBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
-            console.log('[READ AHEAD] Clicked — cardLayer:', state.cardLayer, 'isFlipped:', card.dataset.flipped);
 
             // EXPLICIT: Always go headline → summary, never skip
             if (card.dataset.flipped !== 'true') {
                 flipCard(card, story);
                 state.isCardFlipped = true;
                 state.cardLayer = 'summary';
-                updateBackButtonVisibility(card);
-                state.navigationClickCount++;
-                updateBackgroundBlob();
-                console.log('[READ AHEAD] Navigated to SUMMARY');
-            } else {
-                console.warn('[READ AHEAD] Already flipped — ignoring');
+                updateUI(card);
             }
         });
     }
@@ -4592,20 +4414,14 @@ function setupNavHintClickHandlers(card, story) {
         digDeeperBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHaptic('light');
-            console.log('[DIG DEEPER L2] Clicked — cardLayer:', state.cardLayer, 'isFlipped:', card.dataset.flipped);
 
             // EXPLICIT: Always go summary → questions, never skip
             if (card.dataset.flipped === 'true' && state.cardLayer === 'summary') {
                 state.cardLayer = 'questions';
                 setQACardState(QA_STATES.ACTIVE);
                 setupQACardSwipe();
-                updateBackButtonVisibility(card);
                 logSupabaseEvent('questions_opened', { story_headline: story.headline });
-                state.navigationClickCount++;
-                updateBackgroundBlob();
-                console.log('[DIG DEEPER L2] Navigated to QUESTIONS');
-            } else {
-                console.warn('[DIG DEEPER L2] Not on summary — ignoring');
+                updateUI(card);
             }
         });
     }
@@ -4630,14 +4446,12 @@ function setupNavHintClickHandlers(card, story) {
 // ==========================================
 
 function handleDragStart(e, card, story) {
-    PerfMonitor.start('handleDragStart');
     // NUCLEAR FIX: If touch originates inside an active sub-card (answer, dig deeper),
     // do NOT start drag on the parent story card — the sub-card handles its own gestures
     const target = e.target || e.srcElement;
     const activeSubCard = target.closest('.answer-card.active, .dig-deeper-qa-card.active, .dig-deeper-answer-card.active');
     if (activeSubCard) {
         state.isDragging = false;
-        PerfMonitor.end('handleDragStart');
         return;
     }
 
@@ -4660,7 +4474,6 @@ function handleDragStart(e, card, story) {
     card.classList.add('dragging');
     card.classList.add('touch-active'); // Subtle scale feedback
     hideSwipeHint();
-    PerfMonitor.end('handleDragStart');
 }
 
 // Legacy function kept for compatibility
@@ -4753,8 +4566,7 @@ function handleDragMove(e, card) {
 }
 
 function handleDragEnd(e, card, story) {
-    PerfMonitor.start('handleDragEnd');
-    if (!state.isDragging) { PerfMonitor.end('handleDragEnd'); return; }
+    if (!state.isDragging) { return; }
 
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
@@ -4766,7 +4578,6 @@ function handleDragEnd(e, card, story) {
         state._isContentScroll = false;
         state.currentX = 0;
         state.currentY = 0;
-        PerfMonitor.end('handleDragEnd');
         return;
     }
     state._scrollTarget = null;
@@ -4785,7 +4596,6 @@ function handleDragEnd(e, card, story) {
         snapCardBack(card);
         state.currentX = 0;
         state.currentY = 0;
-        PerfMonitor.end('handleDragEnd');
         return;
     }
 
@@ -4830,7 +4640,6 @@ function handleDragEnd(e, card, story) {
 
     state.currentX = 0;
     state.currentY = 0;
-    PerfMonitor.end('handleDragEnd');
 }
 
 /**
@@ -4947,35 +4756,27 @@ function handleSwipeUp(card, story) {
     // Guard: Only handle swipe up on headline or summary layers
     // Q&A, answer, and dig-deeper layers have their own swipe handlers
     if (state.cardLayer !== 'headline' && state.cardLayer !== 'summary') {
-        console.log('[handleSwipeUp] Ignoring — already on deeper layer:', state.cardLayer);
         return;
     }
 
     const isFlipped = card.dataset.flipped === 'true';
-    console.log('[handleSwipeUp] isFlipped:', isFlipped, 'cardLayer:', state.cardLayer);
 
     if (!isFlipped && state.cardLayer === 'headline') {
         // Currently on HEADLINE - flip to SUMMARY
-        console.log('[handleSwipeUp] Headline → Summary');
         flipCard(card, story);
         state.isCardFlipped = true;
         state.cardLayer = 'summary';
-        updateBackButtonVisibility(card);
     } else if (isFlipped && state.cardLayer === 'summary') {
         // Currently on SUMMARY - show Q&A (ACTIVE)
-        console.log('[handleSwipeUp] Summary → Questions');
         state.cardLayer = 'questions';
         setQACardState(QA_STATES.ACTIVE);
         setupQACardSwipe(); // Setup swipe-down to dismiss
-        updateBackButtonVisibility(card);
         logSupabaseEvent('questions_opened', { story_headline: story.headline });
     } else {
-        console.warn('[handleSwipeUp] State mismatch — isFlipped:', isFlipped, 'cardLayer:', state.cardLayer);
         return;
     }
 
-    state.navigationClickCount++;
-    updateBackgroundBlob();
+    updateUI(card);
 }
 
 /**
@@ -5004,9 +4805,7 @@ function handleSwipeDown(card, story) {
         state.cardLayer = 'headline';
         // Also hide Q&A card completely when going back to headline
         setQACardState(QA_STATES.HIDDEN);
-        updateBackButtonVisibility(card);
-        state.navigationClickCount++;
-        updateBackgroundBlob();
+        updateUI(card);
     } else {
         // Already on HEADLINE - bounce back, nothing to do
         snapCardBack(card);
@@ -5563,8 +5362,7 @@ function closeQACard() {
         }
     }
 
-    updateBackButtonVisibility();
-    console.log('[closeQACard] Returned to Summary with Q&A hidden');
+    updateUI();
 }
 
 // ==========================================
@@ -5576,9 +5374,8 @@ function closeQACard() {
  * @param {number} questionIndex - Index of the selected question (0-3)
  */
 function showAnswerCard(questionIndex) {
-    PerfMonitor.start('showAnswerCard');
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) { PerfMonitor.end('showAnswerCard'); return; }
+    if (!currentCard) { return; }
 
     const answerCard = currentCard.querySelector('.answer-card');
     if (!answerCard) return;
@@ -5604,25 +5401,11 @@ function showAnswerCard(questionIndex) {
     // Update state
     state.cardLayer = 'answer';
 
-    // Update progress bar
-    if (storyId) updateThreeSegmentProgress(storyId);
-
     // Setup swipe handler for this card
     setupAnswerCardSwipe();
 
-    // Re-attach bookmark handlers in case DOM was regenerated
-    if (currentCard) setupBookmarkButtons(currentCard);
+    updateUI(currentCard);
 
-    updateBackButtonVisibility();
-
-    // NUCLEAR: Re-attach dig deeper handler every time answer card is shown
-    reinitializeDigDeeperHandler();
-
-    state.navigationClickCount++;
-    updateBackgroundBlob();
-
-    console.log('[showAnswerCard] Showing answer for question', questionIndex);
-    PerfMonitor.end('showAnswerCard');
 }
 
 /**
@@ -5644,15 +5427,9 @@ function hideAnswerCard() {
 
     // Reset path tracking
     state.currentPath = { l3QuestionIndex: null, l5QuestionIndex: null };
-    const storyId = state.currentStory?.id;
-    if (storyId) updateThreeSegmentProgress(storyId);
 
-    updateBackButtonVisibility();
+    updateUI();
 
-    state.navigationClickCount++;
-    updateBackgroundBlob();
-
-    console.log('[hideAnswerCard] Returned to Q&A');
 }
 
 /**
@@ -5713,30 +5490,24 @@ function resetAnswerCardStars(answerCard) {
  * Show Dig Deeper Q&A Card - slide up from bottom
  */
 function showDigDeeperQACard() {
-    PerfMonitor.start('showDigDeeperQACard');
-    console.log('[showDigDeeperQACard] START — cardLayer:', state.cardLayer, 'currentQuestion:', !!state.currentQuestion);
 
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (!currentCard) {
         console.error('[showDigDeeperQACard] ERROR: No current card found');
-        PerfMonitor.end('showDigDeeperQACard');
         return;
     }
 
     const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
     if (!digDeeperQACard) {
         console.error('[showDigDeeperQACard] ERROR: No dig-deeper-qa-card found');
-        PerfMonitor.end('showDigDeeperQACard');
         return;
     }
 
     // Populate with dig deeper questions
-    console.log('[showDigDeeperQACard] Populating questions...');
     populateDigDeeperQACard();
 
     // Show the card
     digDeeperQACard.classList.add('active');
-    console.log('[showDigDeeperQACard] Added .active class, classList:', digDeeperQACard.classList.toString());
 
     // Update state
     state.cardLayer = 'dig-deeper-qa';
@@ -5744,16 +5515,8 @@ function showDigDeeperQACard() {
     // Setup swipe handler
     setupDigDeeperQACardSwipe();
 
-    // Re-attach bookmark handlers in case DOM was regenerated
-    if (currentCard) setupBookmarkButtons(currentCard);
+    updateUI(currentCard);
 
-    updateBackButtonVisibility();
-
-    state.navigationClickCount++;
-    updateBackgroundBlob();
-
-    console.log('[showDigDeeperQACard] COMPLETE — cardLayer:', state.cardLayer);
-    PerfMonitor.end('showDigDeeperQACard');
 }
 
 /**
@@ -5772,19 +5535,14 @@ function hideDigDeeperQACard() {
     // Update state - return to Answer
     state.cardLayer = 'answer';
 
-    updateBackButtonVisibility();
+    updateUI();
 
-    state.navigationClickCount++;
-    updateBackgroundBlob();
-
-    console.log('[hideDigDeeperQACard] Returned to Answer');
 }
 
 /**
  * Populate Dig Deeper Q&A Card with follow-up questions
  */
 function populateDigDeeperQACard() {
-    console.log('[populateDigDeeperQACard] START — currentQuestion:', !!state.currentQuestion, 'questionIndex:', state.currentQuestionIndex);
 
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (!currentCard || !state.currentQuestion) {
@@ -5803,7 +5561,6 @@ function populateDigDeeperQACard() {
     questionsList.innerHTML = '';
 
     const deepQuestions = state.currentQuestion.deepQuestions || [];
-    console.log('[populateDigDeeperQACard] Deep questions count:', deepQuestions.length);
 
     // Create button for each dig deeper question
     const parentIndex = state.currentQuestionIndex;
@@ -5838,14 +5595,12 @@ function populateDigDeeperQACard() {
  * @param {number} questionIndex - Index of the dig deeper question (0-2)
  */
 function showDigDeeperAnswerCard(questionIndex) {
-    PerfMonitor.start('showDigDeeperAnswerCard');
-    console.log('[showDigDeeperAnswerCard] START — questionIndex:', questionIndex, 'cardLayer:', state.cardLayer);
 
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) { console.error('[showDigDeeperAnswerCard] ERROR: No current card'); PerfMonitor.end('showDigDeeperAnswerCard'); return; }
+    if (!currentCard) { console.error('[showDigDeeperAnswerCard] ERROR: No current card'); return; }
 
     const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
-    if (!digDeeperAnswerCard) { console.error('[showDigDeeperAnswerCard] ERROR: No dig-deeper-answer-card'); PerfMonitor.end('showDigDeeperAnswerCard'); return; }
+    if (!digDeeperAnswerCard) { console.error('[showDigDeeperAnswerCard] ERROR: No dig-deeper-answer-card'); return; }
 
     // Store the question index
     state.currentDigDeeperQuestionIndex = questionIndex;
@@ -5867,22 +5622,11 @@ function showDigDeeperAnswerCard(questionIndex) {
     // Update state
     state.cardLayer = 'dig-deeper-answer';
 
-    // Update progress bar
-    if (storyId) updateThreeSegmentProgress(storyId);
-
     // Setup swipe handler
     setupDigDeeperAnswerCardSwipe();
 
-    // Re-attach bookmark handlers in case DOM was regenerated
-    if (currentCard) setupBookmarkButtons(currentCard);
+    updateUI(currentCard);
 
-    updateBackButtonVisibility();
-
-    state.navigationClickCount++;
-    updateBackgroundBlob();
-
-    console.log('[showDigDeeperAnswerCard] Showing dig deeper answer', questionIndex);
-    PerfMonitor.end('showDigDeeperAnswerCard');
 }
 
 /**
@@ -5904,15 +5648,9 @@ function hideDigDeeperAnswerCard() {
 
     // Reset L5 path tracking
     state.currentPath.l5QuestionIndex = null;
-    const storyId = state.currentStory?.id;
-    if (storyId) updateThreeSegmentProgress(storyId);
 
-    updateBackButtonVisibility();
+    updateUI();
 
-    state.navigationClickCount++;
-    updateBackgroundBlob();
-
-    console.log('[hideDigDeeperAnswerCard] Returned to Dig Deeper Q&A');
 }
 
 /**
@@ -6246,7 +5984,6 @@ function showAnswer(question, questionIndex) {
         question_text: question.text
     });
 
-    console.log('[showAnswer] Transitioning from Q&A to answer view');
 
     // Prepare answer view content in LEGACY modal
     elements.answerLabel.textContent = (questionIndex !== undefined) ? (questionIndex + 1) : '✦';
@@ -6278,7 +6015,6 @@ function showAnswer(question, questionIndex) {
 }
 
 function showQAView() {
-    console.log('[showQAView] Starting transition to Q&A view');
 
     // Find which view is currently visible
     const currentView = [elements.answerView, elements.digDeeperView, elements.deepAnswerView]
@@ -6311,7 +6047,6 @@ function showQAView() {
         elements.modalBackdrop.classList.add('visible');
     }
 
-    console.log('[showQAView] Q&A view should now be visible');
 }
 
 function verifyModalState() {
@@ -6324,17 +6059,12 @@ function verifyModalState() {
     const digDeeperHidden = elements.digDeeperView ? elements.digDeeperView.classList.contains('hidden') : true;
     const deepAnswerHidden = elements.deepAnswerView ? elements.deepAnswerView.classList.contains('hidden') : true;
 
-    console.log('[verifyModalState] Q&A visible:', qaViewVisible);
-    console.log('[verifyModalState] Answer hidden:', answerHidden);
-    console.log('[verifyModalState] DigDeeper hidden:', digDeeperHidden);
-    console.log('[verifyModalState] DeepAnswer hidden:', deepAnswerHidden);
 
     // Check for any stray overlay elements
     const overlays = document.querySelectorAll('[class*="overlay"], [class*="backdrop"]');
     overlays.forEach(el => {
         const style = getComputedStyle(el);
         if (style.position === 'fixed' || style.position === 'absolute') {
-            console.log('[verifyModalState] Found overlay element:', el.className, 'zIndex:', style.zIndex);
         }
     });
 }
@@ -6457,7 +6187,6 @@ function setupSummaryModalSwipe() {
 // ==========================================
 
 function showDigDeeper() {
-    console.log('[showDigDeeper] Transitioning to dig deeper view');
 
     const question = state.currentQuestion;
     if (!question || !question.deepQuestions || question.deepQuestions.length === 0) {
@@ -6513,12 +6242,10 @@ function showDigDeeper() {
 }
 
 function hideDigDeeper() {
-    console.log('[hideDigDeeper] Returning to Q&A view');
     showQAView();
 }
 
 function showDeepAnswer(deepQuestion, questionIndex) {
-    console.log('[showDeepAnswer] Transitioning to deep answer view');
 
     // Reset all views first
     resetAllModalViews();
@@ -6544,7 +6271,6 @@ function showDeepAnswer(deepQuestion, questionIndex) {
 }
 
 function backToDeepQuestions() {
-    console.log('[backToDeepQuestions] Transitioning from deep answer to deep questions');
 
     // Immediately reset all views
     resetAllModalViews();
@@ -6560,7 +6286,6 @@ function backToDeepQuestions() {
 }
 
 function hideDigDeeperToAnswer() {
-    console.log('[hideDigDeeperToAnswer] Transitioning from dig deeper to answer');
 
     // Immediately reset all views
     resetAllModalViews();
@@ -6576,7 +6301,6 @@ function hideDigDeeperToAnswer() {
 }
 
 function deepDone() {
-    console.log('[deepDone] Returning to Q&A view from deep answer');
 
     // Use the comprehensive showQAView function
     showQAView();
@@ -6623,9 +6347,6 @@ function verifyCleanState() {
     });
 
     // Log current state for debugging
-    console.log('[verifyCleanState] cardLayer:', state.cardLayer,
-                'modalStack:', state.modalStack.length,
-                'modalVisible:', modalVisible);
 }
 
 /**
@@ -6633,7 +6354,6 @@ function verifyCleanState() {
  * CRITICAL: This prevents cards persisting across stories
  */
 function resetAllCardStates() {
-    console.log('[resetAllCardStates] Resetting all card states');
 
     const storyCard = document.querySelector('.story-card[data-card-type="current"]');
 
@@ -6688,7 +6408,6 @@ function resetAllCardStates() {
     // 6. Reset card layer state
     state.cardLayer = 'headline';
     state.isCardFlipped = false;
-    state.modalStack = [];
 
     // 7. Reset question indices
     state.currentQuestionIndex = null;
@@ -6700,8 +6419,8 @@ function resetAllCardStates() {
     // 9. Remove no-scroll from body
     document.body.classList.remove('no-scroll');
 
-    // 10. Reset blob to default state
-    updateBackgroundBlob();
+    // 10. Reset UI to default state
+    updateUI();
 }
 
 /**
@@ -6709,7 +6428,6 @@ function resetAllCardStates() {
  * Used by logo click and other "go home" actions
  */
 function fullStateReset() {
-    console.log('[fullStateReset] Performing complete navigation reset');
 
     // Reset all card states
     resetAllCardStates();
@@ -7265,7 +6983,6 @@ function setupEventListeners() {
 
     // Logo click - ALWAYS returns to today's Story 1, from ANY state
     safeAddListener(elements.headerLogo, 'click', async () => {
-        console.log('[LOGO CLICKED] Forcing transition to Story 1');
         triggerHaptic('light');
 
         // Always transition to stories mode with fresh state
@@ -7378,7 +7095,6 @@ function setupEventListeners() {
 
             // In FAQ mode, this button becomes "Go to stories"
             if (elements.yourQuestionsBtn.dataset.faqAction === 'go-to-stories') {
-                console.log('[Go to stories] Transitioning from FAQ completion to Story 1');
                 // Use state machine to properly transition to stories
                 await transitionToMode('stories');
                 return;
@@ -7412,21 +7128,18 @@ function setupEventListeners() {
 
             // If in FAQ mode on first card, exit to stories
             if (state.faqMode && state.currentIndex === 0) {
-                console.log('[Prev] Exiting FAQ mode on first card');
                 await transitionToMode('stories');
                 return;
             }
 
             // If in archive mode on first card from no-stories page
             if (state.archiveMode && state.currentIndex === 0 && state.enteredArchivesFromNoStories) {
-                console.log('[Prev] Returning to no-stories from archives');
                 await transitionToMode('stories'); // Will show no-stories if still empty
                 return;
             }
 
             // If in archive mode on first card, return to stories completion
             if (state.archiveMode && state.currentIndex === 0) {
-                console.log('[Prev] Exiting archive mode on first card');
                 // Go back to stories and show completion
                 cleanupCurrentState();
                 state.archiveMode = false;
@@ -7457,16 +7170,13 @@ function setupEventListeners() {
 
             if (state.faqMode) {
                 // In FAQ mode: "Go to archives" - use state machine
-                console.log('[Go to archives] Transitioning from FAQ to archives');
                 trackRecapViewed('faq_completion');
                 await transitionToMode('archives', { source: 'faq_completion' });
             } else if (state.archiveMode) {
                 // In archive mode: go back to today's stories
-                console.log('[Back to today] Transitioning from archives to stories');
                 await transitionToMode('stories');
             } else {
                 // In today mode: go to archives
-                console.log('[Go to archives] Transitioning from stories to archives');
                 trackRecapViewed('completion_button');
                 await transitionToMode('archives', {
                     source: 'completion_button',
@@ -7675,7 +7385,7 @@ function handleKeyboardDown(card, story) {
                 state.isCardFlipped = false;
                 state.cardLayer = 'headline';
                 setQACardState(QA_STATES.HIDDEN);
-                updateBackButtonVisibility();
+                updateUI();
             }
             break;
 
@@ -7729,7 +7439,7 @@ function handleKeyboardBack() {
                 state.isCardFlipped = false;
                 state.cardLayer = 'headline';
                 setQACardState(QA_STATES.HIDDEN);
-                updateBackButtonVisibility();
+                updateUI();
             }
             break;
 
@@ -7745,18 +7455,3 @@ function handleKeyboardBack() {
 
 document.addEventListener('DOMContentLoaded', init);
 
-// ==========================================
-// TOUCH DIAGNOSTICS - Global passive listeners
-// ==========================================
-document.addEventListener('touchstart', (e) => {
-    TouchDiagnostics.logTouch('touchstart', e.timeStamp);
-}, { passive: true });
-
-document.addEventListener('touchmove', (e) => {
-    TouchDiagnostics.logTouch('touchmove', e.timeStamp);
-}, { passive: true });
-
-document.addEventListener('touchend', (e) => {
-    TouchDiagnostics.logTouch('touchend', e.timeStamp);
-    TouchDiagnostics.report();
-}, { passive: true });
