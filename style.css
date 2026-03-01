@@ -260,7 +260,7 @@ body {
 }
 
 /* Body text elements that respond to text size toggle */
-/* Normal state - use fluid responsive sizes */
+/* Default state - 1.4x base (12.5px × 1.4 = 17.5px) */
 .card-teaser,
 .card-summary-text,
 .answer-text,
@@ -268,11 +268,12 @@ body {
 .answer-question-text,
 .dig-deeper-subheading,
 .answer-question {
-    font-size: var(--font-size-md); /* 15-17px */
+    font-size: 17.5px;
+    line-height: 1.5;
     transition: font-size 0.2s ease;
 }
 
-/* Enlarged state - 2 sizes bigger */
+/* Enlarged state - 2.8x base (12.5px × 2.8 = 35px) */
 body.text-enlarged .card-teaser,
 body.text-enlarged .card-summary-text,
 body.text-enlarged .answer-text,
@@ -280,7 +281,8 @@ body.text-enlarged .qa-question-text,
 body.text-enlarged .answer-question-text,
 body.text-enlarged .dig-deeper-subheading,
 body.text-enlarged .answer-question {
-    font-size: var(--font-size-xl); /* 22-25px */
+    font-size: 35px;
+    line-height: 1.4;
 }
 
 /* Headlines use Cabinet Grotesk Variable */
@@ -821,6 +823,12 @@ button {
 
 .story-card.dragging {
     /* No transition removal needed — card doesn't move during drag */
+}
+
+/* Subtle touch-active scale feedback — modern feel without position drift */
+.story-card.touch-active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-out;
 }
 
 .story-card.swiping-right {
