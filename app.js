@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 console.log(`[FYI] App version: ${APP_VERSION} loaded at ${new Date().toLocaleTimeString()}`);
 
 // ==========================================
@@ -1117,7 +1117,11 @@ function setCardHeight() {
     const bottomMargin = 24;
 
     // Calculate available height (conservative)
-    const cardHeight = viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER;
+    let cardHeight = viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER;
+
+    // Cap at 85vh to give breathing room on all devices
+    const maxHeight = viewportHeight * 0.85;
+    cardHeight = Math.min(cardHeight, maxHeight);
 
     // Set as CSS custom property
     document.documentElement.style.setProperty('--card-height', cardHeight + 'px');
@@ -3326,7 +3330,7 @@ function toggleTextSize() {
     console.log('[toggleTextSize] CALLED - textEnlarged:', textEnlarged);
 
     // Apply inline styles to all body text elements
-    const enlargedSize = '22px';
+    const enlargedSize = '35px';
 
     let totalElements = 0;
     TEXT_SIZE_SELECTORS.forEach(selector => {
@@ -3374,7 +3378,7 @@ function applyTextSizeToAllElements() {
 
     TEXT_SIZE_SELECTORS.forEach(selector => {
         document.querySelectorAll(selector).forEach(el => {
-            el.style.fontSize = '22px';
+            el.style.fontSize = '35px';
         });
     });
 }
@@ -3391,11 +3395,11 @@ function setupTextSizeMutationObserver() {
                 if (node.nodeType === 1) {
                     TEXT_SIZE_SELECTORS.forEach(selector => {
                         if (node.matches && node.matches(selector)) {
-                            node.style.fontSize = '22px';
+                            node.style.fontSize = '35px';
                         }
                         if (node.querySelectorAll) {
                             node.querySelectorAll(selector).forEach(el => {
-                                el.style.fontSize = '22px';
+                                el.style.fontSize = '35px';
                             });
                         }
                     });
@@ -4464,6 +4468,7 @@ function handleDragStart(e, card, story) {
     state.currentY = 0;
     state.swipeStartTime = Date.now();
     card.classList.add('dragging');
+    card.classList.add('touch-active'); // Subtle scale feedback
     hideSwipeHint();
 }
 
@@ -4560,7 +4565,7 @@ function handleDragEnd(e, card, story) {
     if (!state.isDragging) return;
 
     state.isDragging = false;
-    card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down');
+    card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
 
     // NUCLEAR FIX: If was content scrolling, just clean up — no swipe action
     if (state._isContentScroll) {
