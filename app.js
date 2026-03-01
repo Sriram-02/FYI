@@ -4,8 +4,41 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v33';
+const APP_VERSION = 'v34';
 console.log(`[FYI] App version: ${APP_VERSION} loaded at ${new Date().toLocaleTimeString()}`);
+
+// ==========================================
+// PERFORMANCE MONITOR - Diagnostic instrumentation
+// ==========================================
+const PerfMonitor = {
+    _entries: [],
+    _enabled: true,
+    start(label) {
+        if (!this._enabled) return;
+        performance.mark(`perf-${label}-start`);
+    },
+    end(label) {
+        if (!this._enabled) return;
+        performance.mark(`perf-${label}-end`);
+        try {
+            performance.measure(label, `perf-${label}-start`, `perf-${label}-end`);
+            const measure = performance.getEntriesByName(label).pop();
+            if (measure) {
+                const entry = { label, duration: Math.round(measure.duration * 100) / 100, ts: Date.now() };
+                this._entries.push(entry);
+                if (entry.duration > 16) {
+                    console.warn(`[Perf] SLOW: ${label} took ${entry.duration}ms`);
+                } else {
+                    console.log(`[Perf] ${label}: ${entry.duration}ms`);
+                }
+            }
+        } catch (e) { /* noop */ }
+    },
+    report() {
+        console.table(this._entries.slice(-20));
+        return this._entries;
+    }
+};
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -354,6 +387,8 @@ async function getUserBookmarks() {
  */
 async function handleBookmarkClick(button, bookmarkData) {
     const wasBookmarked = button.classList.contains('bookmarked');
+    console.log('[Bookmark] handleBookmarkClick — wasBookmarked:', wasBookmarked,
+        'supabaseClient:', !!supabaseClient, 'bookmarkData:', JSON.stringify(bookmarkData));
 
     // Optimistic UI update
     button.classList.toggle('bookmarked');
@@ -1462,50 +1497,36 @@ function updateThreeSegmentProgress(storyId) {
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (!currentCard) return;
 
-    // Resolve storyId — use param or fall back to current story
-    const resolvedStoryId = storyId || state.currentStory?.id;
-    const progress = resolvedStoryId ? (storyProgress[resolvedStoryId] || {}) : {};
-
     console.log('[Progress] Updating — layer:', state.cardLayer, 'qIdx:', state.currentQuestionIndex, 'deepIdx:', state.currentDigDeeperQuestionIndex);
 
-    // Update ALL progress bars in the current card (summary, answer, and dig-deeper cards each have one)
-    const bars = currentCard.querySelectorAll('.three-segment-progress');
+    // Update ALL gradient progress bars in the current card
+    const bars = currentCard.querySelectorAll('.progress-bar-gradient');
     bars.forEach(bar => {
-        const s1 = bar.querySelector('.segment-1');
-        const s2 = bar.querySelector('.segment-2');
-        const s3 = bar.querySelector('.segment-3');
-        if (!s1 || !s2 || !s3) return;
+        // SEGMENT 1: ALWAYS accent — if visible, summary was visited
+        const seg1Color = 'var(--accent)';
 
-        // SEGMENT 1: ALWAYS orange — if we can see the progress bar, summary was visited
-        s1.classList.add('filled');
-        s1.style.background = ''; // Uses CSS accent (orange)
-
-        // SEGMENT 2: Filled when currently on answer level or deeper (L4+)
+        // SEGMENT 2: Filled when on answer level or deeper (L4+)
+        let seg2Color = 'var(--border-color)';
         const onAnswerOrDeeper = ['answer', 'dig-deeper-qa', 'dig-deeper-answer'].includes(state.cardLayer);
         if (onAnswerOrDeeper && state.currentQuestionIndex != null) {
-            s2.classList.add('filled');
             const l3Color = L3_QUESTION_COLORS[state.currentQuestionIndex] || null;
-            s2.style.background = l3Color || '';
-        } else {
-            // Clear segment 2 — we're above answer level (backward navigation)
-            s2.classList.remove('filled');
-            s2.style.background = '';
+            seg2Color = l3Color || 'var(--accent)';
         }
 
-        // SEGMENT 3: Filled ONLY when on dig-deeper-answer level (L6)
+        // SEGMENT 3: Filled ONLY on dig-deeper-answer level (L6)
+        let seg3Color = 'var(--border-color)';
         if (state.cardLayer === 'dig-deeper-answer' && state.currentQuestionIndex != null && state.currentDigDeeperQuestionIndex != null) {
-            s3.classList.add('filled');
             const parentIdx = state.currentQuestionIndex;
             const childIdx = state.currentDigDeeperQuestionIndex;
             const l5Color = (L5_QUESTION_COLORS[parentIdx] && L5_QUESTION_COLORS[parentIdx][childIdx])
                 ? L5_QUESTION_COLORS[parentIdx][childIdx]
                 : null;
-            s3.style.background = l5Color || '';
-        } else {
-            // Clear segment 3 — we're above dig-deeper-answer level
-            s3.classList.remove('filled');
-            s3.style.background = '';
+            seg3Color = l5Color || 'var(--accent)';
         }
+
+        bar.style.setProperty('--seg1-color', seg1Color);
+        bar.style.setProperty('--seg2-color', seg2Color);
+        bar.style.setProperty('--seg3-color', seg3Color);
     });
 }
 
@@ -1557,14 +1578,16 @@ function updateBackgroundBlob() {
     const clickIdx = (state.navigationClickCount || 0) % offsetCycle.length;
     const offset = offsetCycle[clickIdx];
 
-    // Prominent rotation — primary animation driver
+    // Prominent rotation — primary animation driver with vertical bias
     blobState.rotation += 30;
     blobState.scale = 1 + (Math.sin(clickIdx * 0.6) * 0.08);
+    const rotX = Math.sin(blobState.rotation * Math.PI / 180) * 8;
+    const rotY = blobState.rotation;
 
-    // Apply position + transform (rotation is the star of the show)
+    // Apply position + transform with vertical stretch for mobile
     blob.style.top = `${offset.y}%`;
     blob.style.left = `calc(50% + ${offset.x}%)`;
-    blob.style.transform = `translateX(-50%) rotate(${blobState.rotation}deg) scale(${blobState.scale})`;
+    blob.style.transform = `translateX(-50%) rotateX(${rotX}deg) rotateY(${rotY * 0.3}deg) scaleX(${blobState.scale * 0.9}) scaleY(${blobState.scale * 1.2})`;
 
     // Apply color to both circles
     circle1.style.fill = newColor;
@@ -3295,18 +3318,26 @@ function applyTheme() {
 }
 
 function toggleTheme() {
+    PerfMonitor.start('toggleTheme');
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     applyTheme();
     saveToStorage();
     triggerHaptic('light');
     trackThemeChanged(state.theme);
+    PerfMonitor.end('toggleTheme');
 }
 
 // ==========================================
-// Text Size Toggle
+// Text Size Toggle + Slider
 // ==========================================
 
 let textEnlarged = false;
+let textMultiplier = 1.4; // Default: 12.5px × 1.4 = 17.5px
+const TEXT_BASE_SIZE = 12.5;
+const TEXT_DEFAULT_MULTIPLIER = 1.4;
+const TEXT_ENLARGED_MULTIPLIER = 2.8; // 12.5px × 2.8 = 35px
+let longPressTimer = null;
+let sliderVisible = false;
 
 const TEXT_SIZE_SELECTORS = [
     '.card-teaser',
@@ -3320,48 +3351,52 @@ const TEXT_SIZE_SELECTORS = [
 ];
 
 /**
- * Toggle text size between normal and enlarged
- * Uses inline styles (highest specificity) to guarantee override
+ * Toggle text size between normal and enlarged (tap behavior)
  */
 function toggleTextSize() {
+    PerfMonitor.start('toggleTextSize');
     textEnlarged = !textEnlarged;
+    textMultiplier = textEnlarged ? TEXT_ENLARGED_MULTIPLIER : TEXT_DEFAULT_MULTIPLIER;
     document.body.classList.toggle('text-enlarged', textEnlarged);
 
-    console.log('[toggleTextSize] CALLED - textEnlarged:', textEnlarged);
+    console.log('[toggleTextSize] CALLED - textEnlarged:', textEnlarged, 'multiplier:', textMultiplier);
 
-    // Apply inline styles to all body text elements
-    const enlargedSize = '35px';
-
-    let totalElements = 0;
-    TEXT_SIZE_SELECTORS.forEach(selector => {
-        const els = document.querySelectorAll(selector);
-        totalElements += els.length;
-        els.forEach(el => {
-            if (textEnlarged) {
-                el.style.fontSize = enlargedSize;
-            } else {
-                el.style.fontSize = '';
-            }
-        });
-    });
-
-    console.log('[toggleTextSize] Applied to', totalElements, 'elements');
+    applyTextSizeToAllElements();
 
     // Update all AA button states
     document.querySelectorAll('.btn-text-size').forEach(btn => {
         btn.classList.toggle('active', textEnlarged);
     });
 
+    // Update slider position if visible
+    const slider = document.getElementById('textSizeSlider');
+    if (slider) slider.value = textMultiplier;
+
     // Persist preference
-    localStorage.setItem('fyi_text_enlarged', textEnlarged.toString());
+    localStorage.setItem('fyi_text_multiplier', textMultiplier.toString());
 
     triggerHaptic('light');
-    trackEvent('Text Size Toggled', { enlarged: textEnlarged });
+    trackEvent('Text Size Toggled', { enlarged: textEnlarged, multiplier: textMultiplier });
+    PerfMonitor.end('toggleTextSize');
 }
 
 function loadTextSizePreference() {
-    if (localStorage.getItem('fyi_text_enlarged') === 'true') {
+    // Handle both old boolean format and new multiplier format
+    const stored = localStorage.getItem('fyi_text_multiplier');
+    const oldBool = localStorage.getItem('fyi_text_enlarged');
+
+    if (stored) {
+        textMultiplier = parseFloat(stored);
+        textEnlarged = textMultiplier > TEXT_DEFAULT_MULTIPLIER;
+    } else if (oldBool === 'true') {
+        // Migrate old boolean preference
+        textMultiplier = TEXT_ENLARGED_MULTIPLIER;
         textEnlarged = true;
+        localStorage.setItem('fyi_text_multiplier', textMultiplier.toString());
+        localStorage.removeItem('fyi_text_enlarged');
+    }
+
+    if (textEnlarged) {
         document.body.classList.add('text-enlarged');
         applyTextSizeToAllElements();
         document.querySelectorAll('.btn-text-size').forEach(btn => {
@@ -3371,16 +3406,67 @@ function loadTextSizePreference() {
 }
 
 /**
- * Apply text size to all matching elements
+ * Apply text size to all matching elements based on current multiplier
  */
 function applyTextSizeToAllElements() {
-    if (!textEnlarged) return;
-
+    const size = Math.round(TEXT_BASE_SIZE * textMultiplier * 10) / 10 + 'px';
     TEXT_SIZE_SELECTORS.forEach(selector => {
         document.querySelectorAll(selector).forEach(el => {
-            el.style.fontSize = '35px';
+            el.style.fontSize = (textMultiplier !== TEXT_DEFAULT_MULTIPLIER) ? size : '';
         });
     });
+}
+
+/**
+ * Show text size slider overlay (triggered by long press on AA button)
+ */
+function showTextSizeSlider() {
+    const overlay = document.getElementById('textSizeSliderOverlay');
+    const slider = document.getElementById('textSizeSlider');
+    if (!overlay || !slider) return;
+
+    slider.value = textMultiplier;
+    overlay.classList.add('visible');
+    sliderVisible = true;
+    triggerHaptic('medium');
+
+    // Listen for input changes
+    slider.oninput = (e) => {
+        textMultiplier = parseFloat(e.target.value);
+        textEnlarged = textMultiplier > TEXT_DEFAULT_MULTIPLIER;
+        document.body.classList.toggle('text-enlarged', textEnlarged);
+        applyTextSizeToAllElements();
+        document.querySelectorAll('.btn-text-size').forEach(btn => {
+            btn.classList.toggle('active', textEnlarged);
+        });
+    };
+
+    // Close on tap outside (with delay to prevent immediate close)
+    const closeHandler = (e) => {
+        if (!overlay.contains(e.target) && !e.target.closest('.btn-text-size')) {
+            hideTextSizeSlider();
+            document.removeEventListener('click', closeHandler);
+            document.removeEventListener('touchend', closeHandler);
+        }
+    };
+    setTimeout(() => {
+        document.addEventListener('click', closeHandler);
+        document.addEventListener('touchend', closeHandler);
+    }, 100);
+}
+
+/**
+ * Hide text size slider overlay
+ */
+function hideTextSizeSlider() {
+    const overlay = document.getElementById('textSizeSliderOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    sliderVisible = false;
+
+    // Save final value
+    localStorage.setItem('fyi_text_multiplier', textMultiplier.toString());
+    triggerHaptic('light');
 }
 
 /**
@@ -3388,18 +3474,19 @@ function applyTextSizeToAllElements() {
  */
 function setupTextSizeMutationObserver() {
     const observer = new MutationObserver((mutations) => {
-        if (!textEnlarged) return;
+        if (textMultiplier === TEXT_DEFAULT_MULTIPLIER) return;
 
+        const size = Math.round(TEXT_BASE_SIZE * textMultiplier * 10) / 10 + 'px';
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType === 1) {
                     TEXT_SIZE_SELECTORS.forEach(selector => {
                         if (node.matches && node.matches(selector)) {
-                            node.style.fontSize = '35px';
+                            node.style.fontSize = size;
                         }
                         if (node.querySelectorAll) {
                             node.querySelectorAll(selector).forEach(el => {
-                                el.style.fontSize = '35px';
+                                el.style.fontSize = size;
                             });
                         }
                     });
@@ -3417,6 +3504,10 @@ function setupTextSizeMutationObserver() {
 
 function toggleBookmark(button) {
     const currentStory = state.stories[state.currentIndex];
+    console.log('[Bookmark] toggleBookmark called — currentIndex:', state.currentIndex,
+        'currentStory:', !!currentStory, 'cardLayer:', state.cardLayer,
+        'button.dataset.storyId:', button.dataset.storyId,
+        'button.classList:', button.classList.toString());
     if (!currentStory) {
         // Fallback: just toggle visually
         button.classList.toggle('bookmarked');
@@ -3613,9 +3704,7 @@ function createCardElement(story, position) {
                 <div class="card-swipe-overlay right"></div>
                 <div class="card-back-content">
                     <div class="three-segment-progress">
-                        <div class="segment segment-1"></div>
-                        <div class="segment segment-2"></div>
-                        <div class="segment segment-3"></div>
+                        <div class="progress-bar-gradient"></div>
                     </div>
                     <h3 class="card-back-header">Summary</h3>
                     <div class="card-summary-text">${summaryHTML}</div>
@@ -3649,9 +3738,7 @@ function createCardElement(story, position) {
         <!-- ANSWER CARD - slides up when question is clicked -->
         <div class="answer-card" data-story-id="${story.id}">
             <div class="three-segment-progress">
-                <div class="segment segment-1"></div>
-                <div class="segment segment-2"></div>
-                <div class="segment segment-3"></div>
+                <div class="progress-bar-gradient"></div>
             </div>
             <div class="answer-header">
                 <p class="answer-question-text"></p>
@@ -3708,9 +3795,7 @@ function createCardElement(story, position) {
         <!-- DIG DEEPER ANSWER CARD - slides up when dig deeper question is clicked -->
         <div class="dig-deeper-answer-card" data-story-id="${story.id}">
             <div class="three-segment-progress">
-                <div class="segment segment-1"></div>
-                <div class="segment segment-2"></div>
-                <div class="segment segment-3"></div>
+                <div class="progress-bar-gradient"></div>
             </div>
             <div class="answer-header">
                 <p class="answer-question-text"></p>
@@ -3731,7 +3816,7 @@ function createCardElement(story, position) {
                 <button class="btn-text-size" aria-label="Toggle text size">
                     <span class="text-size-small">A</span><span class="text-size-large">A</span>
                 </button>
-                <span class="nav-hint nav-hint-center" style="visibility:hidden;">&nbsp;</span>
+                <button class="back-to-headline-link">Back to headline</button>
                 <button class="btn-bookmark answer-bookmark" aria-label="Bookmark this answer" data-story-id="${story.id}">
                     <svg class="bookmark-icon" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3750,6 +3835,7 @@ function createCardElement(story, position) {
 
 // Flip card function - manages headline/summary flip AND Q&A peek state
 function flipCard(card, story) {
+    PerfMonitor.start('flipCard');
     const isFlipped = card.dataset.flipped === 'true';
 
     if (isFlipped) {
@@ -3786,6 +3872,7 @@ function flipCard(card, story) {
             });
         }
     }
+    PerfMonitor.end('flipCard');
 }
 
 /**
@@ -4057,24 +4144,32 @@ function setupTextSizeButtons(card) {
         // Track touch state to prevent double-fire from touchend + click
         let touchHandled = false;
 
-        // Touchend handler - fires BEFORE click on mobile
+        // Touchstart: start long press timer for slider
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                touchHandled = true;
+                console.log('[AA Button] long press - showing slider');
+                showTextSizeSlider();
+                setTimeout(() => { touchHandled = false; }, 300);
+            }, 300);
+        }, { capture: true });
+
+        // Touchend: if timer still running, it was a tap → toggle
         btn.addEventListener('touchend', (e) => {
             e.stopPropagation();
             e.stopImmediatePropagation();
-            // Only toggle if this was a tap (minimal movement)
-            const touch = e.changedTouches[0];
-            if (touch) {
+            if (longPressTimer) {
+                // Timer still running — this was a short tap
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
                 touchHandled = true;
-                console.log('[AA Button] touchend fired - toggling');
+                console.log('[AA Button] touchend tap - toggling');
                 toggleTextSize();
-                // Reset flag after a tick so click handler doesn't also fire
                 setTimeout(() => { touchHandled = false; }, 300);
             }
-        }, { capture: true });
-
-        // Prevent touchstart from being captured by card drag handler
-        btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
+            // If longPressTimer is null, long press already fired showTextSizeSlider
         }, { capture: true });
 
         // Click handler - for desktop and as fallback
@@ -4082,7 +4177,7 @@ function setupTextSizeButtons(card) {
             e.stopPropagation();
             e.stopImmediatePropagation();
             if (touchHandled) {
-                console.log('[AA Button] click ignored (already handled by touchend)');
+                console.log('[AA Button] click ignored (already handled by touch)');
                 return;
             }
             console.log('[AA Button] click fired - toggling');
@@ -4102,6 +4197,9 @@ function setupTextSizeButtons(card) {
 function setupBookmarkButtons(card) {
     const bookmarkBtns = card.querySelectorAll('.btn-bookmark');
     bookmarkBtns.forEach(btn => {
+        // Guard against duplicate handler attachment
+        if (btn.dataset.bookmarkBound) return;
+        btn.dataset.bookmarkBound = 'true';
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleBookmark(btn);
@@ -4259,8 +4357,17 @@ function reinitializeDigDeeperHandler() {
  * Back navigation is now handled by universal back button.
  */
 function setupDigDeeperAnswerCardButtons(card) {
-    // No more Done/Back button — handled by universal back button
-    // This function is kept for compatibility with setupCardInteractions() call
+    const digDeeperAnswerCard = card.querySelector('.dig-deeper-answer-card');
+    if (!digDeeperAnswerCard) return;
+
+    const backToHeadlineBtn = digDeeperAnswerCard.querySelector('.back-to-headline-link');
+    if (backToHeadlineBtn) {
+        backToHeadlineBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            backToHeadline();
+        });
+    }
 }
 
 /**
@@ -4442,12 +4549,14 @@ function setupNavHintClickHandlers(card, story) {
 // ==========================================
 
 function handleDragStart(e, card, story) {
+    PerfMonitor.start('handleDragStart');
     // NUCLEAR FIX: If touch originates inside an active sub-card (answer, dig deeper),
     // do NOT start drag on the parent story card — the sub-card handles its own gestures
     const target = e.target || e.srcElement;
     const activeSubCard = target.closest('.answer-card.active, .dig-deeper-qa-card.active, .dig-deeper-answer-card.active');
     if (activeSubCard) {
         state.isDragging = false;
+        PerfMonitor.end('handleDragStart');
         return;
     }
 
@@ -4470,6 +4579,7 @@ function handleDragStart(e, card, story) {
     card.classList.add('dragging');
     card.classList.add('touch-active'); // Subtle scale feedback
     hideSwipeHint();
+    PerfMonitor.end('handleDragStart');
 }
 
 // Legacy function kept for compatibility
@@ -4562,7 +4672,8 @@ function handleDragMove(e, card) {
 }
 
 function handleDragEnd(e, card, story) {
-    if (!state.isDragging) return;
+    PerfMonitor.start('handleDragEnd');
+    if (!state.isDragging) { PerfMonitor.end('handleDragEnd'); return; }
 
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
@@ -4574,6 +4685,7 @@ function handleDragEnd(e, card, story) {
         state._isContentScroll = false;
         state.currentX = 0;
         state.currentY = 0;
+        PerfMonitor.end('handleDragEnd');
         return;
     }
     state._scrollTarget = null;
@@ -4592,6 +4704,7 @@ function handleDragEnd(e, card, story) {
         snapCardBack(card);
         state.currentX = 0;
         state.currentY = 0;
+        PerfMonitor.end('handleDragEnd');
         return;
     }
 
@@ -4636,6 +4749,7 @@ function handleDragEnd(e, card, story) {
 
     state.currentX = 0;
     state.currentY = 0;
+    PerfMonitor.end('handleDragEnd');
 }
 
 /**
@@ -5381,8 +5495,9 @@ function closeQACard() {
  * @param {number} questionIndex - Index of the selected question (0-3)
  */
 function showAnswerCard(questionIndex) {
+    PerfMonitor.start('showAnswerCard');
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) return;
+    if (!currentCard) { PerfMonitor.end('showAnswerCard'); return; }
 
     const answerCard = currentCard.querySelector('.answer-card');
     if (!answerCard) return;
@@ -5414,6 +5529,9 @@ function showAnswerCard(questionIndex) {
     // Setup swipe handler for this card
     setupAnswerCardSwipe();
 
+    // Re-attach bookmark handlers in case DOM was regenerated
+    if (currentCard) setupBookmarkButtons(currentCard);
+
     updateBackButtonVisibility();
 
     // NUCLEAR: Re-attach dig deeper handler every time answer card is shown
@@ -5423,6 +5541,7 @@ function showAnswerCard(questionIndex) {
     updateBackgroundBlob();
 
     console.log('[showAnswerCard] Showing answer for question', questionIndex);
+    PerfMonitor.end('showAnswerCard');
 }
 
 /**
@@ -5513,17 +5632,20 @@ function resetAnswerCardStars(answerCard) {
  * Show Dig Deeper Q&A Card - slide up from bottom
  */
 function showDigDeeperQACard() {
+    PerfMonitor.start('showDigDeeperQACard');
     console.log('[showDigDeeperQACard] START — cardLayer:', state.cardLayer, 'currentQuestion:', !!state.currentQuestion);
 
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
     if (!currentCard) {
         console.error('[showDigDeeperQACard] ERROR: No current card found');
+        PerfMonitor.end('showDigDeeperQACard');
         return;
     }
 
     const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
     if (!digDeeperQACard) {
         console.error('[showDigDeeperQACard] ERROR: No dig-deeper-qa-card found');
+        PerfMonitor.end('showDigDeeperQACard');
         return;
     }
 
@@ -5541,12 +5663,16 @@ function showDigDeeperQACard() {
     // Setup swipe handler
     setupDigDeeperQACardSwipe();
 
+    // Re-attach bookmark handlers in case DOM was regenerated
+    if (currentCard) setupBookmarkButtons(currentCard);
+
     updateBackButtonVisibility();
 
     state.navigationClickCount++;
     updateBackgroundBlob();
 
     console.log('[showDigDeeperQACard] COMPLETE — cardLayer:', state.cardLayer);
+    PerfMonitor.end('showDigDeeperQACard');
 }
 
 /**
@@ -5631,13 +5757,14 @@ function populateDigDeeperQACard() {
  * @param {number} questionIndex - Index of the dig deeper question (0-2)
  */
 function showDigDeeperAnswerCard(questionIndex) {
+    PerfMonitor.start('showDigDeeperAnswerCard');
     console.log('[showDigDeeperAnswerCard] START — questionIndex:', questionIndex, 'cardLayer:', state.cardLayer);
 
     const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (!currentCard) { console.error('[showDigDeeperAnswerCard] ERROR: No current card'); return; }
+    if (!currentCard) { console.error('[showDigDeeperAnswerCard] ERROR: No current card'); PerfMonitor.end('showDigDeeperAnswerCard'); return; }
 
     const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
-    if (!digDeeperAnswerCard) { console.error('[showDigDeeperAnswerCard] ERROR: No dig-deeper-answer-card'); return; }
+    if (!digDeeperAnswerCard) { console.error('[showDigDeeperAnswerCard] ERROR: No dig-deeper-answer-card'); PerfMonitor.end('showDigDeeperAnswerCard'); return; }
 
     // Store the question index
     state.currentDigDeeperQuestionIndex = questionIndex;
@@ -5665,12 +5792,16 @@ function showDigDeeperAnswerCard(questionIndex) {
     // Setup swipe handler
     setupDigDeeperAnswerCardSwipe();
 
+    // Re-attach bookmark handlers in case DOM was regenerated
+    if (currentCard) setupBookmarkButtons(currentCard);
+
     updateBackButtonVisibility();
 
     state.navigationClickCount++;
     updateBackgroundBlob();
 
     console.log('[showDigDeeperAnswerCard] Showing dig deeper answer', questionIndex);
+    PerfMonitor.end('showDigDeeperAnswerCard');
 }
 
 /**
