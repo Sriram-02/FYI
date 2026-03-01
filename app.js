@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v34';
+const APP_VERSION = 'v35';
 console.log(`[FYI] App version: ${APP_VERSION} loaded at ${new Date().toLocaleTimeString()}`);
 
 // ==========================================
@@ -37,6 +37,24 @@ const PerfMonitor = {
     report() {
         console.table(this._entries.slice(-20));
         return this._entries;
+    }
+};
+
+// ==========================================
+// TOUCH DIAGNOSTICS - Latency measurement
+// ==========================================
+const TouchDiagnostics = {
+    measurements: [],
+    logTouch(type, timestamp) {
+        const now = performance.now();
+        this.measurements.push({ type, latency: Math.round((now - timestamp) * 100) / 100 });
+        if (this.measurements.length > 20) this.measurements.shift();
+    },
+    report() {
+        if (!this.measurements.length) return;
+        const avg = this.measurements.reduce((s, m) => s + m.latency, 0) / this.measurements.length;
+        console.log('[TouchDiag] Avg latency:', avg.toFixed(2), 'ms (target: <16ms)');
+        console.table(this.measurements.slice(-5));
     }
 };
 
@@ -388,33 +406,53 @@ async function getUserBookmarks() {
 async function handleBookmarkClick(button, bookmarkData) {
     const wasBookmarked = button.classList.contains('bookmarked');
     console.log('[Bookmark] handleBookmarkClick — wasBookmarked:', wasBookmarked,
-        'supabaseClient:', !!supabaseClient, 'bookmarkData:', JSON.stringify(bookmarkData));
+        'supabaseClient:', !!supabaseClient);
 
-    // Optimistic UI update
+    // Set toggling flag to prevent updateBookmarkStates from overriding UI
+    state._bookmarkToggling = true;
+
+    // Toggle UI — this ALWAYS succeeds, never reverts
     button.classList.toggle('bookmarked');
     triggerHaptic('light');
 
-    if (!supabaseClient) {
-        // Offline mode - just toggle locally and show toast
-        const isNowBookmarked = button.classList.contains('bookmarked');
-        showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
-        return;
+    const isNowBookmarked = button.classList.contains('bookmarked');
+
+    // Sync ALL bookmark buttons for this same context on the current card
+    // (summary nav-hints, answer bottom-bar, etc. may each have a bookmark button)
+    const currentCard = button.closest('.story-card');
+    if (currentCard) {
+        currentCard.querySelectorAll('.btn-bookmark').forEach(btn => {
+            if (btn !== button) {
+                btn.classList.toggle('bookmarked', isNowBookmarked);
+            }
+        });
     }
 
-    let success;
-    if (wasBookmarked) {
-        success = await removeBookmark(bookmarkData);
+    // Save to localStorage for persistence across sessions
+    const localKey = `fyi_bk_${bookmarkData.storyHeadline}_${bookmarkData.questionPath || 'story'}`;
+    if (isNowBookmarked) {
+        localStorage.setItem(localKey, '1');
     } else {
-        success = await saveBookmark(bookmarkData);
+        localStorage.removeItem(localKey);
     }
 
-    if (success) {
-        // Check button's actual state after operation to show correct toast
-        const isNowBookmarked = button.classList.contains('bookmarked');
-        showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
-    } else {
-        // Revert optimistic update on failure
-        button.classList.toggle('bookmarked');
+    showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
+
+    // Clear toggling flag after UI is stable
+    setTimeout(() => { state._bookmarkToggling = false; }, 1000);
+
+    // Fire-and-forget Supabase sync — never revert UI on failure
+    if (supabaseClient) {
+        try {
+            if (wasBookmarked) {
+                await removeBookmark(bookmarkData);
+            } else {
+                await saveBookmark(bookmarkData);
+            }
+            console.log('[Bookmark] Supabase sync success');
+        } catch (e) {
+            console.debug('[Bookmark] Supabase sync failed (keeping local state):', e.message);
+        }
     }
 }
 
@@ -464,28 +502,49 @@ function generateSupabaseSessionId() {
  * Checks Supabase to see if story/answer is bookmarked and updates UI
  */
 async function updateBookmarkStates() {
-    if (!supabaseClient) return;
+    // Don't override optimistic UI during an active toggle
+    if (state._bookmarkToggling) {
+        console.log('[Bookmark] updateBookmarkStates skipped — toggle in progress');
+        return;
+    }
 
     const currentStory = state.stories[state.currentIndex];
     if (!currentStory) return;
 
-    try {
-        const isStoryBookmarked = await checkIsBookmarked(
-            currentStory.date,
-            currentStory.headline,
-            null
-        );
+    // Check localStorage first (always available, always authoritative)
+    const localKey = `fyi_bk_${currentStory.headline}_story`;
+    const isLocallyBookmarked = localStorage.getItem(localKey) === '1';
 
-        // Update all story-level bookmark buttons on current card
-        document.querySelectorAll('.btn-bookmark').forEach(btn => {
-            // Only update story-level bookmarks (not answer-level ones inside answer cards)
-            if (!btn.closest('.answer-card') && !btn.closest('.dig-deeper-answer-card')) {
-                btn.classList.toggle('bookmarked', isStoryBookmarked);
+    // Try Supabase if available, but fall back to localStorage
+    let isStoryBookmarked = isLocallyBookmarked;
+
+    if (supabaseClient) {
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                const supabaseResult = await checkIsBookmarked(
+                    currentStory.date,
+                    currentStory.headline,
+                    null
+                );
+                // Supabase is source of truth IF we have a session
+                isStoryBookmarked = supabaseResult || isLocallyBookmarked;
             }
-        });
-    } catch (e) {
-        console.debug('[Supabase] updateBookmarkStates failed:', e.message);
+        } catch (e) {
+            console.debug('[Supabase] updateBookmarkStates query failed:', e.message);
+        }
     }
+
+    // Don't override if toggle happened while we were querying
+    if (state._bookmarkToggling) return;
+
+    // Update all story-level bookmark buttons on current card
+    document.querySelectorAll('.btn-bookmark').forEach(btn => {
+        // Only update story-level bookmarks (not answer-level ones inside answer cards)
+        if (!btn.closest('.answer-card') && !btn.closest('.dig-deeper-answer-card')) {
+            btn.classList.toggle('bookmarked', isStoryBookmarked);
+        }
+    });
 }
 
 // ==========================================
@@ -1151,18 +1210,25 @@ function setCardHeight() {
     // Bottom margin for visual breathing room
     const bottomMargin = 24;
 
-    // Calculate available height (conservative)
-    let cardHeight = viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER;
+    // Calculate available height (conservative) — 85% of previous for compact sizing
+    let cardHeight = (viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER) * 0.85;
 
-    // Cap at 85vh to give breathing room on all devices
-    const maxHeight = viewportHeight * 0.85;
+    // Cap at 75vh for breathing room
+    const maxHeight = viewportHeight * 0.75;
     cardHeight = Math.min(cardHeight, maxHeight);
+
+    // Enforce 1.5:1 max aspect ratio (height:width)
+    // Card max-width is min(340px, 77vw) — estimate actual card width
+    const viewportWidth = Math.min(window.innerWidth, document.documentElement.clientWidth);
+    const cardWidth = Math.min(340, viewportWidth * 0.77);
+    const maxAspectHeight = cardWidth * 1.5;
+    cardHeight = Math.min(cardHeight, maxAspectHeight);
 
     // Set as CSS custom property
     document.documentElement.style.setProperty('--card-height', cardHeight + 'px');
 
     console.log('[setCardHeight] Card height set to:', cardHeight + 'px',
-        '(viewport:', viewportHeight, 'header:', headerHeight, 'progress:', progressHeight, ')');
+        '(viewport:', viewportHeight, 'cardWidth:', cardWidth, 'aspectCap:', maxAspectHeight, ')');
 }
 
 /**
@@ -1565,41 +1631,42 @@ function updateBackgroundBlob() {
 
     const newColor = BACKGROUND_COLORS[colorKey] || BACKGROUND_COLORS.headline;
 
-    // Position offset cycling — minimal shifts to keep blob mostly centered
+    // Position offset cycling — wider shifts for visible movement on all sides
     const offsetCycle = [
-        { x: 0, y: -25 },    // Starting position (center-top)
-        { x: 2, y: -24 },    // Barely right
-        { x: 3, y: -23 },    // Slightly right-down
-        { x: 2, y: -25 },    // Back towards center
-        { x: -2, y: -26 },   // Slightly left-up
-        { x: -3, y: -25 }    // Slightly left
+        { x: 0, y: -10 },    // Center
+        { x: 5, y: -8 },     // Right shift
+        { x: 8, y: -5 },     // Far right, rising
+        { x: 3, y: -12 },    // Slight right, higher
+        { x: -5, y: -8 },    // Left shift
+        { x: -8, y: -6 },    // Far left
+        { x: -3, y: -14 },   // Slight left, higher
+        { x: 0, y: -10 }     // Return to center
     ];
 
     const clickIdx = (state.navigationClickCount || 0) % offsetCycle.length;
     const offset = offsetCycle[clickIdx];
 
-    // Prominent rotation — primary animation driver with vertical bias
-    blobState.rotation += 30;
-    blobState.scale = 1 + (Math.sin(clickIdx * 0.6) * 0.08);
-    const rotX = Math.sin(blobState.rotation * Math.PI / 180) * 8;
-    const rotY = blobState.rotation;
+    // Balanced rotation — visible from all directions, no vertical line bias
+    blobState.rotation += 45;
+    blobState.scale = 1 + (Math.sin(clickIdx * 0.8) * 0.06);
+    const rotAngle = blobState.rotation;
 
-    // Apply position + transform with vertical stretch for mobile
+    // Apply position + transform — balanced spread, no vertical stretch
     blob.style.top = `${offset.y}%`;
     blob.style.left = `calc(50% + ${offset.x}%)`;
-    blob.style.transform = `translateX(-50%) rotateX(${rotX}deg) rotateY(${rotY * 0.3}deg) scaleX(${blobState.scale * 0.9}) scaleY(${blobState.scale * 1.2})`;
+    blob.style.transform = `translateX(-50%) rotate(${rotAngle}deg) scale(${blobState.scale})`;
 
     // Apply color to both circles
     circle1.style.fill = newColor;
     circle2.style.fill = newColor;
 
-    // Morph circle positions for dramatic shape variation
-    const morphX = Math.sin(clickIdx * 0.7) * 20;
-    const morphY = Math.cos(clickIdx * 0.7) * 20;
-    circle1.setAttribute('cx', 100 + morphX);
+    // Morph circle positions for dramatic shape variation — wider range
+    const morphX = Math.sin(clickIdx * 0.7) * 30;
+    const morphY = Math.cos(clickIdx * 0.7) * 25;
+    circle1.setAttribute('cx', 95 + morphX);
     circle1.setAttribute('cy', 100 + morphY);
-    circle2.setAttribute('cx', 120 - morphX);
-    circle2.setAttribute('cy', 90 - morphY);
+    circle2.setAttribute('cx', 115 - morphX);
+    circle2.setAttribute('cy', 95 - morphY);
 
     blobState.currentColor = newColor;
     console.log('[Blob] Updated — colorKey:', colorKey, 'color:', newColor, 'rotation:', blobState.rotation);
@@ -3336,7 +3403,6 @@ let textMultiplier = 1.4; // Default: 12.5px × 1.4 = 17.5px
 const TEXT_BASE_SIZE = 12.5;
 const TEXT_DEFAULT_MULTIPLIER = 1.4;
 const TEXT_ENLARGED_MULTIPLIER = 2.8; // 12.5px × 2.8 = 35px
-let longPressTimer = null;
 let sliderVisible = false;
 
 const TEXT_SIZE_SELECTORS = [
@@ -3418,7 +3484,18 @@ function applyTextSizeToAllElements() {
 }
 
 /**
- * Show text size slider overlay (triggered by long press on AA button)
+ * Toggle slider visibility (called by AA button tap)
+ */
+function toggleSliderVisibility() {
+    if (sliderVisible) {
+        hideTextSizeSlider();
+    } else {
+        showTextSizeSlider();
+    }
+}
+
+/**
+ * Show text size slider overlay (triggered by AA button tap)
  */
 function showTextSizeSlider() {
     const overlay = document.getElementById('textSizeSliderOverlay');
@@ -4144,44 +4221,26 @@ function setupTextSizeButtons(card) {
         // Track touch state to prevent double-fire from touchend + click
         let touchHandled = false;
 
-        // Touchstart: start long press timer for slider
+        // Touchstart: just stop propagation (no long press timer needed)
         btn.addEventListener('touchstart', (e) => {
             e.stopPropagation();
-            longPressTimer = setTimeout(() => {
-                longPressTimer = null;
-                touchHandled = true;
-                console.log('[AA Button] long press - showing slider');
-                showTextSizeSlider();
-                setTimeout(() => { touchHandled = false; }, 300);
-            }, 300);
         }, { capture: true });
 
-        // Touchend: if timer still running, it was a tap → toggle
+        // Touchend: toggle slider visibility (no font change on tap)
         btn.addEventListener('touchend', (e) => {
             e.stopPropagation();
             e.stopImmediatePropagation();
-            if (longPressTimer) {
-                // Timer still running — this was a short tap
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-                touchHandled = true;
-                console.log('[AA Button] touchend tap - toggling');
-                toggleTextSize();
-                setTimeout(() => { touchHandled = false; }, 300);
-            }
-            // If longPressTimer is null, long press already fired showTextSizeSlider
+            touchHandled = true;
+            toggleSliderVisibility();
+            setTimeout(() => { touchHandled = false; }, 300);
         }, { capture: true });
 
         // Click handler - for desktop and as fallback
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.stopImmediatePropagation();
-            if (touchHandled) {
-                console.log('[AA Button] click ignored (already handled by touch)');
-                return;
-            }
-            console.log('[AA Button] click fired - toggling');
-            toggleTextSize();
+            if (touchHandled) return;
+            toggleSliderVisibility();
         });
 
         // Apply current state
@@ -4197,13 +4256,35 @@ function setupTextSizeButtons(card) {
 function setupBookmarkButtons(card) {
     const bookmarkBtns = card.querySelectorAll('.btn-bookmark');
     bookmarkBtns.forEach(btn => {
-        // Guard against duplicate handler attachment
-        if (btn.dataset.bookmarkBound) return;
-        btn.dataset.bookmarkBound = 'true';
-        btn.addEventListener('click', (e) => {
+        if (btn.dataset.bookmarkBound === 'v35') return; // Already bound this version
+
+        // Clone to remove ALL existing listeners (nuclear cleanup)
+        const newBtn = btn.cloneNode(true);
+        newBtn.dataset.bookmarkBound = 'v35';
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        let touchHandled = false;
+
+        // Single click handler with maximum propagation blocking
+        newBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            toggleBookmark(btn);
-        });
+            e.stopImmediatePropagation();
+            if (touchHandled) return;
+            console.log('[Bookmark] click handler fired');
+            toggleBookmark(newBtn);
+        }, { capture: true });
+
+        // Touch handler for mobile reliability
+        newBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            touchHandled = true;
+            console.log('[Bookmark] touchend handler fired');
+            toggleBookmark(newBtn);
+            setTimeout(() => { touchHandled = false; }, 300);
+        }, { capture: true, passive: false });
     });
 }
 
@@ -7663,3 +7744,19 @@ function handleKeyboardBack() {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ==========================================
+// TOUCH DIAGNOSTICS - Global passive listeners
+// ==========================================
+document.addEventListener('touchstart', (e) => {
+    TouchDiagnostics.logTouch('touchstart', e.timeStamp);
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+    TouchDiagnostics.logTouch('touchmove', e.timeStamp);
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+    TouchDiagnostics.logTouch('touchend', e.timeStamp);
+    TouchDiagnostics.report();
+}, { passive: true });
