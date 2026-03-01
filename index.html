@@ -114,8 +114,30 @@
 
         <!-- Loading State -->
         <div class="loading-state" id="loadingState">
-            <div class="loading-spinner"></div>
+            <svg class="loading-blob" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <filter id="loading-goo">
+                        <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+                        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" result="goo" />
+                    </filter>
+                </defs>
+                <g filter="url(#loading-goo)">
+                    <circle class="loading-blob-circle loading-blob-1" cx="70" cy="50" r="18" />
+                    <circle class="loading-blob-circle loading-blob-2" cx="100" cy="50" r="18" />
+                    <circle class="loading-blob-circle loading-blob-3" cx="130" cy="50" r="18" />
+                </g>
+            </svg>
             <p class="loading-text">Loading today's stories...</p>
+        </div>
+
+        <!-- Text Size Slider Overlay -->
+        <div class="text-size-slider-overlay" id="textSizeSliderOverlay">
+            <div class="text-size-slider-container">
+                <span class="slider-label slider-label-small">A</span>
+                <input type="range" class="text-size-slider" id="textSizeSlider"
+                       min="1" max="3" step="0.1" value="1.4" />
+                <span class="slider-label slider-label-large">A</span>
+            </div>
         </div>
 
         <!-- Main Content Area -->
