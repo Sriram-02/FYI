@@ -201,25 +201,20 @@ body {
 
 .background-blob {
     position: fixed;
-    top: -20%;
+    top: -25%;
     left: 50%;
     transform: translateX(-50%);
-    width: 200vw;
-    height: 130vh;
+    width: 150vw;
+    height: 150vh;
     z-index: 0;
     pointer-events: none;
     opacity: 0.5;
     filter: blur(60px);
-    transition: top 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-                left 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-                transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s ease;
+    transition: opacity 0.3s ease;
 }
 
 .blob-circle-1, .blob-circle-2 {
-    transition: fill 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-                cx 1s cubic-bezier(0.4, 0, 0.2, 1),
-                cy 1s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: fill 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     fill: var(--accent); /* Default: app accent color */
 }
 
@@ -2267,13 +2262,6 @@ button {
     transition: transform 300ms ease-out, opacity 200ms ease;
     /* No scroll bars - content will be truncated */
     overflow: hidden;
-}
-
-/* GPU acceleration hints for animated sub-cards */
-.answer-card,
-.dig-deeper-qa-card,
-.dig-deeper-answer-card {
-    will-change: transform, opacity;
 }
 
 .answer-card.active {
