@@ -28,20 +28,11 @@
     </script>
 </head>
 <body style="overscroll-behavior-y: none;">
-    <!-- Background blob - animated amorphous shape that tracks navigation state -->
-    <svg class="background-blob" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <filter id="goo">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="goo" />
-                <feBlend in="SourceGraphic" in2="goo" />
-            </filter>
-        </defs>
-        <g filter="url(#goo)">
-            <circle class="blob-circle-1" cx="100" cy="100" r="40" />
-            <circle class="blob-circle-2" cx="120" cy="90" r="35" />
-        </g>
-    </svg>
+    <!-- Background blob - CSS-only ambient glow (GPU-accelerated, no SVG filters) -->
+    <div class="background-blob">
+        <div class="blob-circle-1"></div>
+        <div class="blob-circle-2"></div>
+    </div>
 
     <div id="app">
         <!-- Header -->
@@ -123,7 +114,7 @@
             <div class="text-size-slider-container">
                 <span class="slider-label slider-label-small">A</span>
                 <input type="range" class="text-size-slider" id="textSizeSlider"
-                       min="1" max="1.43" step="0.05" value="1.0" />
+                       min="1" max="1.4" step="0.05" value="1.0" />
                 <span class="slider-label slider-label-large">A</span>
             </div>
         </div>
