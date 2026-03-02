@@ -1054,8 +1054,10 @@ function updateThreeSegmentProgress(storyId) {
 /**
  * Update the background blob color and position based on navigation state.
  * Called at every navigation transition point.
+ * PERF TEST: Disabled — blob hidden via CSS to verify rendering improvement.
  */
 function updateBackgroundBlob() {
+    return; // PERF TEST: Skip all blob updates
     const blob = document.querySelector('.background-blob');
     if (!blob) return;
 
