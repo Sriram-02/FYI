@@ -202,6 +202,7 @@ body {
    ========================================== */
 
 .background-blob {
+    display: none !important; /* PERF TEST: Disable blob to verify rendering improvement */
     position: fixed;
     top: -25%;
     left: 50%;
