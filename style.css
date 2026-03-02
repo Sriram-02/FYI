@@ -26,6 +26,15 @@
     --accent-light: #E8956E;
     --accent-glow: rgba(218, 119, 86, 0.3);
 
+    /* Q&A + Article Text Color System
+       color-1: signature orange (same in light/dark)
+       color-2: Q1 blue   | color-3: Q2 green  | color-4: Q3 golden
+       Dark mode defaults — lighter pastels that read on dark cards */
+    --color-1: #DA7756;
+    --color-2: #A8DADC;
+    --color-3: #B5E7A0;
+    --color-4: #F4D58D;
+
     --success: #4ADE80;
     --warning: #FBBF24;
     --danger: #EF4444;
@@ -127,6 +136,11 @@
 
     --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+    /* Light mode: darker, more saturated versions for text readability */
+    --color-2: #5B9FA3;
+    --color-3: #6BA854;
+    --color-4: #D4A84E;
 }
 
 /* ==========================================
@@ -197,67 +211,76 @@ body {
 }
 
 /* ==========================================
-   Background Blob - Animated amorphous shape
-   Tracks navigation state with color morphing
+   Background Blob - CSS-only GPU-accelerated glow
+   Two blurred div circles track navigation state with color morphing
    ========================================== */
 
+/* CSS-only blob — GPU-accelerated via will-change + filter: blur()
+   Two overlapping circles with large blur radius create the same
+   soft amorphous glow as the old SVG goo filter, but composited
+   entirely on the GPU. One slow breathing animation instead of three. */
+
 .background-blob {
-    display: none !important; /* PERF TEST: Disable blob to verify rendering improvement */
     position: fixed;
-    top: -25%;
+    top: -20%;
     left: 50%;
     transform: translateX(-50%);
-    width: 150vw;
-    height: 150vh;
+    width: 100vw;
+    height: 100vh;
     z-index: 0;
     pointer-events: none;
-    opacity: 0.5;
-    filter: blur(60px);
+    opacity: 0.45;
     transition: opacity 0.3s ease;
+    will-change: transform;
 }
 
-.blob-circle-1, .blob-circle-2 {
-    transition: fill 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    fill: var(--accent); /* Default: app accent color */
-}
-
-/* Ambient breathing — slow rotation and scale pulse */
-@keyframes blob-breathe {
-    0%, 100% { transform: scale(1) rotate(0deg); }
-    33% { transform: scale(1.04) rotate(2deg); }
-    66% { transform: scale(0.98) rotate(-1.5deg); }
-}
-
-.background-blob g {
-    animation: blob-breathe 14s ease-in-out infinite;
-    transform-origin: center center;
-}
-
-/* Individual circle drift — visible floating */
-@keyframes blob-float-1 {
-    0%, 100% { transform: translate(0, 0); }
-    33% { transform: translate(6px, -4px); }
-    66% { transform: translate(-3px, 3px); }
-}
-
-@keyframes blob-float-2 {
-    0%, 100% { transform: translate(0, 0); }
-    33% { transform: translate(-5px, 3px); }
-    66% { transform: translate(4px, -5px); }
+.blob-circle-1,
+.blob-circle-2 {
+    position: absolute;
+    border-radius: 50%;
+    background-color: var(--accent);
+    transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: blur(80px);
+    will-change: transform, filter;
 }
 
 .blob-circle-1 {
-    animation: blob-float-1 10s ease-in-out infinite;
+    width: 45vw;
+    height: 45vw;
+    top: 10%;
+    left: 10%;
+    animation: blob-drift-1 16s ease-in-out infinite;
 }
 
 .blob-circle-2 {
-    animation: blob-float-2 12s ease-in-out infinite;
+    width: 37.5vw;
+    height: 37.5vw;
+    top: 20%;
+    left: 30%;
+    animation: blob-drift-2 20s ease-in-out infinite;
+}
+
+/* Single slow breathing + drift per circle — minimal GPU work */
+@keyframes blob-drift-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(3vw, -2vh) scale(1.05); }
+    66% { transform: translate(-2vw, 1.5vh) scale(0.97); }
+}
+
+@keyframes blob-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    40% { transform: translate(-3vw, 2vh) scale(1.03); }
+    70% { transform: translate(2vw, -2.5vh) scale(0.98); }
 }
 
 @media (max-width: 480px) {
-    .background-blob {
-        width: 200vw;
-        height: 200vh;
+    .blob-circle-1 {
+        width: 60vw;
+        height: 60vw;
+    }
+    .blob-circle-2 {
+        width: 52.5vw;
+        height: 52.5vw;
     }
 }
 
@@ -281,7 +304,7 @@ body {
 .answer-text,
 .answer-question,
 .dig-deeper-answer-text {
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.55;
     text-align: left;
     font-feature-settings: 'kern' 1, 'liga' 1;
@@ -304,7 +327,7 @@ body.text-enlarged .card-summary-text,
 body.text-enlarged .answer-text,
 body.text-enlarged .answer-question,
 body.text-enlarged .dig-deeper-answer-text {
-    font-size: 20px;
+    font-size: 21px;
     line-height: 1.45;
 }
 
@@ -887,8 +910,8 @@ button {
     /* Align cards to top, not center - prevents vertical centering issues */
     align-items: flex-start;
     justify-content: center;
-    /* Fluid padding that scales with viewport */
-    padding-top: var(--spacing-xl);
+    /* Fluid padding that scales with viewport + 10px offset to push card lower */
+    padding-top: calc(var(--spacing-xl) + 10px);
     padding-left: var(--spacing-lg);
     padding-right: var(--spacing-lg);
     /* Space for footer */
@@ -912,9 +935,9 @@ button {
 
 .story-card {
     position: absolute;
-    /* Fluid width - 85% of previous sizing for compact feel */
+    /* Fluid width — enlarged for more content space */
     width: calc(100% - var(--spacing-lg) * 2);
-    max-width: min(340px, 77vw);
+    max-width: min(360px, 82vw);
     /* FIXED HEIGHT - set by JS with 1.5:1 aspect ratio cap, fallback to 60vh */
     height: var(--card-height, 60vh);
     background: transparent;
@@ -4077,20 +4100,12 @@ button {
    HTML Text Formatting (from Google Sheets)
    ========================================== */
 
-/* Color 1: Signature Orange */
-.text-color1 {
-    color: var(--accent);
-}
-
-/* Color 2: Standard Green */
-.text-color2 {
-    color: #16A34A;
-}
-
-/* Color 3: Standard Blue */
-.text-color3 {
-    color: #2563EB;
-}
+/* Text color utilities — align with Q&A question colors
+   color-2/3/4 auto-adapt: lighter pastels in dark mode, darker saturated in light mode */
+.text-color1 { color: var(--color-1); } /* Orange — same in both modes */
+.text-color2 { color: var(--color-2); } /* Blue  (Q1) */
+.text-color3 { color: var(--color-3); } /* Green (Q2) */
+.text-color4 { color: var(--color-4); } /* Golden (Q3) */
 
 /* Mark: Removed - no visible highlight */
 .text-mark {
@@ -4150,15 +4165,7 @@ button {
     line-height: var(--line-height-relaxed);
 }
 
-/* Light mode adjustments for text formatting */
-:root.light-mode .text-color2 {
-    color: #107C10;
-}
-
-:root.light-mode .text-color3 {
-    color: #0078D4;
-}
-
+/* Light mode text-color2/3/4 handled by --color-2/3/4 CSS variables in :root.light-mode */
 :root.light-mode .text-mark {
     background: transparent;
 }
