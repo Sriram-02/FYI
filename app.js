@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v36-lean';
+const APP_VERSION = 'v38.2-foundation';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -213,187 +213,197 @@ function setupSignInModal() {
 }
 
 // ==========================================
-// SUPABASE: Bookmark Functions
+// BOOKMARKS — Simple localStorage System
+// Single source of truth. Zero dependencies.
 // ==========================================
 
-/**
- * Save a bookmark to Supabase
- * @param {object} bookmarkData - { type, storyDate, storyHeadline, questionPath, content }
- * @returns {boolean} success
- */
-async function saveBookmark(bookmarkData) {
-    if (!supabaseClient) return false;
-    try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) { console.error('[Supabase] No session for bookmark'); return false; }
+const BOOKMARKS_KEY = 'fyi-bookmarks';
 
-        // Determine category from story data or auto-guess from headline
-        const category = bookmarkData.category ||
-                         state.currentStory?.category ||
-                         guessCategory(bookmarkData.storyHeadline);
+const Bookmarks = {
+    /** Get all bookmarks as array */
+    getAll() {
+        try {
+            return JSON.parse(localStorage.getItem(BOOKMARKS_KEY)) || [];
+        } catch (e) {
+            console.error('[Bookmarks] Read failed:', e);
+            return [];
+        }
+    },
 
-        const { error } = await supabaseClient.from('bookmarks').insert({
-            user_id: session.user.id,
-            bookmark_type: bookmarkData.type,
-            story_date: bookmarkData.storyDate,
-            story_headline: bookmarkData.storyHeadline,
-            question_path: bookmarkData.questionPath || null,
-            bookmark_content: bookmarkData.content,
-            category: category
+    /** Check if a story is bookmarked by headline */
+    has(headline) {
+        return this.getAll().some(b => b.id === headline);
+    },
+
+    /** Add a bookmark. Returns true on success. */
+    add(headline, displayData) {
+        if (!headline) return false;
+        const bookmarks = this.getAll();
+        if (bookmarks.some(b => b.id === headline)) return true; // Already bookmarked
+        bookmarks.push({
+            id: headline,
+            headline: displayData?.headline || headline,
+            teaser: displayData?.teaser || '',
+            category: displayData?.category || '',
+            timestamp: Date.now()
         });
-
-        if (error) {
-            if (error.code === '23505') {
-                // Duplicate - bookmark already exists, treat as success
-                return true;
-            }
-            console.error('[Supabase] Bookmark save error:', error);
+        try {
+            localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
+            console.log('[Bookmarks] Added:', headline, '- Total:', bookmarks.length);
+            return true;
+        } catch (e) {
+            console.error('[Bookmarks] Save failed:', e);
             return false;
         }
+    },
 
-        await logSupabaseEvent('bookmark_added', {
-            bookmark_type: bookmarkData.type,
-            story_headline: bookmarkData.storyHeadline
-        });
-        return true;
-    } catch (e) {
-        console.error('[Supabase] saveBookmark failed:', e.message);
-        return false;
-    }
-}
-
-/**
- * Remove a bookmark from Supabase
- */
-async function removeBookmark(bookmarkData) {
-    if (!supabaseClient) return false;
-    try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) return false;
-
-        const { error } = await supabaseClient.from('bookmarks').delete().match({
-            user_id: session.user.id,
-            story_date: bookmarkData.storyDate,
-            story_headline: bookmarkData.storyHeadline,
-            question_path: bookmarkData.questionPath || null
-        });
-
-        if (error) { console.error('[Supabase] Bookmark remove error:', error); return false; }
-
-        await logSupabaseEvent('bookmark_removed', {
-            bookmark_type: bookmarkData.type,
-            story_headline: bookmarkData.storyHeadline
-        });
-        return true;
-    } catch (e) {
-        console.error('[Supabase] removeBookmark failed:', e.message);
-        return false;
-    }
-}
-
-/**
- * Check if an item is bookmarked
- */
-async function checkIsBookmarked(storyDate, storyHeadline, questionPath = null) {
-    if (!supabaseClient) return false;
-    try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) return false;
-
-        const query = {
-            user_id: session.user.id,
-            story_date: storyDate,
-            story_headline: storyHeadline
-        };
-        if (questionPath !== null) {
-            query.question_path = questionPath;
-        }
-
-        const { data } = await supabaseClient.from('bookmarks')
-            .select('id')
-            .match(query)
-            .single();
-
-        return !!data;
-    } catch (e) {
-        // .single() throws when no match - that's expected
-        return false;
-    }
-}
-
-/**
- * Get all bookmarks for current user
- */
-async function getUserBookmarks() {
-    if (!supabaseClient) return [];
-    try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) return [];
-
-        const { data, error } = await supabaseClient.from('bookmarks')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .order('created_at', { ascending: false });
-
-        if (error) { console.error('[Supabase] Fetch bookmarks error:', error); return []; }
-        return data || [];
-    } catch (e) {
-        console.error('[Supabase] getUserBookmarks failed:', e.message);
-        return [];
-    }
-}
-
-/**
- * Handle bookmark button click - toggle with Supabase persistence
- */
-async function handleBookmarkClick(button, bookmarkData) {
-    const wasBookmarked = button.classList.contains('bookmarked');
-
-    // Set toggling flag to prevent updateBookmarkStates from overriding UI
-    state._bookmarkToggling = true;
-
-    // Toggle UI — this ALWAYS succeeds, never reverts
-    button.classList.toggle('bookmarked');
-    triggerHaptic('light');
-
-    const isNowBookmarked = button.classList.contains('bookmarked');
-
-    // Sync ALL bookmark buttons for this same context on the current card
-    // (summary nav-hints, answer bottom-bar, etc. may each have a bookmark button)
-    const currentCard = button.closest('.story-card');
-    if (currentCard) {
-        currentCard.querySelectorAll('.btn-bookmark').forEach(btn => {
-            if (btn !== button) {
-                btn.classList.toggle('bookmarked', isNowBookmarked);
-            }
-        });
-    }
-
-    // Save to localStorage for persistence across sessions
-    const localKey = `fyi_bk_${bookmarkData.storyHeadline}_${bookmarkData.questionPath || 'story'}`;
-    if (isNowBookmarked) {
-        localStorage.setItem(localKey, '1');
-    } else {
-        localStorage.removeItem(localKey);
-    }
-
-    showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
-
-    // Clear toggling flag after UI is stable
-    setTimeout(() => { state._bookmarkToggling = false; }, 1000);
-
-    // Fire-and-forget Supabase sync — never revert UI on failure
-    if (supabaseClient) {
+    /** Remove a bookmark. Returns true if found and removed. */
+    remove(headline) {
+        const bookmarks = this.getAll();
+        const filtered = bookmarks.filter(b => b.id !== headline);
+        if (filtered.length === bookmarks.length) return false; // Not found
         try {
-            if (wasBookmarked) {
-                await removeBookmark(bookmarkData);
-            } else {
-                await saveBookmark(bookmarkData);
-            }
+            localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(filtered));
+            console.log('[Bookmarks] Removed:', headline, '- Remaining:', filtered.length);
+            return true;
         } catch (e) {
+            console.error('[Bookmarks] Remove failed:', e);
+            return false;
+        }
+    },
+
+    /** Toggle bookmark state. Returns true if now bookmarked. */
+    toggle(headline, displayData) {
+        if (this.has(headline)) {
+            this.remove(headline);
+            return false;
+        } else {
+            this.add(headline, displayData);
+            return true;
         }
     }
+};
+
+// ==========================================
+// BOOKMARKS PAGE
+// ==========================================
+
+function openBookmarksPage() {
+    if (elements.bookmarksPage) {
+        elements.bookmarksPage.classList.add('visible');
+        document.body.classList.add('no-scroll');
+        loadBookmarksPage();
+        trackEvent('Bookmarks Page Opened');
+    }
 }
+
+function closeBookmarksPage() {
+    if (elements.bookmarksPage) {
+        elements.bookmarksPage.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+    }
+}
+
+function loadBookmarksPage() {
+    const bookmarks = Bookmarks.getAll().sort((a, b) => b.timestamp - a.timestamp);
+    console.log('[Bookmarks Page] Loading', bookmarks.length, 'bookmarks');
+
+    if (!elements.bookmarksList || !elements.bookmarksEmpty) return;
+
+    if (bookmarks.length === 0) {
+        elements.bookmarksList.style.display = 'none';
+        elements.bookmarksEmpty.style.display = 'flex';
+        return;
+    }
+
+    elements.bookmarksList.style.display = 'flex';
+    elements.bookmarksEmpty.style.display = 'none';
+
+    elements.bookmarksList.innerHTML = bookmarks.map(bk => {
+        const safeHL = (bk.headline || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeTeaser = (bk.teaser || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeCat = (bk.category || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const dateStr = formatRelativeDate(bk.timestamp);
+        return `
+            <div class="bookmark-card" data-bookmark-headline="${safeHL.replace(/"/g, '&quot;')}">
+                <div class="bookmark-badge">&#9733;</div>
+                <div class="bookmark-content-wrap">
+                    <h3 class="bookmark-headline">${safeHL}</h3>
+                    ${safeTeaser ? `<p class="bookmark-question">${safeTeaser}</p>` : ''}
+                    <div class="bookmark-meta">
+                        ${safeCat ? `<span class="bookmark-category-tag">${safeCat}</span>` : ''}
+                        <span class="bookmark-date">${dateStr}</span>
+                    </div>
+                </div>
+                <button class="bookmark-delete-btn" aria-label="Delete bookmark">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    // Event delegation — no inline onclick, no quoting issues
+    elements.bookmarksList.querySelectorAll('.bookmark-card').forEach(card => {
+        const headline = card.dataset.bookmarkHeadline;
+        card.addEventListener('click', () => {
+            closeBookmarksPage();
+            const storyIndex = state.stories.findIndex(s => s.headline === headline);
+            if (storyIndex === -1) {
+                showToast('i', 'Story not in today\'s feed');
+                return;
+            }
+            navigateToStoryIndex(storyIndex);
+        });
+        const deleteBtn = card.querySelector('.bookmark-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                Bookmarks.remove(headline);
+                card.remove();
+                updateBookmarkButtons();
+                if (Bookmarks.getAll().length === 0) {
+                    elements.bookmarksList.style.display = 'none';
+                    elements.bookmarksEmpty.style.display = 'flex';
+                }
+                showToast('✓', 'Bookmark removed');
+            });
+        }
+    });
+}
+
+function formatRelativeDate(timestamp) {
+    const diffMs = Date.now() - timestamp;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return new Date(timestamp).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+}
+
+function navigateToStoryIndex(targetIndex) {
+    if (targetIndex < 0 || targetIndex >= state.stories.length) return;
+    state.currentIndex = targetIndex;
+    renderCards();
+    updateProgress();
+}
+
+/** Update bookmark button highlights on the current card */
+function updateBookmarkButtons() {
+    const story = state.stories[state.currentIndex];
+    if (!story) return;
+    const isBookmarked = Bookmarks.has(story.headline);
+    document.querySelectorAll('.btn-bookmark').forEach(btn => {
+        btn.classList.toggle('bookmarked', isBookmarked);
+    });
+}
+
+// ==========================================
+// SUPABASE: Bookmark Functions (REMOVED — bookmarks now use localStorage only)
+// Legacy Supabase bookmark functions removed in v38.2-foundation
+// ==========================================
+// (Supabase bookmark functions removed in v38.2-foundation — bookmarks are now localStorage-only)
 
 // ==========================================
 // SUPABASE: Analytics Event Logging
@@ -431,487 +441,9 @@ function generateSupabaseSessionId() {
     return id;
 }
 
-// ==========================================
-// SUPABASE: Bookmark State Management
-// ==========================================
-
-/**
- * Update bookmark button states for the current story
- * Checks Supabase to see if story/answer is bookmarked and updates UI
- */
-async function updateBookmarkStates() {
-    // Don't override optimistic UI during an active toggle
-    if (state._bookmarkToggling) {
-        return;
-    }
-
-    const currentStory = state.stories[state.currentIndex];
-    if (!currentStory) return;
-
-    // Check localStorage first (always available, always authoritative)
-    const localKey = `fyi_bk_${currentStory.headline}_story`;
-    const isLocallyBookmarked = localStorage.getItem(localKey) === '1';
-
-    // Try Supabase if available, but fall back to localStorage
-    let isStoryBookmarked = isLocallyBookmarked;
-
-    if (supabaseClient) {
-        try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                const supabaseResult = await checkIsBookmarked(
-                    currentStory.date,
-                    currentStory.headline,
-                    null
-                );
-                // Supabase is source of truth IF we have a session
-                isStoryBookmarked = supabaseResult || isLocallyBookmarked;
-            }
-        } catch (e) {
-        }
-    }
-
-    // Don't override if toggle happened while we were querying
-    if (state._bookmarkToggling) return;
-
-    // Update all story-level bookmark buttons on current card
-    document.querySelectorAll('.btn-bookmark').forEach(btn => {
-        // Only update story-level bookmarks (not answer-level ones inside answer cards)
-        if (!btn.closest('.answer-card') && !btn.closest('.dig-deeper-answer-card')) {
-            btn.classList.toggle('bookmarked', isStoryBookmarked);
-        }
-    });
-}
-
-// ==========================================
-// BOOKMARKS PAGE FUNCTIONALITY
-// ==========================================
-
-const BOOKMARK_CATEGORIES = [
-    'Politics',
-    'Economy',
-    'Technology',
-    'Business',
-    'World',
-    'India',
-    'Science',
-    'Culture',
-    'Uncategorized'
-];
-
-let currentBookmarks = [];
-let filteredBookmarks = [];
-
-/**
- * Open bookmarks page overlay
- */
-function openBookmarksPage() {
-    if (elements.bookmarksPage) {
-        elements.bookmarksPage.classList.add('visible');
-        document.body.classList.add('no-scroll');
-        loadBookmarksPage();
-        trackEvent('Bookmarks Page Opened');
-    }
-}
-
-/**
- * Close bookmarks page overlay
- */
-function closeBookmarksPage() {
-    if (elements.bookmarksPage) {
-        elements.bookmarksPage.classList.remove('visible');
-        document.body.classList.remove('no-scroll');
-    }
-}
-
-/**
- * Load all bookmarks from Supabase
- */
-async function loadBookmarksPage() {
-    if (!supabaseClient) {
-        showBookmarksEmpty('Sign in to see your bookmarks');
-        return;
-    }
-
-    try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-
-        if (!session) {
-            showBookmarksEmpty('Sign in to see your bookmarks');
-            return;
-        }
-
-        const { data, error } = await supabaseClient
-            .from('bookmarks')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error('[Bookmarks] Load error:', error);
-            showBookmarksEmpty('Error loading bookmarks');
-            return;
-        }
-
-        currentBookmarks = data || [];
-        populateCategoryFilter();
-        applyBookmarkFilters();
-
-    } catch (err) {
-        console.error('[Bookmarks] Load failed:', err);
-        showBookmarksEmpty('Error loading bookmarks');
-    }
-}
-
-/**
- * Populate category filter dropdown with used categories
- */
-function populateCategoryFilter() {
-    if (!elements.filterCategory) return;
-
-    // Get unique categories from bookmarks
-    const usedCategories = [...new Set(
-        currentBookmarks.map(b => b.category || 'Uncategorized')
-    )];
-
-    let optionsHTML = '<option value="all">All categories</option>';
-    usedCategories.sort().forEach(category => {
-        optionsHTML += `<option value="${escapeHTMLAttr(category)}">${escapeBookmarkHTML(category)}</option>`;
-    });
-
-    elements.filterCategory.innerHTML = optionsHTML;
-}
-
-/**
- * Apply date and category filters
- */
-function applyBookmarkFilters() {
-    const dateFilter = elements.filterDate?.value || 'all';
-    const categoryFilter = elements.filterCategory?.value || 'all';
-
-    filteredBookmarks = currentBookmarks.filter(bookmark => {
-        // Date filter
-        if (dateFilter !== 'all') {
-            const bookmarkDate = new Date(bookmark.created_at);
-            const now = new Date();
-
-            if (dateFilter === 'today') {
-                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                if (bookmarkDate < today) return false;
-            } else if (dateFilter === 'week') {
-                const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                if (bookmarkDate < weekAgo) return false;
-            } else if (dateFilter === 'month') {
-                const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                if (bookmarkDate < monthAgo) return false;
-            }
-        }
-
-        // Category filter
-        if (categoryFilter !== 'all') {
-            const bookmarkCategory = bookmark.category || 'Uncategorized';
-            if (bookmarkCategory !== categoryFilter) return false;
-        }
-
-        return true;
-    });
-
-    renderBookmarksList();
-}
-
-/**
- * Render the bookmarks list UI
- */
-function renderBookmarksList() {
-    if (!elements.bookmarksList || !elements.bookmarksEmpty) return;
-
-    if (filteredBookmarks.length === 0) {
-        elements.bookmarksList.style.display = 'none';
-        elements.bookmarksEmpty.style.display = 'flex';
-        return;
-    }
-
-    elements.bookmarksList.style.display = 'flex';
-    elements.bookmarksEmpty.style.display = 'none';
-
-    elements.bookmarksList.innerHTML = filteredBookmarks.map(bookmark => {
-        const badge = getBookmarkBadge(bookmark);
-        const formattedDate = formatBookmarkDate(bookmark.created_at);
-        const category = bookmark.category || 'Uncategorized';
-        const questionText = bookmark.bookmark_content?.question_text || '';
-
-        return `
-            <div class="bookmark-card" data-bookmark-id="${bookmark.id}" onclick="handleBookmarkCardClick('${bookmark.id}')">
-                <div class="bookmark-badge">${badge}</div>
-                <div class="bookmark-content-wrap">
-                    <h3 class="bookmark-headline">${escapeBookmarkHTML(bookmark.story_headline)}</h3>
-                    ${questionText ? `<p class="bookmark-question">${escapeBookmarkHTML(questionText)}</p>` : ''}
-                    <div class="bookmark-meta">
-                        <span class="bookmark-category-tag">${escapeBookmarkHTML(category)}</span>
-                        <span class="bookmark-date">${formattedDate}</span>
-                    </div>
-                </div>
-                <button class="bookmark-delete-btn" onclick="event.stopPropagation(); handleDeleteBookmark('${bookmark.id}')" aria-label="Delete bookmark">
-                    <svg viewBox="0 0 24 24" width="20" height="20">
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
-                    </svg>
-                </button>
-            </div>
-        `;
-    }).join('');
-}
-
-/**
- * Get badge content for a bookmark
- * Story bookmarks show star, Q&A show numbers, Dig deeper show letters
- */
-function getBookmarkBadge(bookmark) {
-    const type = bookmark.bookmark_type;
-    const path = bookmark.question_path;
-
-    if (type === 'story' || !path) {
-        return '&#9733;'; // Star for story
-    }
-
-    // Parse question path: 'Q1', 'Q2', 'Q1-A', 'Q2-B', etc.
-    if (path.includes('-')) {
-        // Dig deeper: Q1-A, Q1-B, etc.
-        const letter = path.split('-')[1];
-        return letter;
-    } else {
-        // Main question: Q1, Q2, etc.
-        const number = path.replace('Q', '');
-        return number;
-    }
-}
-
-/**
- * Format bookmark date relative to now
- */
-function formatBookmarkDate(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-        return 'Today';
-    } else if (diffDays === 1) {
-        return 'Yesterday';
-    } else if (diffDays < 7) {
-        return `${diffDays} days ago`;
-    } else {
-        return date.toLocaleDateString('en-IN', {
-            month: 'short',
-            day: 'numeric'
-        });
-    }
-}
-
-/**
- * Escape HTML for safe rendering in bookmark cards
- */
-function escapeBookmarkHTML(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-/**
- * Escape HTML for use in attribute values
- */
-function escapeHTMLAttr(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/**
- * Show empty state with custom message
- */
-function showBookmarksEmpty(message) {
-    if (!elements.bookmarksList || !elements.bookmarksEmpty) return;
-    elements.bookmarksList.style.display = 'none';
-    elements.bookmarksEmpty.style.display = 'flex';
-
-    const emptyText = elements.bookmarksEmpty.querySelector('.empty-text');
-    if (emptyText && message) {
-        emptyText.textContent = message;
-    }
-}
-
-/**
- * Handle clicking a bookmark card - navigate to the bookmarked content
- */
-function handleBookmarkCardClick(bookmarkId) {
-    const bookmark = currentBookmarks.find(b => b.id === bookmarkId);
-    if (!bookmark) return;
-
-    // Close bookmarks page
-    closeBookmarksPage();
-
-    // Find the story by headline in current stories
-    const storyIndex = state.stories.findIndex(s =>
-        s.headline === bookmark.story_headline
-    );
-
-    if (storyIndex === -1) {
-        showToast('i', 'Story not in current list');
-        return;
-    }
-
-    // Navigate to the story
-    navigateToStoryIndex(storyIndex);
-
-    const questionPath = bookmark.question_path;
-
-    // If bookmark is for a specific question/answer, navigate there after a delay
-    if (questionPath) {
-        setTimeout(() => {
-            const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-            const currentStory = state.stories[state.currentIndex];
-            if (!currentCard || !currentStory) return;
-
-            // First flip to summary to reveal Q&A
-            flipCard(currentCard, currentStory);
-            state.isCardFlipped = true;
-            state.cardLayer = 'summary';
-            updateBackButtonVisibility();
-
-            setTimeout(() => {
-                // Show Q&A
-                setQACardState(QA_STATES.ACTIVE);
-                state.cardLayer = 'questions';
-                updateBackButtonVisibility();
-                setupQACardSwipe();
-
-                if (questionPath.includes('-')) {
-                    // Dig deeper answer: Q1-A, Q1-B, etc.
-                    const parts = questionPath.split('-');
-                    const qNum = parseInt(parts[0].replace('Q', '')) - 1;
-                    const digDeeperIndex = parts[1].charCodeAt(0) - 65; // A=0, B=1
-
-                    setTimeout(() => {
-                        showAnswerCard(qNum);
-                        setTimeout(() => {
-                            showDigDeeperQACard();
-                            setTimeout(() => {
-                                showDigDeeperAnswerCard(digDeeperIndex);
-                            }, 300);
-                        }, 300);
-                    }, 300);
-                } else {
-                    // Main question: Q1, Q2, etc.
-                    const questionIndex = parseInt(questionPath.replace('Q', '')) - 1;
-                    setTimeout(() => {
-                        showAnswerCard(questionIndex);
-                    }, 300);
-                }
-            }, 300);
-        }, 500);
-    }
-}
-
-/**
- * Navigate to a specific story index
- */
-function navigateToStoryIndex(targetIndex) {
-    if (targetIndex < 0 || targetIndex >= state.stories.length) return;
-
-    // Use existing navigation
-    state.currentIndex = targetIndex;
-    renderCards();
-    updateProgress();
-}
-
-/**
- * Handle deleting a bookmark
- */
-async function handleDeleteBookmark(bookmarkId) {
-    if (!supabaseClient) return;
-
-    try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) return;
-
-        const { error } = await supabaseClient
-            .from('bookmarks')
-            .delete()
-            .eq('id', bookmarkId)
-            .eq('user_id', session.user.id);
-
-        if (error) {
-            console.error('[Bookmarks] Delete error:', error);
-            showToast('!', 'Failed to delete bookmark');
-            return;
-        }
-
-        // Remove from local arrays
-        currentBookmarks = currentBookmarks.filter(b => b.id !== bookmarkId);
-        applyBookmarkFilters();
-
-        showToast('&#10003;', 'Bookmark removed');
-        trackEvent('Bookmark Deleted');
-    } catch (err) {
-        console.error('[Bookmarks] Delete failed:', err);
-        showToast('!', 'Failed to delete bookmark');
-    }
-}
-
-/**
- * Auto-categorize a story based on headline keywords
- * Used as fallback when no category is provided
- */
-function guessCategory(headline) {
-    if (!headline) return 'Uncategorized';
-    const lower = headline.toLowerCase();
-
-    if (lower.includes('election') || lower.includes('government') || lower.includes('minister') ||
-        lower.includes('parliament') || lower.includes('modi') || lower.includes('congress') ||
-        lower.includes('bjp') || lower.includes('political') || lower.includes('vote')) {
-        return 'Politics';
-    }
-    if (lower.includes('economy') || lower.includes('gdp') || lower.includes('inflation') ||
-        lower.includes('rbi') || lower.includes('fiscal') || lower.includes('budget') ||
-        lower.includes('rupee') || lower.includes('stock market') || lower.includes('sensex')) {
-        return 'Economy';
-    }
-    if (lower.includes('tech') || lower.includes('ai') || lower.includes('startup') ||
-        lower.includes('software') || lower.includes('google') || lower.includes('apple') ||
-        lower.includes('meta') || lower.includes('microsoft') || lower.includes('openai') ||
-        lower.includes('digital') || lower.includes('app') || lower.includes('robot')) {
-        return 'Technology';
-    }
-    if (lower.includes('business') || lower.includes('company') || lower.includes('profit') ||
-        lower.includes('revenue') || lower.includes('ceo') || lower.includes('merger') ||
-        lower.includes('acquisition') || lower.includes('ipo') || lower.includes('tata') ||
-        lower.includes('reliance') || lower.includes('adani')) {
-        return 'Business';
-    }
-    if (lower.includes('china') || lower.includes('usa') || lower.includes('europe') ||
-        lower.includes('russia') || lower.includes('ukraine') || lower.includes('global') ||
-        lower.includes('world') || lower.includes('un') || lower.includes('nato') ||
-        lower.includes('war') || lower.includes('trade war') || lower.includes('sanctions')) {
-        return 'World';
-    }
-    if (lower.includes('india') || lower.includes('delhi') || lower.includes('mumbai') ||
-        lower.includes('bengaluru') || lower.includes('chennai') || lower.includes('hyderabad') ||
-        lower.includes('kolkata') || lower.includes('indian')) {
-        return 'India';
-    }
-    if (lower.includes('science') || lower.includes('space') || lower.includes('nasa') ||
-        lower.includes('isro') || lower.includes('research') || lower.includes('climate') ||
-        lower.includes('health') || lower.includes('vaccine') || lower.includes('medical')) {
-        return 'Science';
-    }
-    if (lower.includes('culture') || lower.includes('film') || lower.includes('movie') ||
-        lower.includes('music') || lower.includes('art') || lower.includes('cricket') ||
-        lower.includes('sport') || lower.includes('bollywood') || lower.includes('oscar')) {
-        return 'Culture';
-    }
-
-    return 'Uncategorized';
-}
+// (Old updateBookmarkStates, bookmarks page functions, guessCategory removed in v38.2-foundation)
+// See new Bookmarks object + updateBookmarkButtons() above
+// (All old bookmarks page code removed in v38.2-foundation — see new system above)
 
 // ==========================================
 // Analytics Helper Functions (Plausible)
@@ -1147,8 +679,8 @@ function setCardHeight() {
     // Calculate available height (conservative) — 85% of previous for compact sizing
     let cardHeight = (viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER) * 0.85;
 
-    // Cap at 75vh for breathing room
-    const maxHeight = viewportHeight * 0.75;
+    // Cap at 80vh — reduced whitespace below card
+    const maxHeight = viewportHeight * 0.80;
     cardHeight = Math.min(cardHeight, maxHeight);
 
     // Enforce 1.5:1 max aspect ratio (height:width)
@@ -2018,7 +1550,7 @@ async function init() {
         await loadAppContent();
 
         // Update bookmark states for current story
-        await updateBookmarkStates();
+        updateBookmarkButtons();
 
         // Track app opened
         trackAppOpened();
@@ -3262,19 +2794,16 @@ function toggleTheme() {
 // ==========================================
 
 let textEnlarged = false;
-let textMultiplier = 1.4; // Default: 12.5px × 1.4 = 17.5px
-const TEXT_BASE_SIZE = 12.5;
-const TEXT_DEFAULT_MULTIPLIER = 1.4;
-const TEXT_ENLARGED_MULTIPLIER = 2.8; // 12.5px × 2.8 = 35px
+let textMultiplier = 1.0; // Default: 14px × 1.0 = 14px
+const TEXT_BASE_SIZE = 14;
+const TEXT_DEFAULT_MULTIPLIER = 1.0;
+const TEXT_ENLARGED_MULTIPLIER = 1.43; // 14px × 1.43 ≈ 20px
 let sliderVisible = false;
 
 const TEXT_SIZE_SELECTORS = [
     '.card-teaser',
     '.card-summary-text',
     '.answer-text',
-    '.qa-question-text',
-    '.answer-question-text',
-    '.dig-deeper-subheading',
     '.answer-question',
     '.dig-deeper-answer-text'
 ];
@@ -3313,6 +2842,8 @@ function loadTextSizePreference() {
 
     if (stored) {
         textMultiplier = parseFloat(stored);
+        // Clamp to valid range (handles migration from old 1.4–2.0 range)
+        textMultiplier = Math.min(Math.max(textMultiplier, 1.0), TEXT_ENLARGED_MULTIPLIER);
         textEnlarged = textMultiplier > TEXT_DEFAULT_MULTIPLIER;
     } else if (oldBool === 'true') {
         // Migrate old boolean preference
@@ -3436,62 +2967,35 @@ function setupTextSizeMutationObserver() {
 }
 
 // ==========================================
-// Bookmark Toggle (Supabase-backed)
+// Bookmark Toggle — Simple localStorage system
 // ==========================================
 
 function toggleBookmark(button) {
-    const currentStory = state.stories[state.currentIndex];
-    if (!currentStory) {
-        // Fallback: just toggle visually
+    const story = state.stories[state.currentIndex];
+    if (!story) {
         button.classList.toggle('bookmarked');
         triggerHaptic('light');
         return;
     }
 
-    // Determine bookmark type and context based on current card layer
-    let bookmarkType = 'story';
-    let questionPath = null;
-    let contentPayload = {
-        headline: currentStory.headline,
-        teaser: currentStory.teaser,
-        emoji: currentStory.emoji
-    };
+    const isNowBookmarked = Bookmarks.toggle(story.headline, {
+        headline: story.headline,
+        teaser: story.teaser,
+        category: story.category || ''
+    });
 
-    if (state.cardLayer === 'answer' && state.currentQuestion) {
-        bookmarkType = 'answer';
-        questionPath = `Q${(state.currentQuestionIndex || 0) + 1}`;
-        contentPayload.question_text = state.currentQuestion.text;
-        contentPayload.answer_text = state.currentQuestion.answer;
-    } else if (state.cardLayer === 'dig-deeper-answer' && state.currentQuestion) {
-        bookmarkType = 'deep_answer';
-        const qIdx = (state.currentQuestionIndex || 0) + 1;
-        const dIdx = state.currentDigDeeperQuestionIndex || 0;
-        // Format: Q1-A, Q1-B, Q2-C — matches handleBookmarkCardClick parser
-        const deepLetter = String.fromCharCode(65 + dIdx); // 0→A, 1→B, 2→C
-        questionPath = `Q${qIdx}-${deepLetter}`;
-        const deepQ = state.currentQuestion.deepQuestions?.[state.currentDigDeeperQuestionIndex];
-        if (deepQ) {
-            contentPayload.question_text = deepQ.text;
-            contentPayload.answer_text = deepQ.answer;
-        }
+    triggerHaptic('light');
+
+    // Update ALL bookmark buttons on current card
+    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
+    if (currentCard) {
+        currentCard.querySelectorAll('.btn-bookmark').forEach(btn => {
+            btn.classList.toggle('bookmarked', isNowBookmarked);
+        });
     }
 
-    const bookmarkData = {
-        type: bookmarkType,
-        storyDate: currentStory.date,
-        storyHeadline: currentStory.headline,
-        questionPath: questionPath,
-        content: contentPayload
-    };
-
-
-    // Use Supabase-backed handler
-    handleBookmarkClick(button, bookmarkData);
-
-    // Also track with Plausible
-    const storyId = button.dataset.storyId;
-    const isBookmarked = button.classList.contains('bookmarked');
-    trackEvent('Bookmark Toggled', { storyId, bookmarked: isBookmarked, level: state.cardLayer });
+    showToast('', isNowBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
+    trackEvent('Bookmark Toggled', { headline: story.headline, bookmarked: isNowBookmarked });
 }
 
 // ==========================================
@@ -3914,6 +3418,64 @@ function setupCardInteractions(card, story) {
 
     // Setup dig deeper hint button (answer card → dig deeper Q&A)
     setupDigDeeperHintButton(card);
+
+    // Setup custom scroll indicators for Safari iOS
+    setupScrollIndicators(card);
+}
+
+/**
+ * Custom Scrollbar — Universal, Safari-proof
+ * Completely isolated visual indicator, works on ALL browsers.
+ * Native scrollbar is hidden via CSS; this replaces it.
+ */
+function setupScrollIndicators(card) {
+    const configs = [
+        { scrollEl: '.card-teaser', parentEl: '.card-body' },
+        { scrollEl: '.card-summary-text', parentEl: '.card-back-content' }
+    ];
+
+    configs.forEach(({ scrollEl: sel, parentEl: pSel }) => {
+        const scrollEl = card.querySelector(sel);
+        const parentEl = card.querySelector(pSel);
+        if (!scrollEl || !parentEl) return;
+
+        // Create indicator elements
+        const indicator = document.createElement('div');
+        indicator.className = 'custom-scroll-indicator';
+        const thumb = document.createElement('div');
+        thumb.className = 'custom-scroll-thumb';
+        indicator.appendChild(thumb);
+        parentEl.appendChild(indicator);
+
+        let scrollTimeout;
+
+        function updateScrollbar() {
+            const { scrollHeight, clientHeight, scrollTop } = scrollEl;
+            if (scrollHeight <= clientHeight) {
+                indicator.style.opacity = '0';
+                return;
+            }
+
+            // Thumb height proportional to visible area
+            const thumbHeight = Math.max(30, (clientHeight / scrollHeight) * clientHeight);
+            const maxScroll = scrollHeight - clientHeight;
+            const thumbTop = maxScroll > 0 ? (scrollTop / maxScroll) * (clientHeight - thumbHeight) : 0;
+
+            thumb.style.height = thumbHeight + 'px';
+            thumb.style.transform = `translateY(${thumbTop}px)`;
+
+            // Show while scrolling
+            indicator.style.opacity = '1';
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                indicator.style.opacity = '0';
+            }, 1200);
+        }
+
+        scrollEl.addEventListener('scroll', updateScrollbar, { passive: true });
+        // Initial check after render
+        requestAnimationFrame(updateScrollbar);
+    });
 }
 
 /**
@@ -4102,15 +3664,13 @@ function setupTextSizeButtons(card) {
 }
 
 /**
- * Setup bookmark buttons on card
+ * Setup bookmark buttons on card — simple toggle handler
  */
 function setupBookmarkButtons(card) {
     card.querySelectorAll('.btn-bookmark').forEach(btn => {
-        if (btn._bookmarkBound) return; // Already bound
+        if (btn._bookmarkBound) return;
         btn._bookmarkBound = true;
-
         let touchHandled = false;
-
         btn.addEventListener('touchend', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -4119,7 +3679,6 @@ function setupBookmarkButtons(card) {
             toggleBookmark(btn);
             setTimeout(() => { touchHandled = false; }, 300);
         }, { capture: true, passive: false });
-
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -4554,14 +4113,18 @@ function handleDragMove(e, card) {
             }
         }
     } else {
-        // Vertical swipe - DO NOT move card, only track direction indicators
+        // Vertical swipe — card follows finger with rubber-band resistance
         if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
             e.preventDefault();
         }
 
-        // Direction classes only — no translateY on card
         card.classList.toggle('swiping-up', deltaY < -20);
         card.classList.toggle('swiping-down', deltaY > 20);
+
+        // iOS rubber band: full tracking up to 100px, then dampened
+        const resistance = Math.abs(deltaY) > 100 ? 0.3 : 0.8;
+        card.style.transition = 'none';
+        card.style.transform = `translateX(0) translateY(${deltaY * resistance}px)`;
     }
 }
 
@@ -4759,6 +4322,10 @@ function handleSwipeUp(card, story) {
         return;
     }
 
+    // Clear drag transform before layer transition
+    card.style.transition = 'none';
+    card.style.transform = 'translateX(0)';
+
     const isFlipped = card.dataset.flipped === 'true';
 
     if (!isFlipped && state.cardLayer === 'headline') {
@@ -4796,6 +4363,10 @@ function handleSwipeDown(card, story) {
         return;
     }
 
+    // Clear drag transform before layer transition
+    card.style.transition = 'none';
+    card.style.transform = 'translateX(0)';
+
     const isFlipped = card.dataset.flipped === 'true';
 
     if (isFlipped && state.cardLayer === 'summary') {
@@ -4816,9 +4387,13 @@ function handleSwipeDown(card, story) {
  * Snap card back to original position with spring animation
  */
 function snapCardBack(card) {
-    // Current card stays in place — no transform needed (card never moves during drag)
-    card.style.transform = '';
-    card.style.transition = '';
+    // Spring snap-back with iOS-style curve
+    card.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    card.style.transform = 'translateX(0)';
+    setTimeout(() => {
+        card.style.transition = '';
+        card.style.transform = '';
+    }, 400);
 
     // Reset adjacent cards to their off-screen positions
     const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
@@ -4934,7 +4509,7 @@ function nextCard() {
         renderProgressDots();
         renderCards();
         updatePrevButtonVisibility();
-        updateBookmarkStates();
+        updateBookmarkButtons();
 
         // Log navigation event
         const toStory = state.stories[state.currentIndex];
@@ -4974,7 +4549,7 @@ function prevCard() {
         renderProgressDots();
         renderCards();
         updatePrevButtonVisibility();
-        updateBookmarkStates();
+        updateBookmarkButtons();
         triggerHaptic('light');
         return;
     }
@@ -4987,7 +4562,7 @@ function prevCard() {
         renderProgressDots();
         renderCards();
         updatePrevButtonVisibility();
-        updateBookmarkStates();
+        updateBookmarkButtons();
         triggerHaptic('light');
 
         // Log navigation event
@@ -5120,24 +4695,24 @@ function updateCompletionButtons() {
             archiveBtn.querySelector('span').textContent = 'Go to archives';
         }
     } else if (state.archiveMode) {
-        // Archives completion buttons: "Review stories", "Your questions", "Back to today"
+        // Archives completion buttons: "Review stories", "Your Bookmarks", "Back to today"
         if (reviewBtn) {
             reviewBtn.querySelector('span').textContent = 'Review stories';
         }
         if (questionsBtn) {
-            questionsBtn.querySelector('span').textContent = 'Your questions';
+            questionsBtn.querySelector('span').textContent = 'Your Bookmarks';
             questionsBtn.dataset.faqAction = '';
         }
         if (archiveBtn) {
             archiveBtn.querySelector('span').textContent = 'Back to today';
         }
     } else {
-        // Stories completion buttons: "Review stories", "Your questions", "Go to archives"
+        // Stories completion buttons: "Review stories", "Your Bookmarks", "Go to archives"
         if (reviewBtn) {
             reviewBtn.querySelector('span').textContent = 'Review stories';
         }
         if (questionsBtn) {
-            questionsBtn.querySelector('span').textContent = 'Your questions';
+            questionsBtn.querySelector('span').textContent = 'Your Bookmarks';
             questionsBtn.dataset.faqAction = '';
         }
         if (archiveBtn) {
@@ -5760,7 +5335,9 @@ function setupAnswerCardSwipe() {
 
         if (isDismissing && deltaY > 0) {
             e.preventDefault();
-            // NO card transform — card stays in place during swipe
+            const resistance = deltaY > 100 ? 0.3 : 0.8;
+            answerCard.style.transition = 'none';
+            answerCard.style.transform = `translateY(${deltaY * resistance}px)`;
         }
     };
 
@@ -5770,8 +5347,11 @@ function setupAnswerCardSwipe() {
         if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideAnswerCard();
+        } else if (isDismissing) {
+            answerCard.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            answerCard.style.transform = 'translateY(0)';
+            setTimeout(() => { answerCard.style.transition = ''; }, 400);
         }
-        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -5847,7 +5427,9 @@ function setupDigDeeperQACardSwipe() {
 
         if (isDismissing && deltaY > 0) {
             e.preventDefault();
-            // NO card transform — card stays in place during swipe
+            const resistance = deltaY > 100 ? 0.3 : 0.8;
+            digDeeperQACard.style.transition = 'none';
+            digDeeperQACard.style.transform = `translateY(${deltaY * resistance}px)`;
         }
     };
 
@@ -5857,8 +5439,11 @@ function setupDigDeeperQACardSwipe() {
         if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideDigDeeperQACard();
+        } else if (isDismissing) {
+            digDeeperQACard.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            digDeeperQACard.style.transform = 'translateY(0)';
+            setTimeout(() => { digDeeperQACard.style.transition = ''; }, 400);
         }
-        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -5938,7 +5523,9 @@ function setupDigDeeperAnswerCardSwipe() {
 
         if (isDismissing && deltaY > 0) {
             e.preventDefault();
-            // NO card transform — card stays in place during swipe
+            const resistance = deltaY > 100 ? 0.3 : 0.8;
+            digDeeperAnswerCard.style.transition = 'none';
+            digDeeperAnswerCard.style.transform = `translateY(${deltaY * resistance}px)`;
         }
     };
 
@@ -5948,8 +5535,11 @@ function setupDigDeeperAnswerCardSwipe() {
         if (isDismissing && deltaY > 100) {
             triggerHaptic('light');
             hideDigDeeperAnswerCard();
+        } else if (isDismissing) {
+            digDeeperAnswerCard.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            digDeeperAnswerCard.style.transform = 'translateY(0)';
+            setTimeout(() => { digDeeperAnswerCard.style.transition = ''; }, 400);
         }
-        // No snap-back needed — card never moved
 
         startY = 0;
         currentY = 0;
@@ -6945,9 +6535,7 @@ function setupEventListeners() {
         closeBookmarksPage();
     });
 
-    // Bookmarks filter change handlers
-    safeAddListener(elements.filterDate, 'change', applyBookmarkFilters);
-    safeAddListener(elements.filterCategory, 'change', applyBookmarkFilters);
+    // (Bookmark filter handlers removed — filters no longer used)
 
     // FAQs menu button - force refresh to get latest FAQ content
     safeAddListener(elements.faqsBtn, 'click', async () => {
@@ -7088,21 +6676,19 @@ function setupEventListeners() {
         resetApp();
     });
 
-    // Your Questions button (on completion screen) - behavior changes in FAQ mode
+    // Your Bookmarks button (on completion screen) - behavior changes in FAQ mode
     if (elements.yourQuestionsBtn) {
         elements.yourQuestionsBtn.addEventListener('click', async () => {
             triggerHaptic('light');
 
             // In FAQ mode, this button becomes "Go to stories"
             if (elements.yourQuestionsBtn.dataset.faqAction === 'go-to-stories') {
-                // Use state machine to properly transition to stories
                 await transitionToMode('stories');
                 return;
             }
 
-            // Default behavior: show question history
-            state.cameFromCompletion = true; // Track that we came from completion
-            switchSection('history');
+            // Default behavior: open bookmarks page
+            openBookmarksPage();
         });
     }
 
