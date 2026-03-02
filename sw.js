@@ -3,7 +3,7 @@
  * Enables offline functionality and caching
  */
 
-const CACHE_NAME = 'fyi-v36-lean';
+const CACHE_NAME = 'fyi-v38.2-foundation';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
