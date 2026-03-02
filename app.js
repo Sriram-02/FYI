@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v38.5';
+const APP_VERSION = 'v38.6';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -4199,7 +4199,16 @@ function handleDragEnd(e, card, story) {
             handleSwipeLeft(card, story);
         }
     } else if (isVertical && meetsVerticalThreshold) {
-        // VERTICAL SWIPE: layer navigation
+        // Sub-card layers have their own swipe handlers via initSubCardSwipe.
+        // Parent card should only handle vertical swipes on L1 (headline) and L2 (summary).
+        if (state.cardLayer !== 'headline' && state.cardLayer !== 'summary') {
+            snapCardBack(card);
+            state.currentX = 0;
+            state.currentY = 0;
+            return;
+        }
+
+        // VERTICAL SWIPE: layer navigation (L1 ↔ L2 only)
         triggerHaptic('light');
 
         if (deltaY < 0) {
@@ -5008,6 +5017,19 @@ function initSubCardSwipe(card, opts) {
     card.addEventListener('touchend', handleEnd);
 }
 
+/**
+ * Clear residual inline transforms from all sub-cards after navigation completes.
+ * Prevents transform accumulation when swipe gestures and navigation transitions overlap.
+ */
+function clearSwipeTransforms() {
+    const current = document.querySelector('.story-card[data-card-type="current"]');
+    if (!current) return;
+    ['.qa-card', '.answer-card', '.dig-deeper-qa-card', '.dig-deeper-answer-card'].forEach(sel => {
+        const el = current.querySelector(sel);
+        if (el) { el.style.transform = ''; el.style.transition = ''; }
+    });
+}
+
 // ==========================================
 // SUB-CARD SWIPE SETUP (uses initSubCardSwipe)
 // ==========================================
@@ -5043,16 +5065,8 @@ function closeQACard() {
     // Update layer state - return to SUMMARY
     state.cardLayer = 'summary';
 
-    // Reset Q&A card inline transform
-    const currentCard = document.querySelector('.story-card[data-card-type="current"]');
-    if (currentCard) {
-        const qaCard = currentCard.querySelector('.qa-card');
-        if (qaCard) {
-            qaCard.style.transform = '';
-        }
-    }
-
     updateUI();
+    clearSwipeTransforms();
 }
 
 // ==========================================
@@ -5106,10 +5120,7 @@ function hideAnswerCard() {
     if (!currentCard) return;
 
     const answerCard = currentCard.querySelector('.answer-card');
-    if (answerCard) {
-        answerCard.classList.remove('active');
-        answerCard.style.transform = '';
-    }
+    if (answerCard) answerCard.classList.remove('active');
 
     // Update state - return to Q&A
     state.cardLayer = 'questions';
@@ -5119,7 +5130,7 @@ function hideAnswerCard() {
     state.currentPath = { l3QuestionIndex: null, l5QuestionIndex: null };
 
     updateUI();
-
+    clearSwipeTransforms();
 }
 
 /**
@@ -5217,15 +5228,13 @@ function hideDigDeeperQACard() {
     if (!currentCard) return;
 
     const digDeeperQACard = currentCard.querySelector('.dig-deeper-qa-card');
-    if (digDeeperQACard) {
-        digDeeperQACard.classList.remove('active');
-        digDeeperQACard.style.transform = '';
-    }
+    if (digDeeperQACard) digDeeperQACard.classList.remove('active');
 
     // Update state - return to Answer
     state.cardLayer = 'answer';
 
     updateUI();
+    clearSwipeTransforms();
 
 }
 
@@ -5327,10 +5336,7 @@ function hideDigDeeperAnswerCard() {
     if (!currentCard) return;
 
     const digDeeperAnswerCard = currentCard.querySelector('.dig-deeper-answer-card');
-    if (digDeeperAnswerCard) {
-        digDeeperAnswerCard.classList.remove('active');
-        digDeeperAnswerCard.style.transform = '';
-    }
+    if (digDeeperAnswerCard) digDeeperAnswerCard.classList.remove('active');
 
     // Update state - return to Dig Deeper Q&A
     state.cardLayer = 'dig-deeper-qa';
@@ -5340,7 +5346,7 @@ function hideDigDeeperAnswerCard() {
     state.currentPath.l5QuestionIndex = null;
 
     updateUI();
-
+    clearSwipeTransforms();
 }
 
 /**
@@ -5498,11 +5504,11 @@ function showQAView() {
         elements.qaView.style.transform = 'translateX(-100%)';
         elements.qaView.classList.remove('hidden');
 
-        // Force reflow
-        void elements.qaView.offsetHeight;
-
-        elements.qaView.style.transform = '';
-        currentView.classList.add('slide-out-left');
+        // Double-rAF: lets browser commit first style before triggering transition
+        requestAnimationFrame(() => { requestAnimationFrame(() => {
+            elements.qaView.style.transform = '';
+            currentView.classList.add('slide-out-left');
+        }); });
 
         setTimeout(() => {
             currentView.classList.add('hidden');
@@ -5709,9 +5715,6 @@ function showDigDeeper() {
     elements.digDeeperView.style.display = 'block';
     elements.digDeeperView.style.visibility = 'visible';
     elements.digDeeperView.style.opacity = '1';
-
-    // Force reflow
-    void elements.digDeeperView.offsetHeight;
 }
 
 function hideDigDeeper() {
@@ -5738,9 +5741,6 @@ function showDeepAnswer(deepQuestion, questionIndex) {
     elements.deepAnswerView.style.display = 'block';
     elements.deepAnswerView.style.visibility = 'visible';
     elements.deepAnswerView.style.opacity = '1';
-
-    // Force reflow
-    void elements.deepAnswerView.offsetHeight;
 }
 
 function backToDeepQuestions() {
@@ -5753,9 +5753,6 @@ function backToDeepQuestions() {
     elements.digDeeperView.style.display = 'block';
     elements.digDeeperView.style.visibility = 'visible';
     elements.digDeeperView.style.opacity = '1';
-
-    // Force reflow
-    void elements.digDeeperView.offsetHeight;
 }
 
 function hideDigDeeperToAnswer() {
@@ -5768,9 +5765,6 @@ function hideDigDeeperToAnswer() {
     elements.answerView.style.display = 'block';
     elements.answerView.style.visibility = 'visible';
     elements.answerView.style.opacity = '1';
-
-    // Force reflow
-    void elements.answerView.offsetHeight;
 }
 
 function deepDone() {
@@ -5788,9 +5782,6 @@ function resetAllModalViews() {
         v.classList.remove('fade-out', 'fade-in', 'slide-out-left');
         v.style.cssText = '';
     });
-
-    // Force reflow
-    void document.body.offsetHeight;
 }
 
 /**
