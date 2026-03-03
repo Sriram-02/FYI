@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v38.7';
+const APP_VERSION = 'v38.9';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -650,71 +650,8 @@ const sessionStartTime = Date.now();
  * Calculate and set the fixed card height based on viewport
  * Called on init, resize, and orientation change
  */
-function setCardHeight() {
-    // Safety buffer for browser chrome, Android scaling, and visual breathing room
-    const BUFFER = 100;
-
-    // Use most conservative viewport measurement
-    const viewportHeight = Math.min(
-        window.innerHeight,
-        document.documentElement.clientHeight,
-        window.visualViewport?.height || Infinity
-    );
-
-    // Measure actual elements when possible, with fallbacks
-    const header = document.querySelector('.header');
-    const progressArea = document.querySelector('.progress-area');
-
-    const headerHeight = header ? header.offsetHeight : 60;
-    const progressHeight = progressArea ? progressArea.offsetHeight : 50;
-
-    // Get safe areas with sensible defaults
-    const rootStyles = getComputedStyle(document.documentElement);
-    const safeTop = parseInt(rootStyles.getPropertyValue('--sat')) || 0;
-    const safeBottom = parseInt(rootStyles.getPropertyValue('--sab')) || 20; // Default accounts for gesture areas
-
-    // Bottom margin for visual breathing room
-    const bottomMargin = 24;
-
-    // Calculate available height (conservative) — 85% of previous for compact sizing
-    let cardHeight = (viewportHeight - headerHeight - progressHeight - safeTop - safeBottom - bottomMargin - BUFFER) * 0.85;
-
-    // Cap at 85vh — more vertical space for content
-    const maxHeight = viewportHeight * 0.85;
-    cardHeight = Math.min(cardHeight, maxHeight);
-
-    // Enforce 1.5:1 max aspect ratio (height:width)
-    // Card max-width is min(360px, 82vw) — estimate actual card width
-    const viewportWidth = Math.min(window.innerWidth, document.documentElement.clientWidth);
-    const cardWidth = Math.min(360, viewportWidth * 0.82);
-    const maxAspectHeight = cardWidth * 1.5;
-    cardHeight = Math.min(cardHeight, maxAspectHeight);
-
-    // Set as CSS custom property
-    document.documentElement.style.setProperty('--card-height', cardHeight + 'px');
-
-}
-
-/**
- * Initialize card height system with event listeners
- */
-function initCardHeightSystem() {
-    // Set initial height
-    setCardHeight();
-
-    // Update on resize
-    window.addEventListener('resize', setCardHeight);
-
-    // Update on orientation change (with delay for iOS)
-    window.addEventListener('orientationchange', () => {
-        setTimeout(setCardHeight, 100);
-    });
-
-    // For iOS Safari: use visualViewport API if available
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', setCardHeight);
-    }
-}
+// setCardHeight / initCardHeightSystem REMOVED (v38.8)
+// Card sizing is now pure CSS: width: calc(100vw - 10px), height: min(calc((100vw-10px)*1.5), 90vh)
 
 // ==========================================
 // Fallback Story Data (used when sheet not configured)
@@ -1516,8 +1453,7 @@ function cacheElements() {
 async function init() {
     try {
 
-        // Initialize fixed card height system FIRST
-        initCardHeightSystem();
+        // Card height now pure CSS — no JS calculation needed (v38.8)
 
         cacheElements();
 
@@ -3401,6 +3337,7 @@ function setupCardInteractions(card, story) {
             snapCardBack(card);
             state.currentX = 0;
             state.currentY = 0;
+            state._textSwipeActive = false;
         }
     });
 
@@ -3442,63 +3379,25 @@ function setupCardInteractions(card, story) {
     // Setup dig deeper hint button (answer card → dig deeper Q&A)
     setupDigDeeperHintButton(card);
 
-    // Setup custom scroll indicators for Safari iOS
-    setupScrollIndicators(card);
-}
-
-/**
- * Custom Scrollbar — Universal, Safari-proof
- * Completely isolated visual indicator, works on ALL browsers.
- * Native scrollbar is hidden via CSS; this replaces it.
- */
-function setupScrollIndicators(card) {
-    const configs = [
-        { scrollEl: '.card-teaser', parentEl: '.card-body' },
-        { scrollEl: '.card-summary-text', parentEl: '.card-back-content' }
-    ];
-
-    configs.forEach(({ scrollEl: sel, parentEl: pSel }) => {
-        const scrollEl = card.querySelector(sel);
-        const parentEl = card.querySelector(pSel);
-        if (!scrollEl || !parentEl) return;
-
-        // Create indicator elements
-        const indicator = document.createElement('div');
-        indicator.className = 'custom-scroll-indicator';
-        const thumb = document.createElement('div');
-        thumb.className = 'custom-scroll-thumb';
-        indicator.appendChild(thumb);
-        parentEl.appendChild(indicator);
-
-        let scrollTimeout;
-
-        function updateScrollbar() {
-            const { scrollHeight, clientHeight, scrollTop } = scrollEl;
-            if (scrollHeight <= clientHeight) {
-                indicator.style.opacity = '0';
-                return;
-            }
-
-            // Thumb height proportional to visible area
-            const thumbHeight = Math.max(30, (clientHeight / scrollHeight) * clientHeight);
-            const maxScroll = scrollHeight - clientHeight;
-            const thumbTop = maxScroll > 0 ? (scrollTop / maxScroll) * (clientHeight - thumbHeight) : 0;
-
-            thumb.style.height = thumbHeight + 'px';
-            thumb.style.transform = `translateY(${thumbTop}px)`;
-
-            // Show while scrolling
-            indicator.style.opacity = '1';
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                indicator.style.opacity = '0';
-            }, 1200);
-        }
-
-        scrollEl.addEventListener('scroll', updateScrollbar, { passive: true });
-        // Initial check after render
-        requestAnimationFrame(updateScrollbar);
-    });
+    // v38.8: Scroll-aware swipe on L1/L2 text containers.
+    // Reuses initSubCardSwipe so teaser/summary text scrolls normally when content
+    // overflows, but swipe-up at bottom navigates forward and swipe-down at top goes back.
+    const teaser = card.querySelector('.card-teaser');
+    if (teaser) {
+        initSubCardSwipe(teaser, {
+            scrollSelector: '.card-teaser', // Matches self — card IS the scrollable element
+            onSwipeUp: () => handleSwipeUp(card, story),
+            onSwipeDown: null // Can't go back from L1 headline
+        });
+    }
+    const summaryText = card.querySelector('.card-summary-text');
+    if (summaryText) {
+        initSubCardSwipe(summaryText, {
+            scrollSelector: '.card-summary-text', // Matches self
+            onSwipeUp: () => handleSwipeUp(card, story),
+            onSwipeDown: () => handleSwipeDown(card, story)
+        });
+    }
 }
 
 /**
@@ -4037,9 +3936,12 @@ function handleDragStart(e, card, story) {
         return;
     }
 
-    // v38.7: Scroll detection REMOVED from L1/L2 — card swipes always win.
-    // These handlers only process headline + summary layers (L3+ has early return in handleDragEnd).
-    // Content scroll on .card-teaser/.card-summary-text was eating swipe-up gestures.
+    // v38.8: Detect if touch is on a text container with scroll-aware swipe handler.
+    // If so, initSubCardSwipe on the text container handles vertical gestures;
+    // parent only processes horizontal swipes (story navigation) and taps.
+    const scrollManagedEl = target.closest('.card-teaser, .card-summary-text');
+    state._textSwipeActive = !!(scrollManagedEl && scrollManagedEl._swipeStart);
+
     state.isDragging = true;
     state.isLongPress = false;
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -4108,7 +4010,10 @@ function handleDragMove(e, card) {
             }
         }
     } else {
-        // Vertical swipe — card follows finger with rubber-band resistance
+        // Vertical swipe — if text container has its own handler, defer to it
+        if (state._textSwipeActive) return;
+
+        // Card follows finger with rubber-band resistance
         if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
             e.preventDefault();
         }
@@ -4167,6 +4072,13 @@ function handleDragEnd(e, card, story) {
             // RIGHT SWIPE = Previous story (swipe toward prev)
             handleSwipeLeft(card, story);
         }
+    } else if (isVertical && state._textSwipeActive) {
+        // Text container's initSubCardSwipe handled vertical — just clean up
+        snapCardBack(card);
+        state._textSwipeActive = false;
+        state.currentX = 0;
+        state.currentY = 0;
+        return;
     } else if (isVertical && meetsVerticalThreshold) {
         // Sub-card layers have their own swipe handlers via initSubCardSwipe.
         // Parent card should only handle vertical swipes on L1 (headline) and L2 (summary).
@@ -4194,6 +4106,7 @@ function handleDragEnd(e, card, story) {
 
     state.currentX = 0;
     state.currentY = 0;
+    state._textSwipeActive = false;
 }
 
 /**
@@ -4870,9 +4783,11 @@ function initSubCardSwipe(card, opts) {
 
     let startY = 0;
     let currentY = 0;
+    let prevMoveY = 0;      // Track per-frame delta for JS-driven scrolling
     let startTime = 0;
     let gestureDecided = false;
     let isScrolling = false;
+    let scrollBodyRef = null; // Cached scroll target for JS-driven scroll
     let swipeDirection = null; // 'up' | 'down' | null
 
     // Remove old listeners to prevent duplicates
@@ -4889,36 +4804,39 @@ function initSubCardSwipe(card, opts) {
 
         startY = e.touches[0].clientY;
         currentY = startY;
+        prevMoveY = startY;
         startTime = Date.now();
         gestureDecided = false;
         isScrolling = false;
+        scrollBodyRef = null;
         swipeDirection = null;
     };
 
     const handleMove = (e) => {
         if (startY === 0) return; // Touch started on interactive element
-        currentY = e.touches[0].clientY;
+        const newY = e.touches[0].clientY;
+        const moveDelta = newY - prevMoveY; // Per-frame delta
+        prevMoveY = newY;
+        currentY = newY;
         const deltaY = currentY - startY;
 
         // Decide gesture once after 8px movement
         if (!gestureDecided && Math.abs(deltaY) > 8) {
             gestureDecided = true;
 
-            const scrollBody = scrollSelector ? e.target.closest(scrollSelector) : null;
-            const hasOverflow = scrollBody && (scrollBody.scrollHeight > scrollBody.clientHeight + 2);
+            scrollBodyRef = scrollSelector ? e.target.closest(scrollSelector) : null;
+            const hasOverflow = scrollBodyRef && (scrollBodyRef.scrollHeight > scrollBodyRef.clientHeight + 2);
 
             if (hasOverflow) {
-                const atTop = scrollBody.scrollTop <= 0;
-                const atBottom = scrollBody.scrollTop >= (scrollBody.scrollHeight - scrollBody.clientHeight - 2);
+                const atTop = scrollBodyRef.scrollTop <= 0;
+                const atBottom = scrollBodyRef.scrollTop >= (scrollBodyRef.scrollHeight - scrollBodyRef.clientHeight - 2);
 
                 if (deltaY > 0 && atTop) {
-                    // Pulling down at scroll top → swipe-down
                     swipeDirection = 'down';
                 } else if (deltaY < 0 && atBottom) {
-                    // Pulling up at scroll bottom → swipe-up
                     swipeDirection = 'up';
                 } else {
-                    // Mid-scroll → native scroll
+                    // Mid-scroll → JS-driven scroll (touch-action: none on ancestors)
                     isScrolling = true;
                 }
             } else {
@@ -4927,7 +4845,14 @@ function initSubCardSwipe(card, opts) {
             }
         }
 
-        if (isScrolling) return;
+        if (isScrolling) {
+            // JS-driven scroll: works regardless of touch-action on ancestors
+            if (scrollBodyRef) {
+                e.preventDefault();
+                scrollBodyRef.scrollTop -= moveDelta;
+            }
+            return;
+        }
 
         // Only move card if we have a handler for this direction
         const hasHandler = (swipeDirection === 'down' && onSwipeDown) || (swipeDirection === 'up' && onSwipeUp);
@@ -4971,9 +4896,11 @@ function initSubCardSwipe(card, opts) {
 
         startY = 0;
         currentY = 0;
+        prevMoveY = 0;
         startTime = 0;
         gestureDecided = false;
         isScrolling = false;
+        scrollBodyRef = null;
         swipeDirection = null;
     };
 
@@ -4986,9 +4913,11 @@ function initSubCardSwipe(card, opts) {
         }
         startY = 0;
         currentY = 0;
+        prevMoveY = 0;
         startTime = 0;
         gestureDecided = false;
         isScrolling = false;
+        scrollBodyRef = null;
         swipeDirection = null;
     };
 
@@ -5011,7 +4940,8 @@ function initSubCardSwipe(card, opts) {
 function clearSwipeTransforms() {
     const current = document.querySelector('.story-card[data-card-type="current"]');
     if (!current) return;
-    ['.qa-card', '.answer-card', '.dig-deeper-qa-card', '.dig-deeper-answer-card'].forEach(sel => {
+    ['.qa-card', '.answer-card', '.dig-deeper-qa-card', '.dig-deeper-answer-card',
+     '.card-teaser', '.card-summary-text'].forEach(sel => {
         const el = current.querySelector(sel);
         if (el) { el.style.transform = ''; el.style.transition = ''; }
     });
