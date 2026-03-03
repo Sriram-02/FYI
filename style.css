@@ -915,13 +915,6 @@ button {
     overscroll-behavior: none;
 }
 
-/* Safari safe-area card positioning */
-@supports (-webkit-touch-callout: none) {
-    .story-card {
-        margin-top: env(safe-area-inset-top, 0px);
-    }
-}
-
 /* Mobile override: card fills viewport with minimal 5px margins */
 @media (max-width: 480px) {
     .card-container {
@@ -934,7 +927,9 @@ button {
         width: calc(100vw - 10px);
         max-width: 100%;
         height: min(calc((100vw - 10px) * 1.5), 90vh);
+        height: min(calc((100vw - 10px) * 1.5), 90dvh);
         max-height: 90vh;
+        max-height: 90dvh;
     }
 }
 
@@ -1051,7 +1046,7 @@ button {
     overflow-y: auto; /* Scroll only when needed */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    touch-action: manipulation; /* JS handles swipe vs scroll on L1/L2 */
+    touch-action: none; /* Card-level gestures only; text scrolls via scrollbar/wheel */
 }
 
 /* ========================================
@@ -1244,7 +1239,7 @@ button {
     overflow-y: auto; /* Scroll only when needed */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    touch-action: manipulation; /* JS handles swipe vs scroll on L1/L2 */
+    touch-action: none; /* Card-level gestures only; text scrolls via scrollbar/wheel */
     /* Compositing hint: nudge Safari to create independent scroll layer
        even when ancestor has 3D transforms + backface-visibility:hidden */
     will-change: scroll-position;
