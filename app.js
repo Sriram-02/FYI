@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v38.6';
+const APP_VERSION = 'v38.7';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -1394,7 +1394,7 @@ function cacheElements() {
     elements.progressFill = document.getElementById('progressFill');
     elements.dateDisplay = document.getElementById('dateDisplay');
     elements.progressDots = document.getElementById('progressDots');
-    elements.pullIndicator = document.getElementById('pullIndicator');
+    // pullIndicator removed (v38.7 — pull-to-refresh killed)
     elements.loadingState = document.getElementById('loadingState');
     elements.loadingText = document.querySelector('.loading-text');
     elements.mainContent = document.getElementById('mainContent');
@@ -3393,6 +3393,16 @@ function setupCardInteractions(card, story) {
     card.addEventListener('touchstart', (e) => handleDragStart(e, card, story), { passive: true });
     card.addEventListener('touchmove', (e) => handleDragMove(e, card), { passive: false });
     card.addEventListener('touchend', (e) => handleDragEnd(e, card, story));
+    card.addEventListener('touchcancel', () => {
+        // Touch interrupted (notification, multi-touch, etc.) — snap back
+        if (state.isDragging) {
+            state.isDragging = false;
+            card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
+            snapCardBack(card);
+            state.currentX = 0;
+            state.currentY = 0;
+        }
+    });
 
     // Mouse events for desktop swiping
     card.addEventListener('mousedown', (e) => handleDragStart(e, card, story));
@@ -4027,15 +4037,9 @@ function handleDragStart(e, card, story) {
         return;
     }
 
-    // Check if touch is inside a scrollable L1/L2 content area
-    const scrollableEl = target.closest('.card-teaser, .card-summary-text');
-    state._scrollTarget = null;
-    state._gestureDecided = false;
-    state._isContentScroll = false;
-    if (scrollableEl && scrollableEl.scrollHeight > scrollableEl.clientHeight + 2) {
-        state._scrollTarget = scrollableEl;
-    }
-
+    // v38.7: Scroll detection REMOVED from L1/L2 — card swipes always win.
+    // These handlers only process headline + summary layers (L3+ has early return in handleDragEnd).
+    // Content scroll on .card-teaser/.card-summary-text was eating swipe-up gestures.
     state.isDragging = true;
     state.isLongPress = false;
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -4061,28 +4065,6 @@ function handleDragMove(e, card) {
 
     const deltaX = clientX - state.startX;
     const deltaY = clientY - state.startY;
-
-    // NUCLEAR FIX: If touch is in a scrollable L1/L2 area, decide gesture once
-    if (state._scrollTarget && !state._gestureDecided && (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8)) {
-        state._gestureDecided = true;
-        const isVertical = Math.abs(deltaY) > Math.abs(deltaX);
-        if (isVertical) {
-            // Vertical movement in scrollable area → let native scroll handle it
-            const atTop = state._scrollTarget.scrollTop <= 0;
-            const atBottom = state._scrollTarget.scrollTop >= (state._scrollTarget.scrollHeight - state._scrollTarget.clientHeight - 2);
-            // Only allow native scroll if NOT at boundary, or if at boundary and pulling further into boundary
-            if ((deltaY > 0 && !atTop) || (deltaY < 0 && !atBottom) || (!atTop && !atBottom)) {
-                state._isContentScroll = true;
-            }
-            // If at top pulling down or at bottom pulling up, let card swipe handle it
-        }
-        // Horizontal movement → proceed with card drag (not content scroll)
-    }
-
-    // If content is scrolling, abort all card transforms
-    if (state._isContentScroll) {
-        return; // Let native scroll happen
-    }
 
     state.currentX = deltaX;
     state.currentY = deltaY;
@@ -4146,19 +4128,6 @@ function handleDragEnd(e, card, story) {
 
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
-
-    // NUCLEAR FIX: If was content scrolling, just clean up — no swipe action
-    if (state._isContentScroll) {
-        state._scrollTarget = null;
-        state._gestureDecided = false;
-        state._isContentScroll = false;
-        state.currentX = 0;
-        state.currentY = 0;
-        return;
-    }
-    state._scrollTarget = null;
-    state._gestureDecided = false;
-    state._isContentScroll = false;
 
     const deltaX = state.currentX;
     const deltaY = state.currentY;
@@ -4911,6 +4880,7 @@ function initSubCardSwipe(card, opts) {
         card.removeEventListener('touchstart', card._swipeStart);
         card.removeEventListener('touchmove', card._swipeMove);
         card.removeEventListener('touchend', card._swipeEnd);
+        if (card._swipeCancel) card.removeEventListener('touchcancel', card._swipeCancel);
     }
 
     const handleStart = (e) => {
@@ -5007,14 +4977,31 @@ function initSubCardSwipe(card, opts) {
         swipeDirection = null;
     };
 
+    const handleCancel = () => {
+        // Touch interrupted — snap back to prevent stuck cards
+        if (startY !== 0 && swipeDirection && !isScrolling) {
+            card.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            card.style.transform = 'translateY(0)';
+            setTimeout(() => { card.style.transition = ''; }, 400);
+        }
+        startY = 0;
+        currentY = 0;
+        startTime = 0;
+        gestureDecided = false;
+        isScrolling = false;
+        swipeDirection = null;
+    };
+
     // Store for cleanup
     card._swipeStart = handleStart;
     card._swipeMove = handleMove;
     card._swipeEnd = handleEnd;
+    card._swipeCancel = handleCancel;
 
     card.addEventListener('touchstart', handleStart, { passive: true });
     card.addEventListener('touchmove', handleMove, { passive: false });
     card.addEventListener('touchend', handleEnd);
+    card.addEventListener('touchcancel', handleCancel);
 }
 
 /**
@@ -6206,90 +6193,13 @@ function closeLookupTooltip() {
 // - Must hold for 300ms after reaching threshold
 // This prevents accidental refresh during normal swipe-down navigation
 
-const PULL_REFRESH_THRESHOLD = 150;  // px - must pull this far
-const PULL_REFRESH_HOLD_TIME = 300;  // ms - must hold after threshold
-
-function setupPullToRefresh() {
-    let pullStartY = 0;
-    let isPulling = false;
-    let pullHoldTimer = null;
-    let refreshReady = false;
-
-    elements.sectionToday.addEventListener('touchstart', (e) => {
-        // Only enable pull-to-refresh when at top of content
-        if (elements.sectionToday.scrollTop === 0) {
-            pullStartY = e.touches[0].clientY;
-            isPulling = true;
-            refreshReady = false;
-            clearTimeout(pullHoldTimer);
-            pullHoldTimer = null;
-        }
-    }, { passive: true });
-
-    elements.sectionToday.addEventListener('touchmove', (e) => {
-        if (!isPulling) return;
-
-        const pullDistance = e.touches[0].clientY - pullStartY;
-
-        // Only show indicator when past the high threshold
-        if (pullDistance > PULL_REFRESH_THRESHOLD) {
-            elements.pullIndicator.classList.add('visible');
-
-            if (refreshReady) {
-                elements.pullIndicator.querySelector('.pull-text').textContent = 'Release to refresh';
-            } else {
-                elements.pullIndicator.querySelector('.pull-text').textContent = 'Keep pulling...';
-
-                // Start hold timer if not already started
-                if (!pullHoldTimer) {
-                    pullHoldTimer = setTimeout(() => {
-                        refreshReady = true;
-                        // Haptic feedback when refresh is ready
-                        triggerHaptic('medium');
-                        elements.pullIndicator.querySelector('.pull-text').textContent = 'Release to refresh';
-                    }, PULL_REFRESH_HOLD_TIME);
-                }
-            }
-        } else {
-            // Below threshold - hide indicator and reset timer
-            elements.pullIndicator.classList.remove('visible');
-            clearTimeout(pullHoldTimer);
-            pullHoldTimer = null;
-            refreshReady = false;
-        }
-    }, { passive: true });
-
-    elements.sectionToday.addEventListener('touchend', (e) => {
-        if (!isPulling) return;
-
-        const pullDistance = e.changedTouches[0].clientY - pullStartY;
-
-        // Only trigger refresh if threshold was met AND hold time completed
-        if (pullDistance > PULL_REFRESH_THRESHOLD && refreshReady) {
-            triggerHaptic('heavy');
-            elements.pullIndicator.classList.add('refreshing');
-            elements.pullIndicator.querySelector('.pull-text').textContent = 'Refreshing...';
-            refreshStories();
-        } else {
-            // Not a refresh - just hide indicator
-            elements.pullIndicator.classList.remove('visible');
-        }
-
-        // Reset state
-        isPulling = false;
-        refreshReady = false;
-        clearTimeout(pullHoldTimer);
-        pullHoldTimer = null;
-    });
-}
-
+// Pull-to-refresh gesture REMOVED (v38.7) — conflicted with card swipe-down.
+// refreshStories() kept for empty-state refresh button.
 async function refreshStories() {
     await fetchStories();
     renderCards();
     updateProgress();
     renderProgressDots();
-
-    elements.pullIndicator.classList.remove('visible', 'refreshing');
 }
 
 // ==========================================
@@ -6747,8 +6657,7 @@ function setupEventListeners() {
         }
     });
 
-    // Pull to refresh
-    setupPullToRefresh();
+    // Pull to refresh — REMOVED (conflicted with card swipe-down gestures)
 
     // Keyboard shortcuts - NEW NAVIGATION SYSTEM
     document.addEventListener('keydown', (e) => {
