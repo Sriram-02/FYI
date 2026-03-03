@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v39.0';
+const APP_VERSION = 'v39.1';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -2743,10 +2743,10 @@ function toggleTheme() {
 // ==========================================
 
 let textEnlarged = false;
-let textMultiplier = 1.0; // Default: 15px × 1.0 = 15px
-const TEXT_BASE_SIZE = 15;
+let textMultiplier = 1.0; // Default: 20px × 1.0 = 20px
+const TEXT_BASE_SIZE = 20;
 const TEXT_DEFAULT_MULTIPLIER = 1.0;
-const TEXT_ENLARGED_MULTIPLIER = 1.4; // 15px × 1.4 = 21px
+const TEXT_ENLARGED_MULTIPLIER = 1.5; // 20px × 1.5 = 30px
 let sliderVisible = false;
 
 const TEXT_SIZE_SELECTORS = [
