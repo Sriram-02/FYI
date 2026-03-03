@@ -4,7 +4,7 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v38.9';
+const APP_VERSION = 'v39.0';
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -3337,7 +3337,6 @@ function setupCardInteractions(card, story) {
             snapCardBack(card);
             state.currentX = 0;
             state.currentY = 0;
-            state._textSwipeActive = false;
         }
     });
 
@@ -3378,26 +3377,6 @@ function setupCardInteractions(card, story) {
 
     // Setup dig deeper hint button (answer card → dig deeper Q&A)
     setupDigDeeperHintButton(card);
-
-    // v38.8: Scroll-aware swipe on L1/L2 text containers.
-    // Reuses initSubCardSwipe so teaser/summary text scrolls normally when content
-    // overflows, but swipe-up at bottom navigates forward and swipe-down at top goes back.
-    const teaser = card.querySelector('.card-teaser');
-    if (teaser) {
-        initSubCardSwipe(teaser, {
-            scrollSelector: '.card-teaser', // Matches self — card IS the scrollable element
-            onSwipeUp: () => handleSwipeUp(card, story),
-            onSwipeDown: null // Can't go back from L1 headline
-        });
-    }
-    const summaryText = card.querySelector('.card-summary-text');
-    if (summaryText) {
-        initSubCardSwipe(summaryText, {
-            scrollSelector: '.card-summary-text', // Matches self
-            onSwipeUp: () => handleSwipeUp(card, story),
-            onSwipeDown: () => handleSwipeDown(card, story)
-        });
-    }
 }
 
 /**
@@ -3936,12 +3915,6 @@ function handleDragStart(e, card, story) {
         return;
     }
 
-    // v38.8: Detect if touch is on a text container with scroll-aware swipe handler.
-    // If so, initSubCardSwipe on the text container handles vertical gestures;
-    // parent only processes horizontal swipes (story navigation) and taps.
-    const scrollManagedEl = target.closest('.card-teaser, .card-summary-text');
-    state._textSwipeActive = !!(scrollManagedEl && scrollManagedEl._swipeStart);
-
     state.isDragging = true;
     state.isLongPress = false;
     state.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -4010,9 +3983,6 @@ function handleDragMove(e, card) {
             }
         }
     } else {
-        // Vertical swipe — if text container has its own handler, defer to it
-        if (state._textSwipeActive) return;
-
         // Card follows finger with rubber-band resistance
         if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
             e.preventDefault();
@@ -4072,13 +4042,6 @@ function handleDragEnd(e, card, story) {
             // RIGHT SWIPE = Previous story (swipe toward prev)
             handleSwipeLeft(card, story);
         }
-    } else if (isVertical && state._textSwipeActive) {
-        // Text container's initSubCardSwipe handled vertical — just clean up
-        snapCardBack(card);
-        state._textSwipeActive = false;
-        state.currentX = 0;
-        state.currentY = 0;
-        return;
     } else if (isVertical && meetsVerticalThreshold) {
         // Sub-card layers have their own swipe handlers via initSubCardSwipe.
         // Parent card should only handle vertical swipes on L1 (headline) and L2 (summary).
@@ -4106,7 +4069,6 @@ function handleDragEnd(e, card, story) {
 
     state.currentX = 0;
     state.currentY = 0;
-    state._textSwipeActive = false;
 }
 
 /**
@@ -4940,8 +4902,7 @@ function initSubCardSwipe(card, opts) {
 function clearSwipeTransforms() {
     const current = document.querySelector('.story-card[data-card-type="current"]');
     if (!current) return;
-    ['.qa-card', '.answer-card', '.dig-deeper-qa-card', '.dig-deeper-answer-card',
-     '.card-teaser', '.card-summary-text'].forEach(sel => {
+    ['.qa-card', '.answer-card', '.dig-deeper-qa-card', '.dig-deeper-answer-card'].forEach(sel => {
         const el = current.querySelector(sel);
         if (el) { el.style.transform = ''; el.style.transition = ''; }
     });
