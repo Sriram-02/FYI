@@ -797,46 +797,7 @@ button {
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
-/* ==========================================
-   Pull to Refresh
-   ========================================== */
-
-.pull-indicator {
-    position: absolute;
-    top: calc(var(--safe-top) + 70px);
-    left: 50%;
-    transform: translateX(-50%) translateY(-60px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-    opacity: 0;
-    transition: transform var(--transition-normal), opacity var(--transition-normal);
-    z-index: var(--z-hint);
-    pointer-events: none;
-}
-
-.pull-indicator.visible {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
-.pull-indicator.refreshing .pull-spinner {
-    animation: spin 1s linear infinite;
-}
-
-.pull-spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--border-color);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-}
-
-.pull-text {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-}
+/* Pull to Refresh — REMOVED v38.7 (conflicted with card swipe-down) */
 
 /* ==========================================
    Main Content
@@ -925,7 +886,7 @@ button {
     /* Prevent touch scrolling - we handle gestures manually */
     overflow: hidden;
     overscroll-behavior: none;
-    touch-action: pan-x; /* Allow horizontal swipes only */
+    touch-action: none; /* JS handles all gestures — no browser interference */
     -webkit-overflow-scrolling: auto; /* Disable momentum scrolling */
 
     /* Performance optimization */
@@ -947,7 +908,7 @@ button {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card);
     cursor: grab;
-    touch-action: pan-y;
+    touch-action: none; /* JS handles all card gestures */
     user-select: none;
     transform-origin: center center;
     transition: box-shadow var(--transition-normal);
@@ -1075,10 +1036,10 @@ button {
     /* Fill remaining space and scroll */
     flex: 1;
     min-height: 0; /* CRITICAL: allows flex child to shrink for scroll */
-    overflow-y: scroll; /* Always show scrollbar — matches card-summary-text */
+    overflow-y: auto; /* Scroll only when needed */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    touch-action: pan-y; /* Allow vertical scroll, don't let parent capture */
+    touch-action: manipulation; /* JS handles swipe vs scroll on L1/L2 */
 }
 
 /* ========================================
@@ -1284,10 +1245,10 @@ button {
     /* Fill remaining space and scroll */
     flex: 1;
     min-height: 0; /* CRITICAL: allows flex child to shrink for scroll */
-    overflow-y: scroll; /* Always show scrollbar */
+    overflow-y: auto; /* Scroll only when needed */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    touch-action: pan-y; /* Allow vertical scroll, don't let parent capture */
+    touch-action: manipulation; /* JS handles swipe vs scroll on L1/L2 */
 }
 
 /* ==========================================
