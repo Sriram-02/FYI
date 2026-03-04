@@ -4,7 +4,33 @@
  * Filters to show only today's stories
  */
 
-const APP_VERSION = 'v39.1';
+const APP_VERSION = 'v39.2';
+
+// ==========================================
+// GESTURE CONFIGURATION
+// ==========================================
+const GESTURE_CONFIG = {
+    touchSlop: 8,                        // Dead zone before gesture begins (px)
+    directionLockRatio: 1.2,             // Dominant axis must be 1.2x other to lock
+    horizontalCommitDistance: 50,         // px — commit on distance alone
+    horizontalMinDistForVelocity: 30,    // px — minimum distance for velocity-based commit
+    horizontalVelocityThreshold: 0.3,    // px/ms
+    verticalCommitDistance: 50,
+    verticalMinDistForVelocity: 30,
+    verticalVelocityThreshold: 0.3,
+    subCardCommitDistance: 100,           // Sub-card: higher threshold (longer gesture)
+    subCardMinDistForVelocity: 50,
+    subCardVelocityThreshold: 0.3,
+    tapMaxDistance: 15,                   // px — tap detection
+    tapMaxDuration: 300,                 // ms
+    swipeIndicatorThreshold: 20,         // px — CSS class toggle threshold
+    resistanceLightZone: 100,            // Smooth curve inflection point (px)
+    resistanceLightFactor: 0.8,          // Resistance at 0px
+    resistanceHeavyFactor: 0.3,          // Resistance at infinity
+    snapBackDuration: 400,               // ms
+    snapBackEasing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+    hapticOnCommitThreshold: true,       // Fire haptic when crossing commit threshold mid-drag
+};
 
 // ==========================================
 // CONFIGURATION - Edit this!
@@ -823,10 +849,15 @@ const state = {
     startX: 0,
     startY: 0,
     currentX: 0,
-    currentY: 0, // Track vertical movement for up/down swipes
-    dragThreshold: 50, // Reduced from 100 for new swipe mechanics
-    swipeVelocityThreshold: 0.3, // px/ms velocity threshold
-    swipeStartTime: 0, // Track swipe start time for velocity calculation
+    currentY: 0,
+    swipeStartTime: 0,
+    // v39.2 gesture state
+    gestureDecided: false,       // Touch slop exceeded?
+    lockedAxis: null,            // 'horizontal' | 'vertical' | null
+    crossedCommitThreshold: false, // For mid-drag haptic (fire once)
+    scrollTarget: null,          // Cached scrollable element for JS-driven scroll
+    isJSScrolling: false,        // Currently doing JS-driven scroll (not card swipe)
+    prevMoveY: 0,                // Per-frame Y for JS-driven scroll delta
     hasShownHint: false,
     rating: 0,
     history: [],
@@ -1566,6 +1597,7 @@ async function loadAppContent() {
     renderProgressDots();
     renderHistory();
     showSwipeHint();
+    showNavNudge(); // Teach swipe-up affordance on first ever open
     registerServiceWorker();
 
     // Log first story opened
@@ -2743,9 +2775,9 @@ function toggleTheme() {
 // ==========================================
 
 let textEnlarged = false;
-let textMultiplier = 1.0; // Default: 20px × 1.0 = 20px
+let textMultiplier = 1.1; // Default: 20px × 1.1 = 22px
 const TEXT_BASE_SIZE = 20;
-const TEXT_DEFAULT_MULTIPLIER = 1.0;
+const TEXT_DEFAULT_MULTIPLIER = 1.1; // 22px — comfortable reading default
 const TEXT_ENLARGED_MULTIPLIER = 1.5; // 20px × 1.5 = 30px
 let sliderVisible = false;
 
@@ -2791,7 +2823,7 @@ function loadTextSizePreference() {
 
     if (stored) {
         textMultiplier = parseFloat(stored);
-        // Clamp to valid range (handles migration from old 1.4–2.0 range)
+        // Clamp to valid range (handles migration from old ranges)
         textMultiplier = Math.min(Math.max(textMultiplier, 1.0), TEXT_ENLARGED_MULTIPLIER);
         textEnlarged = textMultiplier > TEXT_DEFAULT_MULTIPLIER;
     } else if (oldBool === 'true') {
@@ -2800,11 +2832,16 @@ function loadTextSizePreference() {
         textEnlarged = true;
         localStorage.setItem('fyi_text_multiplier', textMultiplier.toString());
         localStorage.removeItem('fyi_text_enlarged');
+    } else {
+        // First-time user — apply 22px default
+        textMultiplier = TEXT_DEFAULT_MULTIPLIER;
     }
+
+    // Always apply the current multiplier to all elements
+    applyTextSizeToAllElements();
 
     if (textEnlarged) {
         document.body.classList.add('text-enlarged');
-        applyTextSizeToAllElements();
         document.querySelectorAll('.btn-text-size').forEach(btn => {
             btn.classList.add('active');
         });
@@ -3334,9 +3371,20 @@ function setupCardInteractions(card, story) {
         if (state.isDragging) {
             state.isDragging = false;
             card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
+            // v39.2: will-change cleanup
+            card.style.willChange = '';
+            const nextC = document.querySelector('.story-card[data-card-type="next"]');
+            const prevC = document.querySelector('.story-card[data-card-type="prev"]');
+            if (nextC) nextC.style.willChange = '';
+            if (prevC) prevC.style.willChange = '';
             snapCardBack(card);
             state.currentX = 0;
             state.currentY = 0;
+            state.gestureDecided = false;
+            state.lockedAxis = null;
+            state.crossedCommitThreshold = false;
+            state.scrollTarget = null;
+            state.isJSScrolling = false;
         }
     });
 
@@ -3922,8 +3970,24 @@ function handleDragStart(e, card, story) {
     state.currentX = 0;
     state.currentY = 0;
     state.swipeStartTime = Date.now();
+
+    // v39.2: gesture enhancement state
+    state.gestureDecided = false;
+    state.lockedAxis = null;
+    state.crossedCommitThreshold = false;
+    state.scrollTarget = null;
+    state.isJSScrolling = false;
+    state.prevMoveY = state.startY;
+
+    // v39.2: will-change compositing hint
+    card.style.willChange = 'transform';
+    const nextC = document.querySelector('.story-card[data-card-type="next"]');
+    const prevC = document.querySelector('.story-card[data-card-type="prev"]');
+    if (nextC) nextC.style.willChange = 'transform, opacity';
+    if (prevC) prevC.style.willChange = 'transform, opacity';
+
     card.classList.add('dragging');
-    card.classList.add('touch-active'); // Subtle scale feedback
+    card.classList.add('touch-active');
     hideSwipeHint();
 }
 
@@ -3944,55 +4008,119 @@ function handleDragMove(e, card) {
     state.currentX = deltaX;
     state.currentY = deltaY;
 
-    // Determine dominant axis
-    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    // === JS-driven scroll mode (decided in slop phase below) ===
+    if (state.isJSScrolling && state.scrollTarget) {
+        if (e.type === 'touchmove') e.preventDefault();
+        const frameDelta = clientY - state.prevMoveY;
+        state.prevMoveY = clientY;
+        state.scrollTarget.scrollTop -= frameDelta;
+        return;
+    }
 
-    if (isHorizontal) {
-        // Horizontal swipe - DO NOT move current card, only show direction indicators
-        if (e.type === 'touchmove' && Math.abs(deltaX) > 10) {
-            e.preventDefault();
+    // === TOUCH SLOP: 8px dead zone before gesture begins ===
+    if (!state.gestureDecided) {
+        const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        if (totalMovement < GESTURE_CONFIG.touchSlop) {
+            return; // Still in dead zone — no visual changes
         }
 
-        // Show visual indicators for swipe direction (no card transform)
-        card.classList.toggle('swiping-left', deltaX < -20);
-        card.classList.toggle('swiping-right', deltaX > 20);
+        // Slop exceeded — decide and lock axis
+        state.gestureDecided = true;
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
 
-        // PROGRESSIVE REVEAL: Animate adjacent card proportionally during drag
+        if (absX > absY * GESTURE_CONFIG.directionLockRatio) {
+            state.lockedAxis = 'horizontal';
+        } else if (absY > absX * GESTURE_CONFIG.directionLockRatio) {
+            state.lockedAxis = 'vertical';
+        } else {
+            // Ambiguous diagonal — default to horizontal (story nav is primary)
+            state.lockedAxis = 'horizontal';
+        }
+
+        // === SCROLL BOUNDARY CHECK (vertical only) ===
+        // .card-teaser/.card-summary-text have touch-action:none, so native scroll
+        // is disabled. Use JS-driven scroll when container is mid-scroll.
+        if (state.lockedAxis === 'vertical') {
+            const target = e.target || e.srcElement;
+            const scrollContainer = target.closest('.card-teaser, .card-summary-text');
+            if (scrollContainer) {
+                const hasOverflow = scrollContainer.scrollHeight > scrollContainer.clientHeight + 2;
+                if (hasOverflow) {
+                    const atTop = scrollContainer.scrollTop <= 0;
+                    const atBottom = scrollContainer.scrollTop >=
+                        (scrollContainer.scrollHeight - scrollContainer.clientHeight - 2);
+                    const swipingDown = deltaY > 0;
+                    const swipingUp = deltaY < 0;
+
+                    // Mid-scroll: not at boundary in swipe direction → JS-driven scroll
+                    if ((swipingDown && !atTop) || (swipingUp && !atBottom)) {
+                        state.isJSScrolling = true;
+                        state.scrollTarget = scrollContainer;
+                        state.prevMoveY = clientY;
+                        if (e.type === 'touchmove') e.preventDefault();
+                        return;
+                    }
+                    // At boundary → continue with normal card gesture
+                }
+            }
+        }
+    }
+
+    // === preventDefault after slop decided ===
+    if (e.type === 'touchmove') {
+        e.preventDefault();
+    }
+
+    // === MID-DRAG HAPTIC: fire once when crossing commit threshold ===
+    if (GESTURE_CONFIG.hapticOnCommitThreshold && !state.crossedCommitThreshold) {
+        const commitDist = state.lockedAxis === 'horizontal'
+            ? GESTURE_CONFIG.horizontalCommitDistance
+            : GESTURE_CONFIG.verticalCommitDistance;
+        const relevantDelta = state.lockedAxis === 'horizontal' ? Math.abs(deltaX) : Math.abs(deltaY);
+        if (relevantDelta >= commitDist) {
+            state.crossedCommitThreshold = true;
+            triggerHaptic('light');
+        }
+    }
+
+    // === VISUAL FEEDBACK (locked axis only) ===
+    if (state.lockedAxis === 'horizontal') {
+        card.classList.toggle('swiping-left', deltaX < -GESTURE_CONFIG.swipeIndicatorThreshold);
+        card.classList.toggle('swiping-right', deltaX > GESTURE_CONFIG.swipeIndicatorThreshold);
+        card.classList.remove('swiping-up', 'swiping-down');
+
+        // Progressive reveal of adjacent card
         const screenWidth = window.innerWidth;
         const dragProgress = Math.min(Math.abs(deltaX) / (screenWidth * 0.35), 1);
 
         if (deltaX < 0) {
-            // Swiping LEFT (toward NEXT story)
             const nextCard = document.querySelector('.story-card[data-card-type="next"]');
             if (nextCard) {
-                const nextOffset = 110 - (dragProgress * 110);
-                const nextOpacity = 0.7 + (dragProgress * 0.3);
-                nextCard.style.transform = `translateX(${nextOffset}%)`;
-                nextCard.style.opacity = nextOpacity;
+                nextCard.style.transform = `translateX(${110 - (dragProgress * 110)}%)`;
+                nextCard.style.opacity = 0.7 + (dragProgress * 0.3);
                 nextCard.style.transition = 'none';
             }
         } else {
-            // Swiping RIGHT (toward PREV story)
             const prevCard = document.querySelector('.story-card[data-card-type="prev"]');
             if (prevCard) {
-                const prevOffset = -110 + (dragProgress * 110);
-                const prevOpacity = 0.7 + (dragProgress * 0.3);
-                prevCard.style.transform = `translateX(${prevOffset}%)`;
-                prevCard.style.opacity = prevOpacity;
+                prevCard.style.transform = `translateX(${-110 + (dragProgress * 110)}%)`;
+                prevCard.style.opacity = 0.7 + (dragProgress * 0.3);
                 prevCard.style.transition = 'none';
             }
         }
     } else {
-        // Card follows finger with rubber-band resistance
-        if (e.type === 'touchmove' && Math.abs(deltaY) > 10) {
-            e.preventDefault();
-        }
+        card.classList.toggle('swiping-up', deltaY < -GESTURE_CONFIG.swipeIndicatorThreshold);
+        card.classList.toggle('swiping-down', deltaY > GESTURE_CONFIG.swipeIndicatorThreshold);
+        card.classList.remove('swiping-left', 'swiping-right');
 
-        card.classList.toggle('swiping-up', deltaY < -20);
-        card.classList.toggle('swiping-down', deltaY > 20);
+        // Smooth progressive resistance: hyperbolic curve (no binary jump)
+        const absDelta = Math.abs(deltaY);
+        const light = GESTURE_CONFIG.resistanceLightFactor;
+        const heavy = GESTURE_CONFIG.resistanceHeavyFactor;
+        const zone = GESTURE_CONFIG.resistanceLightZone;
+        const resistance = heavy + (light - heavy) / (1 + absDelta / zone);
 
-        // iOS rubber band: full tracking up to 100px, then dampened
-        const resistance = Math.abs(deltaY) > 100 ? 0.3 : 0.8;
         card.style.transition = 'none';
         card.style.transform = `translateX(0) translateY(${deltaY * resistance}px)`;
     }
@@ -4004,18 +4132,53 @@ function handleDragEnd(e, card, story) {
     state.isDragging = false;
     card.classList.remove('dragging', 'swiping-left', 'swiping-right', 'swiping-up', 'swiping-down', 'touch-active');
 
+    // v39.2: Clean up will-change
+    card.style.willChange = '';
+    const nextC = document.querySelector('.story-card[data-card-type="next"]');
+    const prevC = document.querySelector('.story-card[data-card-type="prev"]');
+    if (nextC) nextC.style.willChange = '';
+    if (prevC) prevC.style.willChange = '';
+
+    // v39.2: If we were JS-scrolling, just reset state (no navigation)
+    if (state.isJSScrolling) {
+        state.currentX = 0;
+        state.currentY = 0;
+        state.gestureDecided = false;
+        state.lockedAxis = null;
+        state.crossedCommitThreshold = false;
+        state.scrollTarget = null;
+        state.isJSScrolling = false;
+        return;
+    }
+
     const deltaX = state.currentX;
     const deltaY = state.currentY;
     const swipeDuration = Date.now() - state.swipeStartTime;
 
-    // NEW: Detect TAP (minimal movement, quick touch) - Instagram style
-    const isTap = Math.abs(deltaX) < 15 && Math.abs(deltaY) < 15 && swipeDuration < 300;
+    // TAP detection (unchanged)
+    const isTap = Math.abs(deltaX) < GESTURE_CONFIG.tapMaxDistance
+              && Math.abs(deltaY) < GESTURE_CONFIG.tapMaxDistance
+              && swipeDuration < GESTURE_CONFIG.tapMaxDuration;
 
     if (isTap) {
         handleTapZone(e, card, story);
         snapCardBack(card);
         state.currentX = 0;
         state.currentY = 0;
+        state.gestureDecided = false;
+        state.lockedAxis = null;
+        state.crossedCommitThreshold = false;
+        return;
+    }
+
+    // v39.2: If gesture never exceeded touch slop, snap back
+    if (!state.gestureDecided) {
+        snapCardBack(card);
+        state.currentX = 0;
+        state.currentY = 0;
+        state.gestureDecided = false;
+        state.lockedAxis = null;
+        state.crossedCommitThreshold = false;
         return;
     }
 
@@ -4023,52 +4186,57 @@ function handleDragEnd(e, card, story) {
     const velocityX = Math.abs(deltaX) / swipeDuration;
     const velocityY = Math.abs(deltaY) / swipeDuration;
 
-    // Determine dominant axis
-    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
-    const isVertical = Math.abs(deltaY) > Math.abs(deltaX);
+    // v39.2: Use locked axis (not per-frame re-evaluation)
+    const isHorizontal = state.lockedAxis === 'horizontal';
+    const isVertical = state.lockedAxis === 'vertical';
 
-    // Check if swipe meets threshold (distance OR velocity)
-    const meetsHorizontalThreshold = Math.abs(deltaX) > state.dragThreshold || velocityX > state.swipeVelocityThreshold;
-    const meetsVerticalThreshold = Math.abs(deltaY) > state.dragThreshold || velocityY > state.swipeVelocityThreshold;
+    // v39.2: DUAL THRESHOLD — distance alone OR (velocity + minimum distance)
+    const meetsHorizontalThreshold =
+        Math.abs(deltaX) > GESTURE_CONFIG.horizontalCommitDistance ||
+        (velocityX > GESTURE_CONFIG.horizontalVelocityThreshold
+         && Math.abs(deltaX) > GESTURE_CONFIG.horizontalMinDistForVelocity);
+
+    const meetsVerticalThreshold =
+        Math.abs(deltaY) > GESTURE_CONFIG.verticalCommitDistance ||
+        (velocityY > GESTURE_CONFIG.verticalVelocityThreshold
+         && Math.abs(deltaY) > GESTURE_CONFIG.verticalMinDistForVelocity);
 
     if (isHorizontal && meetsHorizontalThreshold) {
-        // HORIZONTAL SWIPE: left/right navigation
         triggerHaptic('light');
 
         if (deltaX < 0) {
-            // LEFT SWIPE = Next story (swipe toward next)
             handleSwipeRight(card, story);
         } else {
-            // RIGHT SWIPE = Previous story (swipe toward prev)
             handleSwipeLeft(card, story);
         }
     } else if (isVertical && meetsVerticalThreshold) {
-        // Sub-card layers have their own swipe handlers via initSubCardSwipe.
-        // Parent card should only handle vertical swipes on L1 (headline) and L2 (summary).
+        // Parent card only handles vertical on L1/L2
         if (state.cardLayer !== 'headline' && state.cardLayer !== 'summary') {
             snapCardBack(card);
             state.currentX = 0;
             state.currentY = 0;
+            state.gestureDecided = false;
+            state.lockedAxis = null;
+            state.crossedCommitThreshold = false;
             return;
         }
 
-        // VERTICAL SWIPE: layer navigation (L1 ↔ L2 only)
         triggerHaptic('light');
 
         if (deltaY < 0) {
-            // SWIPE UP = Reveal next layer
             handleSwipeUp(card, story);
         } else {
-            // SWIPE DOWN = Return to previous layer
             handleSwipeDown(card, story);
         }
     } else {
-        // Small drag or tap: snap back
         snapCardBack(card);
     }
 
     state.currentX = 0;
     state.currentY = 0;
+    state.gestureDecided = false;
+    state.lockedAxis = null;
+    state.crossedCommitThreshold = false;
 }
 
 /**
@@ -4727,8 +4895,8 @@ function setupModalSwipe() {
  * Unified sub-card swipe physics — iOS Control Center feel for all card layers.
  * Handles both swipe-up (advance) and swipe-down (dismiss) with:
  *   - Scroll-aware gesture detection (native scroll vs card swipe)
- *   - Rubber-band resistance (0.8× within 100px, 0.3× past)
- *   - Velocity-based commit (matches L1-L2 thresholds)
+ *   - Smooth progressive rubber-band resistance (0.8× → 0.3× hyperbolic curve)
+ *   - Dual threshold commit: distance OR (velocity + min distance)
  *   - Spring snap-back on abort
  *   - Button/interactive element exclusion
  *
@@ -4782,8 +4950,8 @@ function initSubCardSwipe(card, opts) {
         currentY = newY;
         const deltaY = currentY - startY;
 
-        // Decide gesture once after 8px movement
-        if (!gestureDecided && Math.abs(deltaY) > 8) {
+        // Decide gesture once after touch slop
+        if (!gestureDecided && Math.abs(deltaY) > GESTURE_CONFIG.touchSlop) {
             gestureDecided = true;
 
             scrollBodyRef = scrollSelector ? e.target.closest(scrollSelector) : null;
@@ -4822,13 +4990,18 @@ function initSubCardSwipe(card, opts) {
 
         if (swipeDirection === 'down' && deltaY > 0) {
             e.preventDefault();
-            const resistance = deltaY > 100 ? 0.3 : 0.8;
+            const absDelta = Math.abs(deltaY);
+            const resistance = GESTURE_CONFIG.resistanceHeavyFactor +
+                (GESTURE_CONFIG.resistanceLightFactor - GESTURE_CONFIG.resistanceHeavyFactor) /
+                (1 + absDelta / GESTURE_CONFIG.resistanceLightZone);
             card.style.transition = 'none';
             card.style.transform = `translateY(${deltaY * resistance}px)`;
         } else if (swipeDirection === 'up' && deltaY < 0) {
             e.preventDefault();
             const absDelta = Math.abs(deltaY);
-            const resistance = absDelta > 100 ? 0.3 : 0.8;
+            const resistance = GESTURE_CONFIG.resistanceHeavyFactor +
+                (GESTURE_CONFIG.resistanceLightFactor - GESTURE_CONFIG.resistanceHeavyFactor) /
+                (1 + absDelta / GESTURE_CONFIG.resistanceLightZone);
             card.style.transition = 'none';
             card.style.transform = `translateY(${deltaY * resistance}px)`;
         }
@@ -4840,8 +5013,10 @@ function initSubCardSwipe(card, opts) {
         const elapsed = Date.now() - startTime;
         const velocity = Math.abs(deltaY) / elapsed; // px/ms
 
-        // Commit threshold: 100px distance OR 0.3 px/ms velocity (50px min)
-        const committed = Math.abs(deltaY) > 100 || (velocity > 0.3 && Math.abs(deltaY) > 50);
+        // Dual threshold: distance alone OR (velocity + minimum distance)
+        const committed = Math.abs(deltaY) > GESTURE_CONFIG.subCardCommitDistance ||
+            (velocity > GESTURE_CONFIG.subCardVelocityThreshold
+             && Math.abs(deltaY) > GESTURE_CONFIG.subCardMinDistForVelocity);
 
         if (swipeDirection === 'down' && committed && onSwipeDown) {
             triggerHaptic('light');
@@ -4851,9 +5026,9 @@ function initSubCardSwipe(card, opts) {
             onSwipeUp();
         } else if (swipeDirection && !isScrolling) {
             // Snap back with spring animation
-            card.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            card.style.transition = `transform ${GESTURE_CONFIG.snapBackDuration}ms ${GESTURE_CONFIG.snapBackEasing}`;
             card.style.transform = 'translateY(0)';
-            setTimeout(() => { card.style.transition = ''; }, 400);
+            setTimeout(() => { card.style.transition = ''; }, GESTURE_CONFIG.snapBackDuration);
         }
 
         startY = 0;
@@ -4869,9 +5044,9 @@ function initSubCardSwipe(card, opts) {
     const handleCancel = () => {
         // Touch interrupted — snap back to prevent stuck cards
         if (startY !== 0 && swipeDirection && !isScrolling) {
-            card.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            card.style.transition = `transform ${GESTURE_CONFIG.snapBackDuration}ms ${GESTURE_CONFIG.snapBackEasing}`;
             card.style.transform = 'translateY(0)';
-            setTimeout(() => { card.style.transition = ''; }, 400);
+            setTimeout(() => { card.style.transition = ''; }, GESTURE_CONFIG.snapBackDuration);
         }
         startY = 0;
         currentY = 0;
@@ -6139,6 +6314,29 @@ function showSwipeHint() {
 
 function hideSwipeHint() {
     elements.swipeHint.classList.remove('visible');
+}
+
+/**
+ * Nudge the "Read ahead ↑" nav hint upward once to teach the swipe-up affordance.
+ * Only fires on the first story, only ever once (localStorage-gated).
+ */
+function showNavNudge() {
+    if (localStorage.getItem('fyi_has_shown_nav_nudge')) return;
+    if (state.stories.length === 0) return;
+
+    setTimeout(() => {
+        const card = document.querySelector('.story-card[data-card-type="current"]');
+        if (!card) return;
+        const hint = card.querySelector('.nav-hint-read-ahead');
+        if (!hint) return;
+
+        hint.classList.add('nav-hint-nudge');
+        hint.addEventListener('animationend', () => {
+            hint.classList.remove('nav-hint-nudge');
+        }, { once: true });
+
+        localStorage.setItem('fyi_has_shown_nav_nudge', 'true');
+    }, 2500); // 2.5s delay — let user settle before the nudge appears
 }
 
 // ==========================================
