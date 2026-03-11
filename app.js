@@ -858,6 +858,8 @@ const state = {
     scrollTarget: null,          // Cached scrollable element for JS-driven scroll
     isJSScrolling: false,        // Currently doing JS-driven scroll (not card swipe)
     prevMoveY: 0,                // Per-frame Y for JS-driven scroll delta
+    loadingStartTime: 0,         // When loading state was shown (for minimum display)
+    loadingHideTimer: null,      // Pending setTimeout handle for delayed hide
     hasShownHint: false,
     rating: 0,
     history: [],
@@ -2988,17 +2990,38 @@ function toggleBookmark(button) {
 // Loading State
 // ==========================================
 
-function showLoading(show, customText = null) {
-    state.isLoading = show;
-    elements.loadingState.classList.toggle('visible', show);
+const LOADING_MIN_MS = 3000; // one full animation loop
 
-    // Update loading text if provided, otherwise reset to default
-    if (elements.loadingText) {
-        if (show && customText) {
-            elements.loadingText.textContent = customText;
-        } else if (!show) {
-            // Reset to default when hiding
-            elements.loadingText.textContent = "Loading today's stories...";
+function showLoading(show, customText = null) {
+    if (show) {
+        // Cancel any pending delayed hide from a previous call
+        if (state.loadingHideTimer) {
+            clearTimeout(state.loadingHideTimer);
+            state.loadingHideTimer = null;
+        }
+        state.loadingStartTime = Date.now();
+        state.isLoading = true;
+        elements.loadingState.classList.add('visible');
+        if (elements.loadingText) {
+            elements.loadingText.textContent = customText || "Loading today's stories...";
+        }
+    } else {
+        const elapsed  = Date.now() - (state.loadingStartTime || Date.now());
+        const remaining = LOADING_MIN_MS - elapsed;
+        state.isLoading = false;
+
+        const doHide = () => {
+            state.loadingHideTimer = null;
+            elements.loadingState.classList.remove('visible');
+            if (elements.loadingText) {
+                elements.loadingText.textContent = "Loading today's stories...";
+            }
+        };
+
+        if (remaining > 0) {
+            state.loadingHideTimer = setTimeout(doHide, remaining);
+        } else {
+            doHide();
         }
     }
 }
@@ -4716,14 +4739,14 @@ function updateCompletionButtons() {
     const archiveBtn = elements.recapWeekBtn;
 
     if (state.faqMode) {
-        // FAQ completion buttons: "Review FAQs", "Go to stories", "Go to archives"
+        // FAQ completion: 2 buttons only — "Today's stories" (orange, primary) + "Go to archives"
         if (reviewBtn) {
-            reviewBtn.querySelector('span').textContent = 'Review FAQs';
+            reviewBtn.style.display = 'none';
         }
         if (questionsBtn) {
-            questionsBtn.querySelector('span').textContent = 'Go to stories';
-            // Change functionality for FAQ mode
+            questionsBtn.querySelector('span').textContent = "Today's stories";
             questionsBtn.dataset.faqAction = 'go-to-stories';
+            questionsBtn.classList.add('btn-accent');
         }
         if (archiveBtn) {
             archiveBtn.querySelector('span').textContent = 'Go to archives';
@@ -4731,11 +4754,13 @@ function updateCompletionButtons() {
     } else if (state.archiveMode) {
         // Archives completion buttons: "Review stories", "Your Bookmarks", "Back to today"
         if (reviewBtn) {
+            reviewBtn.style.display = '';
             reviewBtn.querySelector('span').textContent = 'Review stories';
         }
         if (questionsBtn) {
             questionsBtn.querySelector('span').textContent = 'Your Bookmarks';
             questionsBtn.dataset.faqAction = '';
+            questionsBtn.classList.remove('btn-accent');
         }
         if (archiveBtn) {
             archiveBtn.querySelector('span').textContent = 'Back to today';
@@ -4743,11 +4768,13 @@ function updateCompletionButtons() {
     } else {
         // Stories completion buttons: "Review stories", "Your Bookmarks", "Go to archives"
         if (reviewBtn) {
+            reviewBtn.style.display = '';
             reviewBtn.querySelector('span').textContent = 'Review stories';
         }
         if (questionsBtn) {
             questionsBtn.querySelector('span').textContent = 'Your Bookmarks';
             questionsBtn.dataset.faqAction = '';
+            questionsBtn.classList.remove('btn-accent');
         }
         if (archiveBtn) {
             archiveBtn.querySelector('span').textContent = 'Go to archives';
